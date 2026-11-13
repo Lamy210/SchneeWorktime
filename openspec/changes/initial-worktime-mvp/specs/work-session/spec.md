@@ -85,3 +85,36 @@ The system SHALL flag active work intervals intersecting a detected sleep, clock
 #### Scenario: Correct sleep as break
 - **WHEN** 要確認の16:30〜17:30を休憩へ訂正する
 - **THEN** 実働から60分除外し、見込みと未来通知を再計算する
+
+### Requirement: Workday identity across midnight
+The system SHALL bind continuation and resumption to a stable workday UUID rather than local calendar-day equality. It SHALL allow explicitly resuming the same ended workday after midnight if no later workday exists and the resulting intervals do not overlap another workday.
+
+#### Scenario: Resume after midnight
+- **WHEN** 21:00に開始して翌日00:30に退勤した勤務記録を、翌日01:00に明示的に再開する
+- **THEN** 開始日の勤務記録IDを再利用し、00:30〜01:00を実働へ加算しない
+
+#### Scenario: Later workday already exists
+- **WHEN** 後続の勤務日が記録済みである古い勤務日を再開しようとする
+- **THEN** 新しい実働区間の追加を拒否し、既存履歴の訂正導線を提示する
+
+### Requirement: Recover uncertain app downtime
+The system SHALL NOT equate application termination with clock-out. It SHALL flag an active session's unobserved period after unexpected app termination, system shutdown or restart as an uncertain span for explicit confirmation or correction.
+
+#### Scenario: Quit without clock-out
+- **WHEN** 16:00にworking状態でアプリを終了し17:00に再起動する
+- **THEN** 勤務日の状態を維持し、未観測区間を要確認として提示し、退勤を捏造しない
+
+#### Scenario: Restart while break was active
+- **WHEN** onBreak状態でアプリが終了して30分後に再起動する
+- **THEN** 開いた休憩が継続中として復元され、ユーザーが休憩終了時刻を訂正できる
+
+#### Scenario: Screen lock but app remains active
+- **WHEN** Macの画面のみをロックしアプリが継続稼働する
+- **THEN** ロックだけを理由に休憩や退勤を自動生成しない
+
+### Requirement: Prevent actual events in the future
+The system SHALL accept actual clock-in, break and clock-out instants only at or before a trusted current Instant; future times are planning data, not attendance events.
+
+#### Scenario: Future correction entered as actual
+- **WHEN** 現在15:00なのに実績の退勤を18:00へ訂正しようとする
+- **THEN** 実績としての保存を拒否し、将来の退勤予定として別操作を案内する

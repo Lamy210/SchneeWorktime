@@ -1,46 +1,44 @@
-# Tasks: SchneeWorktime initial MVP
+# Tasks: SchneeWorktime 初期MVP — 仕様に紐づく段階別実装計画
 
-## PR 1 — specification and foundation
-- [ ] OpenSpec changeをレビューし、会社規則が不明な項目は未確定のまま明示する
-- [ ] `openspec validate initial-worktime-mvp --strict` を実行して警告ゼロを確認する（CLIバージョン差はヘルプ確認）
-- [ ] 新規Swift 6 macOS app target, local SwiftPM domain/application targetsを作成する
-- [ ] `Lamy210/template` の品質CIを実際のScheme/Packageに結線する。空のtemplate fixtureだけのgreenを「アプリ検証済」と扱わない
+チェック済みは仕様資料の作成のみ。OpenSpec CLI、Swift/Xcodeビルド、実機QAは実施していない。
 
-## PR 2 — pure domain
-- [ ] 区間モデル、状態遷移、logical workday、UTC instant, timezone policyを実装
-- [ ] 420分の計算、実績/予測分離、2種類の目標時刻、未確定を実装
-- [ ] 基準18:00と日次超過を独立計算。法定残業用の型・文言を導入しない
-- [ ] FakeClockで代表値、秒境界、日跨ぎ、DST/時刻逆行を検証
+## 1. 仕様レビュー・フォーマット検証
+- [x] 1.1 OpenSpec change、7capabilities、受入マトリクス、レビュー論点を作成する
+- [x] 1.2 休憩予定と実績、アプリ終了中の未確認時間、実働上下限、記録訂正の保存単位を明文化する
+- [ ] 1.3 `openspec validate initial-worktime-mvp --strict` を実行し、CLIの実結果を確認する
+- [ ] 1.4 清算期間・基準定時18:00・休憩時間帯など、利用者固有の未確定制度を確認する
+- [ ] 1.5 計算と通知の境界事例をレビューし、PR #4をReadyへ移すか判断する
 
-## PR 3 — application/persistence
-- [ ] 明示打刻とCorrection revision、履歴全体の検証と監査ログ
-- [ ] Atomic保存・版管理・失敗回復・破損退避・復元を実装
-- [ ] 退勤後の凍結、再開、長時間未終了とスリープ時の要確認
-- [ ] エクスポートと確認付き全削除を実装
+## 2. app target・品質基盤（仕様PRとは別変更）
+- [ ] 2.1 Swift 6/macOS 15+のXcode app targetとlocal SwiftPM domain/applicationを構築する
+- [ ] 2.2 template由来CIを実際のscheme/targetへ接続する（空fixtureの成功は検証扱いしない）
+- [ ] 2.3 template固有のRelease Isolation fixtureリポジトリ名依存を別PRで安全に修正する
 
-## PR 4 — macOS UX
-- [ ] メニューバー操作、設定、NSPanel、位置/透明度/前面表示
-- [ ] 実績/予定/未確定を独立した視覚ラベルにする
-- [ ] VoiceOver、キーボード、Reduced Motion、失われたモニター位置を検証
+## 3. 勤務計算エンジン
+- [ ] 3.1 実働/休憩区間と状態遷移、勤務日UUID、UTC instant、履歴revisionを実装する
+- [ ] 3.2 下限/上限/未確認時間・正確な到達時刻と範囲・勤務中断の境界計算を実装する
+- [ ] 3.3 予定休憩と実績休憩、当日forecast override、見込み退勤時刻を実装する
+- [ ] 3.4 基準時刻・日次実働超過と、正式な残業認定の表示を分離する
+- [ ] 3.5 FakeClockで正確な秒境界、日跨ぎ、DST、時刻異常、退勤後の固定を検証する
 
-## PR 5 — OS notifications
-- [ ] Permission、pending requests adapter、決定的logical ID、future-only計画
-- [ ] committed revision後のcancel/add/reconcileと失敗時再試行
-- [ ] 休憩修正・再起動・時刻変更・達成・退勤で取り消し/再作成
-- [ ] OSの実配信時刻とstrict exactly-onceは非保証と文書化
+## 4. 勤務操作・ローカル保存
+- [ ] 4.1 手動出社・休憩・退勤・休憩中退勤確認・明示再開・訂正を実装する
+- [ ] 4.2 監査ログと同一workday envelopeへの原子的保存、復旧、世代backupを実装する
+- [ ] 4.3 ライフサイクル観測による未確認区間と明示確認/訂正導線を実装する
+- [ ] 4.4 旧revision競合、保存失敗、同時操作、全履歴消去・エクスポートを検証する
 
-## PR 6 — QA and release
-- [ ] docs/SchneeWorktime/ACCEPTANCE_MATRIX.mdのP0全件を自動テストとマッピング
-- [ ] 端末のsleep/wake、通知拒否、長時間稼働、位置復元をmacOS実機確認
-- [ ] 用途と費用に合わせて配布（ad-hoc/署名/公証/Homebrew）を別途決定
-- [ ] CIで真正のアプリビルド・テストを合格させる
+## 5. Native macOS UI
+- [ ] 5.1 MenuBarExtra、NSPanel、設定、アプリを隠す/表示するUIを実装する
+- [ ] 5.2 見込み退勤時刻・最短達成・実働上下限・要確認を状態ごとに表示する
+- [ ] 5.3 VoiceOver/キーボード/Reduce Motion、画面切断後の配置復元を検証する
 
-## PR #4 review hardening checklist (specification work only)
-- [ ] 区間の要確認品質（スリープ・時刻異常）、明示確認と履歴訂正をFakeClockでテスト
-- [ ] 休憩中の退勤確認、取消、区間重複ゼロの状態遷移を検証
-- [ ] 6時間30分退勤による不足固定、再開による残り再計算を検証
-- [ ] 通知本文は「見込み」と「実績達成」を区別し、未確認区間では確定を禁止
-- [ ] 通知IDだけでなく発火時刻・payload revisionが変わったら再登録する
-- [ ] 予約失敗や状態保存直後クラッシュで、再起動時に未来通知へ再収束する
-- [ ] notification stale delivery raceを実機QAしOS非保証を説明する
-- [ ] 既存template release identity fixtureによるCI失敗は安全策を緩めず別PRで修正
+## 6. ローカル通知
+- [ ] 6.1 通知権限・予約・取消・取得を抽象化し、誤った『達成確定』通知を防止する
+- [ ] 6.2 確定した保存revisionからpending予約へ再収束させ、時刻範囲では精密通知を抑制する
+- [ ] 6.3 権限拒否、OS起床、アプリ終了、予約時刻変更、重複抑止の各テストを行う
+
+## 7. リリース判定
+- [ ] 7.1 `docs/SchneeWorktime/ACCEPTANCE_MATRIX.md` のP0全件にテストIDを割り当てる
+- [ ] 7.2 失敗を隠さずCIをグリーンにし、OS実機テストを実施する
+- [ ] 7.3 macOS実機で起動時間・常駐CPU/RAM・省電力動作を計測する
+- [ ] 7.4 配布・署名・公証の方式を決定した後、配布工程を検証する

@@ -61,3 +61,36 @@ The system SHALL export work history only to a user-confirmed local destination 
 #### Scenario: Export cancelled
 - **WHEN** エクスポートの保存先選択をキャンセルする
 - **THEN** 出力を作成せず勤務履歴を変更しない
+
+### Requirement: Save each workday and its audit atomically
+The system SHALL commit the canonical workday intervals, correction audit and revision as one validated atomic unit per workday. It SHALL not expose a new workday revision when its corresponding audit record has not been durably committed.
+
+#### Scenario: Crash between revision and audit write
+- **WHEN** 訂正中にアプリが異常終了する
+- **THEN** 次回起動で勤務日と訂正履歴が同一の正常revisionとして復旧し、不整合な部分書き込みを採用しない
+
+#### Scenario: Concurrent conflicting correction
+- **WHEN** 同一勤務日の旧revisionを持つ2画面が異なる訂正を保存しようとする
+- **THEN** 先に成功したrevisionを保持し、後からの競合更新を明示的に拒否する
+
+### Requirement: App liveness markers are not attendance
+The system SHALL use app lifecycle observation markers only to identify unobserved time after restart. These markers SHALL NOT be counted as work or break records and SHALL NOT modify the workday revision without a user action.
+
+#### Scenario: Process restarted without clean shutdown
+- **WHEN** working状態のままアプリが強制終了し、その後起動する
+- **THEN** 最後の観測時刻から再起動までを要確認として提示し、liveness markerを実働に加算しない
+
+#### Scenario: Liveness metadata unavailable
+- **WHEN** 最終観測メタデータが欠落した状態で未終了勤務を復元する
+- **THEN** 勤務開始から再起動時点までの不確実性を明示し、静かに勤務確定を行わない
+
+### Requirement: Complete app-owned history deletion
+The system SHALL include canonical workday records, correction audit, app-owned backups and app-owned diagnostic attendance data in an explicit destructive local erase, while warning that user-exported files and system backups remain outside app control.
+
+#### Scenario: Confirm local erase
+- **WHEN** 利用者がローカル履歴の全削除を明示確認する
+- **THEN** アプリ管理下の本体記録・訂正ログ・バックアップを削除対象とし、完了/失敗の結果を表示する
+
+#### Scenario: User exports remain
+- **WHEN** アプリの全履歴を削除するが、利用者が過去に別フォルダーへエクスポートしたファイルがある
+- **THEN** アプリは外部ファイルを削除せず、削除対象外であることを事前に案内する

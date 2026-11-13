@@ -6,6 +6,8 @@
 - [受入テスト](ACCEPTANCE_MATRIX.md)
 - [未確定事項](OPEN_QUESTIONS.md)
 - [PR #4レビュー記録](REVIEW_FINDINGS.md)
+- [勤務日の状態・データ契約](WORKDAY_CONTRACT.md)
+- [検証戦略](TEST_STRATEGY.md)
 - [技術設計](../../openspec/changes/initial-worktime-mvp/design.md)
 - [開発タスク](../../openspec/changes/initial-worktime-mvp/tasks.md)
 

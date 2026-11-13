@@ -68,7 +68,7 @@ The system SHALL compare a user-entered future departure Instant against project
 - **THEN** 見込み実働450分、日次目標超過見込み30分を予定として表示する
 
 ### Requirement: Provisional versus confirmed achievement
-The system SHALL keep arithmetic elapsed work separate from confirmed recorded achievement if a contributing interval remains unverified. It SHALL NOT present an unverified threshold crossing as confirmed attainment.
+The system SHALL distinguish provisional from confirmed recorded achievement when unresolved intervals can affect goal attainment. It SHALL report attainment as certain if the verified lower bound alone meets the target, but SHALL NOT claim an exact crossing time if unresolved spans could move that time.
 
 #### Scenario: Threshold includes unverified sleep
 - **WHEN** 60分の未確認スリープを含む勤務記録が7時間相当の経過に到達する
@@ -88,3 +88,40 @@ The system SHALL display a completed workday as achieved or shortfall from the f
 #### Scenario: Explicit resume
 - **WHEN** 実働6時間30分で退勤した勤務日を利用者が明示的に再開する
 - **THEN** 残り30分として新たな最短目標時刻を計算する
+
+### Requirement: Bounded worked time under unresolved anomalies
+The system SHALL compute a nonnegative lower bound from verified recorded work spans and an upper bound by additionally including unresolved spans that may represent work. A goal is definitely not reached when upper bound is below target, possibly reached when lower bound is below target but upper bound meets target, and definitely reached in the user-recorded interval sense when lower bound meets target. An exact achievement Instant SHALL be shown only if invariant under all valid resolutions of uncertain spans.
+
+#### Scenario: Possible achievement after unreviewed sleep
+- **WHEN** 11:30に開始し16:30〜17:30が未確認、現在18:30まで勤務記録が続く
+- **THEN** 確認済み6時間・上限7時間とし、目標は到達可能性あり・要確認、確定時刻は表示しない
+
+#### Scenario: Goal certainly reached despite unreviewed sleep
+- **WHEN** 同じ勤務記録が19:30まで継続し、16:30〜17:30だけが未確認
+- **THEN** 確認済み7時間・上限8時間となり、7時間到達済みだが正確な到達時刻は18:30〜19:30の範囲として表示する
+
+#### Scenario: Correct uncertain hour to break
+- **WHEN** 上記の未確認16:30〜17:30を休憩へ訂正する
+- **THEN** 実働の下限と上限は一致し、最初の7時間到達時刻は19:30となる
+
+#### Scenario: Confirm uncertain hour as working
+- **WHEN** 上記の未確認16:30〜17:30を勤務継続として確認する
+- **THEN** 実働の下限と上限は一致し、最初の7時間到達時刻は18:30となる
+
+#### Scenario: Anomaly occurs after goal was achieved
+- **WHEN** 11:30開始、18:30に7時間到達後、19:00〜20:00に未確認区間が発生する
+- **THEN** 18:30の到達時刻は維持し、未確認区間はその後の超過実働にのみ影響する
+
+### Requirement: Forecast unavailable when bounds diverge
+The system SHALL not present a single exact future target Instant when unresolved spans make multiple target times possible. It SHALL display remaining-work bounds and a review prompt until uncertainty is resolved.
+
+#### Scenario: Uncertain time changes remaining
+- **WHEN** 記録上の実働が6時間で、そのうち30分が未確認である
+- **THEN** 実働の下限5時間30分・上限6時間、残り実働は60〜90分の範囲と表示し、単一の確定退勤見込みを表示しない
+
+### Requirement: Forecast override is independent
+The system SHALL include only explicitly forecast future break seconds when producing an estimated departure and SHALL NOT write forecast overrides into historical work or break intervals.
+
+#### Scenario: Thirty-minute remaining break
+- **WHEN** 11:30開始、未取得休憩60分で今後の休憩見込みだけを30分に変更する
+- **THEN** 最短達成は18:30、休憩込み見込みは19:00、休憩実績は0分となる

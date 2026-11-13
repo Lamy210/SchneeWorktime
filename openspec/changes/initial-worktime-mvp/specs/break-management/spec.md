@@ -55,3 +55,25 @@ The system SHALL expose remaining expected rest as a forecast assumption only wh
 #### Scenario: Recorded rest exceeds assumption
 - **WHEN** 標準休憩60分に対して休憩実績が90分となる
 - **THEN** 残り予定休憩を0分とし、マイナス30分の予定休憩を作らない
+
+### Requirement: Separate remaining-rest plan from actual break
+The system SHALL permit an optional nonnegative forecast-only override for future planned rest on the active workday without modifying recorded breaks or requiring a false completed-break entry. Clearing the override SHALL restore the profile-derived forecast.
+
+#### Scenario: Plan shorter future break
+- **WHEN** 11:30出社・休憩未取得で今後の休憩予定を60分から30分へ変更する
+- **THEN** 最短実働達成18:30を維持し、休憩込み退勤見込みを19:00へ変更する
+
+#### Scenario: Clear rest override
+- **WHEN** 上記の30分予定をクリアする
+- **THEN** 退勤見込みを既定の19:30に戻し、休憩実績は0分のままとする
+
+#### Scenario: Break actually taken after shorter plan
+- **WHEN** 30分の休憩予定を立てた後、実際の休憩を40分記録する
+- **THEN** 実働計算には40分の実績を使用し、予定30分を実績に上書きしない
+
+### Requirement: Recorded break classification
+The system SHALL count explicitly recorded unpaid rest as zero work, and SHALL NOT invent paid-rest or other employer-specific compensation semantics in the MVP.
+
+#### Scenario: Unpaid break interval
+- **WHEN** 13:00〜13:45を休憩として記録する
+- **THEN** 実働に45分加算せず、標準休憩60分との差は将来予測にのみ使用する

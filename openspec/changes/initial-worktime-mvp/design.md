@@ -1,4 +1,4 @@
-# Design: SchneeWorktime MVP v0.3 — PR #4 review reinforcement
+# Design: SchneeWorktime MVP v0.4 — Correctness & recovery
 
 ## Goals / constraints
 - macOS 15+ / Swift 6。SwiftUI + AppKit(NSPanel)。`Lamy210/template` は CI/リリース雛形で、アプリ本体はまだない。
@@ -31,7 +31,7 @@ View/Panel never writes directly to local repository; notification gateway never
 
 ## Domain and state
 - Workday(id UUID, logicalLocalDate, timezoneIDAtStart, profileSnapshot, workIntervals, breakIntervals, state, plannedDeparture, revision, correctionAudit).
-- State transitions: notStarted->working; working->onBreak/ended; onBreak->working/ended (clock-out during break requires confirmation and closes the break without creating work); ended->working by explicit same-day resume.
+- State transitions: notStarted->working; working->onBreak/ended; onBreak->working/ended (break-end clock-out requires confirmation and closes the break without creating work); ended->working by explicit resume of the same workday UUID, including after midnight when no later workday exists and no intervals overlap.
 - Work/break intervals are half-open [start,end); at most one open interval; completed intervals have start<end; no overlaps. A workday never automatically splits at midnight.
 - UTC-comparable `Instant` for math; local wall time only for display and user inputs. DST nonexistent local times are rejected, duplicated local times explicitly disambiguated.
 - At most one unfinished logical workday; use revision-based optimistic updates; invalid edits do not persist or schedule notifications.
@@ -41,8 +41,8 @@ View/Panel never writes directly to local repository; notification gateway never
 - `worked(now)=Σ closed work seconds + max(0,now-openWorkStart)` when working; current break/ended contributes no further duration.
 - `remaining=max(0,target-worked)`; `surplus=max(0,worked-target)`.
 - `recordedBreak=Σ completed actual break intervals`; expected remaining break `max(0,expectedBreak-recordedBreak)` **is an assumption and never actual attendance**.
-- When working and target not met: `earliestGoalAt=now+remaining`; `estimatedDepartureAt=earliestGoalAt+assumedBreakRemaining`. No definitive forecast while an open break has unknown end.
-- At target crossing, compute earliest historical `actualAchievedAt` by walking validated work intervals; if any contributing span is unverified, show a provisional crossing rather than confirmed achievement.
+- When working, target is not met and all historical spans are resolved: `earliestGoalAt=now+remaining`; `estimatedDepartureAt=earliestGoalAt+forecastFutureBreakSeconds`, using the explicit active-day rest override if present, otherwise `max(0,expectedBreak-recordedBreak)`. An open break without a known end or unresolved historical time prevents a single exact forecast.
+- For workdays with uncertain time, calculate `knownWorkLowerBound` and `recordedWorkUpperBound`; if the lower bound already reaches target, attainment is certain even though the exact crossing time may remain unknown. Only show a single `actualAchievedAt` if invariant under all valid interpretations. Label all results as based on the user's recorded work.
 - Reference end uses logical workday's local date + captured zone. If reference precedes clock-in, mark not applicable; after clock-out fix delta at actual end. Never equate with legal overtime.
 - Display duration arithmetic uses seconds; remaining rounds up to minutes, positive earned surplus rounds down; never negative or false completion.
 - If actual time moves behind the start of an open interval, surface clock anomaly and suppress unreliable forecast, without silently rewriting persisted Instants.
@@ -56,7 +56,7 @@ View/Panel never writes directly to local repository; notification gateway never
 - No notifications scheduled for already ended workdays, and no stale pre-alerts sent retrospectively.
 
 ## Storage / failure handling
-- Versioned JSON snapshots and correction log under app-owned Application Support; write temporary file -> sync/atomic rename -> validated read/checkpoint; retain bounded known-good backups.
+- Store each canonical workday's intervals, audit changes and revision in a single validated atomic envelope under app-owned Application Support; write temporary file -> flush as appropriate -> atomic replace -> validation/recovery; retain bounded last-known-good backups. Liveness markers are separate non-attendance metadata and may be lost without making records inconsistent.
 - Canonical state write succeeds before OS notification changes. If persistence fails, keep prior state; if notification fails after persistence, preserve records, show retry.
 - Crash recovery scans last valid snapshot, preserves corrupt data for user-reviewed recovery. Never silently initialize empty data on corruption.
 - Explicit export via user-selected destination; local deletion requires confirmation. Keep employer names, meeting titles, geolocation and screen activity out of data model.
@@ -122,3 +122,54 @@ Apple platform events to consider: NSWorkspace sleep/wake and NSSystemClockDidCh
 - https://developer.apple.com/documentation/usernotifications/unusernotificationcenter
 - https://developer.apple.com/documentation/appkit/nsworkspace/didwakenotification
 - https://developer.apple.com/documentation/foundation/nsnotification/name-swift.struct/nssystemclockdidchange
+
+## v0.4 detailed decisions: interrupted work and uncertainty ranges
+
+### Work-time confidence model
+Each explicit workday has one canonical Workday UUID and a captured start-date/timezone. Per-day target defaults to 25,200 seconds. A recorded work interval may be divided logically into `verified` spans and `uncertain` spans identified by sleep, clock anomaly or app-observation gaps. **Verified here means user-entered or reviewed; it does not mean employer-certified attendance.**
+
+- `lowerWorked = sum(verifiedWorkSpans)`.
+- `upperWorked = lowerWorked + sum(uncertainSpansThatCouldBeWork)`.
+- `remainingRange = [max(0,target-upperWorked), max(0,target-lowerWorked)]`.
+- If `upperWorked < target`: 未達確実.
+- If `lowerWorked < target <= upperWorked`: 達成可能性あり・要確認.
+- If `lowerWorked >= target`: 到達済み確実（記録上）. The exact crossing instant may still be a range; calculate earliest/latest crossings by treating uncertain segments as work/nonwork.
+- If a target crossing precedes every uncertain span, keep the original precise actual achievement time.
+- On explicit confirmation/correction, update the canonical workday revision, preserve before/after and derive the new goal status. Never treat an OS sleep flag as evidence of unpaid leave.
+
+A planned future break override is an optional nonnegative amount of **rest still intended from now**, replacing only the profile-derived future-rest assumption, never changing actual break history. Clearing the override returns to default. While the goal is already achieved, future rest has no effect on the goal time.
+
+### Lifecycle, day boundary and state-machine rules
+- A graceful app exit does NOT imply clock-out. An open session survives app restarts, subject to an explicit review for any unobserved gap.
+- Record a lightweight app-liveness observation independently of canonical attendance revisions while active; missing markers on forced termination means a larger uncertain region rather than invented certainty. Select an event-based or throttled checkpoint frequency after real Mac battery measurements.
+- Screen lock without sleep is not automatically a break; OS activity is not actual proof of work.
+- Resume after midnight requires explicit selection of an existing logical Workday UUID. If a more recent workday exists, resume is disallowed; history correction remains available.
+- Historical **actual** events must not have timestamps later than the reliable current Instant; future clock-out belongs to planned departure only.
+
+### Atomic persistence and privacy
+- The last valid committed per-workday envelope includes intervals + correction audit + schemaVersion + revision. Commit/rollback is indivisible, not an independent update of a snapshot followed by audit append.
+- A saved state commit is authoritative for notification re-scheduling; OS scheduled notifications are derived state, not the attendance database.
+- Updating the same workday from two UI contexts requires serial execution/expected-revision comparison. Failed stale writes cannot silently overwrite.
+- User-requested erase removes app-managed history, audit, backups, and locally managed derived attendance artifacts. File exports and Time Machine/system backups remain outside app control and must be disclosed. Do not claim cryptographic security or tamper-proof legal attendance.
+
+### Notification safety contract
+- Precise forecast notifications may be scheduled only when target time is a single valid future Instant. When the current uncertainty yields a time range, cancel outdated goal/surplus pending requests and surface review in the UI; reference 18:00 notification remains independently valid if enabled.
+- Scheduled notifications **never certify work**. The default UI confirms a recorded goal without issuing a duplicate OS alert after a recent goal forecast; a separate confirmed OS notification is opt-in.
+- Compare notification ID, trigger Instant and content-version against pending OS requests; cancel/recreate stale requests and re-check convergence. Asynchronous cancellation and delivered-notification races remain OS-level limitations.
+- Sleep, restart, clock/timezone changes, break state changes, correction, resume, and profile application all trigger a reconciliation from committed workday state.
+
+### UI state table
+| Workday view | Primary time | Secondary information | Action |
+|---|---|---|---|
+| Not started | 未開始 | 参考18:00 if enabled | 出社時刻を入力 |
+| Working / determined | 休憩込み退勤見込み | 最短達成、残り実働、基準差 | 休憩・退勤 |
+| Working / uncertain | 要確認 + 残り時間の範囲 | 記録上の達成可能性 | 確認・訂正 |
+| On break / unknown end | 時刻未確定 | 残り実働 | 休憩終了・退勤 |
+| Ended / shortfall | 不足の固定時間 | 退勤時刻、記録実働 | 修正・再開 |
+| Ended / achieved | 達成済み | 達成時刻（確定または範囲） | 履歴確認 |
+
+### Revised quality gates
+- All P0 arithmetic/transition/reconciliation cases pass deterministic FakeClock/FakeStore/FakeNotification tests; check numeric boundary values and nonoverlap properties.
+- Forced-write-failure tests show no mixed audit/revision states, even after application restart.
+- macOS wake/sleep, permission denied, no-network, external monitor removal and accessibility are verified manually in addition to pure tests.
+- CPU, memory, battery and UI refresh are measured on a real Mac; thresholds are chosen after baseline measurement rather than asserted without evidence.

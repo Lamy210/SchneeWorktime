@@ -93,3 +93,32 @@ The system SHALL configure a finite set of threshold reminders and SHALL hide em
 #### Scenario: Locked screen
 - **WHEN** 画面ロック中に勤務通知が配信される
 - **THEN** 会社名・出社時刻・休憩履歴を本文に含めない
+
+### Requirement: Do not schedule precise goal reminders when time is ambiguous
+The system SHALL cancel unexpired precise goal and surplus forecasts when unresolved uncertainty makes a single target Instant impossible, while leaving independently valid reference-time reminders unaffected.
+
+#### Scenario: Sleep creates uncertain goal range
+- **WHEN** 目標達成時刻が未確認スリープによって18:30〜19:30の範囲になる
+- **THEN** 単一時刻の未達・超過予報通知を予約せず、勤務記録の確認をUIへ提示する
+
+#### Scenario: User resolves uncertain time
+- **WHEN** 利用者が未確認区間を修正して目標時刻が再び一意になる
+- **THEN** 最新のcommitted revisionから将来の見込み通知を再生成する
+
+### Requirement: Avoid double achievement alerts
+The system SHALL default to one user-visible OS forecast reminder per goal threshold and SHALL show subsequent verified achievement as an in-app state, not a second automatic OS notice, unless explicitly enabled by user preferences.
+
+#### Scenario: Forecast then confirmed while app runs
+- **WHEN** 18:30のOS見込み通知を配信した後アプリが検証済み実働7時間を認識する
+- **THEN** UIは達成済みに更新するが、既定では同一イベントの2通目のOS通知を送らない
+
+### Requirement: Delivery depends on OS permissions and active process
+The system SHALL preserve accurate in-app timing regardless of notification permission and SHALL treat pending OS notifications as best-effort reminders subject to sleep, user Focus settings, app termination and cancellation races.
+
+#### Scenario: Notification disabled during work
+- **WHEN** macOSの通知許可を後から取り消す
+- **THEN** 記録と予測は継続し、設定に通知が無効なことを示す
+
+#### Scenario: Break started while goal reminder pending
+- **WHEN** 勤務中の目標予測通知が予約済みで利用者が休憩を開始する
+- **THEN** 正確な休憩終了時刻が不明なため未来の目標予報通知を削除対象とし、基準終業通知は独立して維持する

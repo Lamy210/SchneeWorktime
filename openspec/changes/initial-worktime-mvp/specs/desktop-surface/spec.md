@@ -51,3 +51,25 @@ The system SHALL clearly label confirmed worked time, forecast departure and unv
 #### Scenario: Early clock-out
 - **WHEN** 実働6時間30分で退勤する
 - **THEN** パネルに「30分不足」と終了時刻を示しタイマーを停止する
+
+### Requirement: Primary glance view exposes prediction assumptions
+The system SHALL make the break-adjusted estimated departure the primary planned time for active workdays with known forecasts, and SHALL separately label earliest goal, actual worked duration and any reference-time delta.
+
+#### Scenario: Late clock-in with no recorded break
+- **WHEN** 11:30出社でまだ休憩実績がなく標準休憩60分である
+- **THEN** 「退勤見込み19:30（休憩予定60分込み）」と「最短7時間18:30」を区別する
+
+#### Scenario: Current forecast overridden
+- **WHEN** 利用者が残りの休憩予定を30分に変更する
+- **THEN** 19:00の退勤見込みに予定条件が表示され、実際の休憩実績は変更されない
+
+### Requirement: Show uncertainty as an interval
+The system SHALL expose work-time lower/upper bounds and goal achievement window when unresolved spans can change elapsed work. It SHALL not display uncertain values using the same confirmed label and typography.
+
+#### Scenario: Goal is certain but completion instant is uncertain
+- **WHEN** 確認済み実働7時間、未確認時間1時間が存在する
+- **THEN** 「7時間以上達成・到達時刻は要確認」を表示する
+
+#### Scenario: Goal might or might not be achieved
+- **WHEN** 実働下限6時間、上限7時間のとき
+- **THEN** 「7時間到達の可能性あり・要確認」と表示し、達成確定を表示しない

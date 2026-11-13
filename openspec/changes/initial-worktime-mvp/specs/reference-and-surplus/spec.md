@@ -48,3 +48,14 @@ The system SHALL compare reference time using the workday's captured date and ti
 #### Scenario: Timezone changes during shift
 - **WHEN** 勤務開始後にOSのタイムゾーンが変わる
 - **THEN** 勤務日開始時点のタイムゾーンに対応した基準Instantを維持する
+
+### Requirement: Reference time is informational
+The system SHALL describe the 18:00 default as a user-configured reference end time, not a legal overtime boundary, and SHALL keep it optional and independent of workday net targets.
+
+#### Scenario: Goal not achieved after reference
+- **WHEN** 基準18:00で18:10現在の実働が5時間40分である
+- **THEN** 「基準時刻から10分」「実働目標まで1時間20分」を両方表示し、残業確定とは表示しない
+
+#### Scenario: Reference disabled
+- **WHEN** 利用者が参考終業時刻を無効化する
+- **THEN** 基準時刻差分と対応通知を非表示にし、日次実働計算は変わらない
