@@ -1,0 +1,34 @@
+name: Governance Audit
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: governance-audit-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  governance-doctor:
+    name: Governance doctor
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Audit core repository governance
+        shell: bash
+        env:
+          TARGET_REPOSITORY: ${{ github.repository }}
+        run: |
+          bash scripts/template/doctor.sh \
+            --repository "${TARGET_REPOSITORY}" \
+            --profile core

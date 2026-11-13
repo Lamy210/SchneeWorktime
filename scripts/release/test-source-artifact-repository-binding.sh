@@ -1,0 +1,141 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+VERIFIER="${REPO_ROOT}/scripts/release/verify-source-artifact-repository.sh"
+TEMP_ROOT="$(mktemp -d)"
+trap 'rm -rf "${TEMP_ROOT}"' EXIT
+
+sha="0123456789abcdef0123456789abcdef01234567"
+source_metadata="${TEMP_ROOT}/source-artifact-metadata.json"
+printf '{"artifactId":7001,"runId":9001,"sourceSHA":"%s"}\n' "${sha}" >"${source_metadata}"
+
+STUB_BIN="${TEMP_ROOT}/bin"
+mkdir -p "${STUB_BIN}"
+cat >"${STUB_BIN}/gh" <<'STUB'
+#!/usr/bin/env bash
+set -euo pipefail
+
+scenario="${GH_STUB_SCENARIO:?GH_STUB_SCENARIO is required}"
+args="$*"
+sha="0123456789abcdef0123456789abcdef01234567"
+artifact_id=7001
+run_id=9001
+repository_id=1367784801
+head_repository_id=1367784801
+case "${scenario}" in
+  wrong-artifact-id) artifact_id=7002 ;;
+  wrong-run-id) run_id=9002 ;;
+  wrong-sha) sha="1123456789abcdef0123456789abcdef01234567" ;;
+  wrong-repository-id) repository_id=9999 ;;
+  wrong-head-repository-id) head_repository_id=9999 ;;
+  boolean-repository-id) repository_id=true ;;
+  boolean-head-repository-id) head_repository_id=true ;;
+esac
+
+if [[ "${args}" == "api repos/Lamy210/template/actions/artifacts/7001" ]]; then
+  if [[ "${scenario}" == "oversized-api-response" ]]; then
+    python3 - "${artifact_id}" "${run_id}" "${sha}" "${repository_id}" "${head_repository_id}" <<'PY'
+import json
+import sys
+
+artifact_id, run_id, sha, repository_id, head_repository_id = sys.argv[1:]
+payload = {
+    "id": int(artifact_id),
+    "workflow_run": {
+        "id": int(run_id),
+        "head_sha": sha,
+        "repository_id": int(repository_id),
+        "head_repository_id": int(head_repository_id),
+    },
+}
+encoded = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+limit = 2 * 1024 * 1024
+if len(encoded) > limit:
+    raise SystemExit("artifact API fixture unexpectedly exceeds JSON byte limit")
+sys.stdout.buffer.write(encoded + b" " * (limit + 1 - len(encoded)))
+PY
+    exit 0
+  fi
+  printf '{"id":%s,"workflow_run":{"id":%s,"head_sha":"%s","repository_id":%s,"head_repository_id":%s}}' \
+    "${artifact_id}" "${run_id}" "${sha}" "${repository_id}" "${head_repository_id}"
+  exit 0
+fi
+
+printf 'unexpected gh invocation: %s\n' "${args}" >&2
+exit 2
+STUB
+chmod +x "${STUB_BIN}/gh"
+
+assert_status() {
+  local scenario="$1"
+  local expected_status="$2"
+  local metadata_path="${3:-${source_metadata}}"
+  set +e
+  PATH="${STUB_BIN}:${PATH}" \
+    GH_STUB_SCENARIO="${scenario}" \
+    GH_TOKEN="test-token" \
+    bash "${VERIFIER}" \
+    --repository Lamy210/template \
+    --repository-id 1367784801 \
+    --source-metadata "${metadata_path}" \
+    >"${TEMP_ROOT}/${scenario}.stdout" \
+    2>"${TEMP_ROOT}/${scenario}.stderr"
+  local status=$?
+  set -e
+  if [[ "${status}" -ne "${expected_status}" ]]; then
+    printf 'scenario %s: expected exit %s, got %s\n' "${scenario}" "${expected_status}" "${status}" >&2
+    cat "${TEMP_ROOT}/${scenario}.stderr" >&2 || true
+    return 1
+  fi
+}
+
+assert_boundary_rejected() {
+  local scenario="$1"
+  local metadata_path="$2"
+  assert_status "${scenario}" 3 "${metadata_path}" &&
+    grep -Fq 'source artifact metadata is malformed' "${TEMP_ROOT}/${scenario}.stderr"
+}
+
+assert_status success 0
+assert_status wrong-artifact-id 4
+assert_status wrong-run-id 4
+assert_status wrong-sha 4
+assert_status wrong-repository-id 4
+assert_status wrong-head-repository-id 4
+assert_status boolean-repository-id 3
+assert_status boolean-head-repository-id 3
+
+oversized_metadata="${TEMP_ROOT}/source-artifact-metadata-oversized.json"
+python3 - "${source_metadata}" "${oversized_metadata}" <<'PY'
+from pathlib import Path
+import sys
+
+source = Path(sys.argv[1]).read_bytes()
+limit = 2 * 1024 * 1024
+if len(source) > limit:
+    raise SystemExit("source metadata fixture unexpectedly exceeds JSON byte limit")
+Path(sys.argv[2]).write_bytes(source + b" " * (limit + 1 - len(source)))
+PY
+
+symlinked_metadata="${TEMP_ROOT}/source-artifact-metadata-symlink.json"
+ln -s "${source_metadata}" "${symlinked_metadata}"
+
+boundary_failures=0
+if ! assert_boundary_rejected oversized-source-metadata "${oversized_metadata}"; then
+  ((boundary_failures += 1))
+fi
+if ! assert_boundary_rejected symlinked-source-metadata "${symlinked_metadata}"; then
+  ((boundary_failures += 1))
+fi
+if ((boundary_failures > 0)); then
+  printf 'source artifact metadata boundary regressions failed: %s\n' "${boundary_failures}" >&2
+  exit 1
+fi
+
+if ! assert_status oversized-api-response 3; then
+  exit 1
+fi
+grep -Fq 'source Artifact API metadata is malformed' "${TEMP_ROOT}/oversized-api-response.stderr"
+
+printf 'source artifact repository binding tests passed\n'
