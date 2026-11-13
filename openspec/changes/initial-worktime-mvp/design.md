@@ -1,4 +1,4 @@
-# Design: SchneeWorktime MVP v0.4 — Correctness & recovery
+# Design: SchneeWorktime MVP v0.5 — Daily usability and correctness
 
 ## Goals / constraints
 - macOS 15+ / Swift 6。SwiftUI + AppKit(NSPanel)。`Lamy210/template` は CI/リリース雛形で、アプリ本体はまだない。
@@ -180,3 +180,52 @@ A future-break override is a forecast-only plan anchored at creation time: `(rem
 - Example: 11:30開始、16:30〜17:30未確認、17:30時点の実働は5h。分類を非勤務ギャップにすると最短19:30・残り予定休憩60m込み退勤20:30。分類を休憩にすると最短19:30・休憩実績60m・退勤19:30。
 - UI must offer the three choices with a preview and explicit save; all corrections use the same revision, atomic envelope, and future notification reconciliation.
 - App shutdown, lock, sleep or wake by itself never determines which of these classifications is correct.
+
+## v0.5 product usability decisions
+
+### The first-screen answer
+- Compact Glass shows **退勤見込み** as the dominant value, then `残り実働`, `実働済み/7時間`, `最短7時間` and the optional `参考18:00との差`.
+- One-tap state-appropriate commands from menu bar and floating surface: clock-in, start/end break, clock-out, simulate departure. Invalid actions must not be executable.
+- When entering the day late, allow explicit backdated actual clock-in with full interval validation; do not force users to clock in at the current time. Future actual times are rejected.
+- Expanded Glass exposes a timeline of verified work/break/nonwork segments, assumption labels, and a what-if editor. Compact/expanded modes must remain keyboard and VoiceOver accessible.
+
+### What-if simulation contract
+- `previewDeparture(candidateInstant, optionalForecastRest)` is a **pure query**, not a command: it must not update the canonical workday, planned departure, notification generation, revision, or audit.
+- Candidate is in the future relative to the currently displayed clock time and not earlier than workday start. A 'leave now' preview is valid with candidate=now.
+- Result is a prediction of actual net work at the candidate Instant given the remaining planned break budget. A preview with previously unresolved work shows lower/upper bounds and assumption labels, not a single exact surplus.
+- A separate **Save as planned departure** confirmation may update `plannedDepartureAt` and only then trigger notification reconciliation (if dependent). Closing/dismissing the preview must change no persistent state.
+- Example (Asia/Tokyo): 11:30 clock-in, 12:00–13:00 break, at 18:10: leave 19:00 -> projected net 390 minutes, 30 minutes short; leave 20:00 -> 450 minutes, 30 minutes above the 420-minute *personal target*. No legal overtime statement.
+
+### Quick control / UI state
+| State | Immediate actions | Disabled actions |
+|---|---|---|
+| notStarted | 今から出社, 始業時刻を入力 | 退勤, 休憩終了 |
+| working | 休憩開始, 退勤, 退勤予定を試算 | 重複出社 |
+| onBreak | 休憩終了, 退勤（確認付き） | 重複休憩開始 |
+| ended | 履歴, 訂正, 明示再開 | 休憩開始 |
+| uncertain | 区間確認, 訂正, 予測を見る | 未確認の実績を確定と断定する動作 |
+
+### Notification lead controls
+- Default is 15 minutes before the earliest calculated goal; offer optional 30- and 5-minute leads as separately enabled choices. Suppress duplicates and skip elapsed lead times without retroactive delivery.
+- Ask for authorization **in context** when the user enables reminders, not automatically on first launch. Continue all other features on denied permissions.
+- Only one precise goal timestamp may drive reminders; uncertain time spans, an open break with unknown end, or invalid clock causes suppression and the UI explains why.
+- OS scheduling may deliver a previously booked forecast despite changed real-world work. Notification content must always say `見込み`, not confirmed attainment.
+
+### Scope boundary
+- `docs/SchneeWorktime/FEATURE_DISCOVERY.md` is a backlog of candidate delight features, not 32 additional mandatory release requirements.
+- `docs/SchneeWorktime/UX_JOURNEYS.md` is the scenario-level usability contract.
+- `docs/SchneeWorktime/RELEASE_SCOPE.md` locks M0/M1/M2 boundaries; weekly totals, calendars, widgets, Shortcuts and idle automation are not silently included in M0.
+
+### Platform constraints
+- macOS `MenuBarExtra` provides persistent access; when an application consists *only* of a menu bar extra, removing that extra may terminate the app. Test alternate Glass/settings recovery and avoid unintentional data loss.
+- WidgetKit supports Mac desktop widgets, but it is not a drop-in continuously refreshing countdown surface. Keep minute-level live display in the app surface; consider widgets separately.
+- App Intents can provide actions for the Mac Shortcuts application. Apple HIG states **App Shortcuts themselves are not supported in macOS**; do not conflate the two products.
+- EventKit calendar reading requires permission. Do not add calendar access to the initial local-first release.
+
+### Sources
+- https://developer.apple.com/documentation/swiftui/menubarextra
+- https://developer.apple.com/documentation/widgetkit/developing-a-widgetkit-strategy
+- https://developer.apple.com/documentation/appintents
+- https://developer.apple.com/design/human-interface-guidelines/app-shortcuts
+- https://developer.apple.com/documentation/UserNotifications/asking-permission-to-use-notifications
+- https://developer.apple.com/documentation/eventkit/accessing-the-event-store

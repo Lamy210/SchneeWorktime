@@ -80,3 +80,18 @@ The system SHALL offer separate explicit review actions for continued work, an a
 #### Scenario: User resolves a sleep interval
 - **WHEN** スリープ由来の要確認区間を訂正画面で開く
 - **THEN** 「勤務継続」「休憩」「非勤務ギャップ」を区別して選択でき、保存前に実働と退勤見込みへの影響を確認できる
+
+### Requirement: Quick actions and compact mode
+The system SHALL expose state-appropriate clock-in, break, clock-out, forecast-preview and expand/collapse actions from the menu bar and Glass surface. It SHALL disable invalid state transitions and SHALL use explicit labels rather than color alone.
+
+#### Scenario: Show appropriate quick actions while working
+- **WHEN** 勤務中にメニューバーを開く
+- **THEN** 「休憩開始」「退勤」「予定を試算」「詳細表示」を選べる
+
+#### Scenario: Hide invalid quick actions during break
+- **WHEN** 休憩中にメニューバーを開く
+- **THEN** 「休憩終了」を提供し「休憩開始」を実行可能にしない
+
+#### Scenario: Compact glass panel
+- **WHEN** 利用者がコンパクト表示を有効にする
+- **THEN** 退勤見込み・残り実働・状態を優先表示し、詳細は別操作で展開できる

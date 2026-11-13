@@ -122,3 +122,22 @@ The system SHALL preserve accurate in-app timing regardless of notification perm
 #### Scenario: Break started while goal reminder pending
 - **WHEN** 勤務中の目標予測通知が予約済みで利用者が休憩を開始する
 - **THEN** 正確な休憩終了時刻が不明なため未来の目標予報通知を削除対象とし、基準終業通知は独立して維持する
+
+### Requirement: Contextual notification authorization and lead times
+The system SHALL request macOS notification authorization only after a user enables notifications or explicitly invokes a notification setup flow; it SHALL display the benefit and permission implications in context. It SHALL support user-selected distinct future lead times from a bounded configured set, with 15 minutes as the default and optional 30/5 minute leads. It SHALL never schedule a reminder retroactively.
+
+#### Scenario: Authorization at onboarding
+- **WHEN** 初回起動で利用者が通知設定をまだ開いていない
+- **THEN** 通知権限を自動要求せず、勤務計算を利用できる
+
+#### Scenario: Select additional lead times
+- **WHEN** 利用者が30分・15分・5分前の通知を有効化し目標時刻が19:30と確定している
+- **THEN** 有効な将来時刻19:00、19:15、19:25について種類別に最大1件ずつ予約を計画する
+
+#### Scenario: Skip an already elapsed lead time
+- **WHEN** 現在19:20で目標時刻19:30、30分・15分・5分前が有効
+- **THEN** 30分前と15分前は遡及送信せず、5分前のみ将来予約候補とする
+
+#### Scenario: Notification permission denied
+- **WHEN** 利用者が通知権限を拒否する
+- **THEN** ローカルの勤務計算・履歴保存・Glass表示を継続し、許可ダイアログを繰り返さない

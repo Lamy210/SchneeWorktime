@@ -129,3 +129,18 @@ The system SHALL allow explicitly resolving an uncertain interval as worked, an 
 #### Scenario: Reclassify non-working gap as actual break
 - **WHEN** 訂正済みの非勤務ギャップをさらに休憩へ訂正する
 - **THEN** 勤務実績は増やさず、休憩実績に60分加え、訂正の履歴を保存する
+
+### Requirement: Fast manual clock-in with past-time correction
+The system SHALL let a user clock in using the current time by default or explicitly choose an earlier actual start Instant. It SHALL preserve the user-selected actual start time and reject future or overlapping work intervals.
+
+#### Scenario: Enter earlier clock-in after opening the app
+- **WHEN** 11:45にアプリを起動し、この勤務日の出社時刻を11:30に指定して確定する
+- **THEN** 11:30から実働を計算し、11:45から15分間の勤務実績として扱う
+
+#### Scenario: Start now with quick command
+- **WHEN** 未開始の勤務日にメニューバーから「今から出社」を選択する
+- **THEN** 現在のInstantを開始時刻として1つの勤務区間を記録する
+
+#### Scenario: Reject future actual clock-in
+- **WHEN** 現在11:45なのに当日12:00の出社時刻を実績として確定しようとする
+- **THEN** 実績の保存を拒否し、必要なら将来の予定として別入力するよう案内する

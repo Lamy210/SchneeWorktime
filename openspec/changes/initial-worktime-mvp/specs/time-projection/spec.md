@@ -136,3 +136,26 @@ The system SHALL exclude explicitly classified non-working gaps from both actual
 #### Scenario: Same interval classified as an actual break
 - **WHEN** 同じ16:30〜17:30を休憩として記録する
 - **THEN** 実働5時間、休憩実績60分、最短達成と退勤見込みは19:30となる
+
+### Requirement: Non-destructive leave-at what-if projection
+The system SHALL calculate a hypothetical net-work result for a candidate departure Instant without modifying the canonical workday, actual end time, or persisted plannedDepartureAt. A user SHALL explicitly confirm if they want to save a candidate as a plan. The preview SHALL account for future planned rest and unresolved recorded intervals.
+
+#### Scenario: Leave at 19:00 after recorded break
+- **WHEN** 11:30開始、12:00〜13:00休憩済み、18:10現在で19:00退勤を試算する
+- **THEN** 19:00の想定実働は6時間30分、日次目標まで30分不足と表示する
+
+#### Scenario: Leave at 20:00 after recorded break
+- **WHEN** 同じ勤務日で20:00退勤を試算する
+- **THEN** 想定実働7時間30分、日次目標を30分超過すると表示する（正式残業認定ではない）
+
+#### Scenario: Cancel hypothetical departure
+- **WHEN** 19:00退勤の試算画面を閉じる
+- **THEN** 記録済み実働・退勤予定・通知計画と勤務日revisionは変わらない
+
+#### Scenario: Hypothetical departure with future break
+- **WHEN** 11:30開始、休憩実績なし、残り予定休憩60分で19:00退勤を試算する
+- **THEN** 想定実働6時間30分、目標不足30分と表示し、その根拠に将来休憩60分を明記する
+
+#### Scenario: Uncertain past work in leave-at preview
+- **WHEN** 過去の未確認時間がある勤務日で19:00退勤を試算する
+- **THEN** 想定実働と過不足を範囲で示し、単一の確定値として表示しない
