@@ -8,9 +8,9 @@
 - `logicalStartDate`、`capturedTimeZoneID`: 勤務開始時に確定した表示/基準時刻の文脈。
 - `profileSnapshot`: `dailyTargetSeconds=25200`、`expectedBreakSeconds=3600`、`referenceEndLocalTime=18:00?`。
 - `state`: `notStarted | working | onBreak | ended`（各workdayの保存時はnotStarted無しでも可）。
-- `workIntervals`、`breakIntervals`: half-open absolute intervals `[startInstant,endInstant)`。最後の開いた区間のみend=null可。
+- `workIntervals`、`breakIntervals`、`nonWorkGapIntervals`: half-open absolute intervals `[startInstant,endInstant)`。3つの種別は互いに重ならず、最後のアクティブ区間のみend=null可。
 - `uncertainSpans`: 元の勤務区間に含まれ、勤務か非勤務か未確認のintervalとその観測理由。
-- `futureBreakOverrideSeconds?`: 以降に取る予定の休憩秒数だけを上書き。実績休憩ではない。解除でglobal snapshot既定計算へ戻す。
+- `futureRestPlan?`: 入力時の残り予定休憩秒数、入力時の休憩実績累積、入力Instantを保持。入力後に実際に取った休憩分だけ予定残りを減らす。実績休憩ではない。
 - `plannedDepartureAt?`: 退勤予定。実際のclock-outと区別。
 - `correctionAudit`: revision、before/after、訂正時刻、訂正の由来、任意のコメント。
 - `schemaVersion`、`revision`: 単一の原子的保存単位に含める。
@@ -63,3 +63,11 @@
 ## Open assumptions
 - このアプリは勤怠システムの正本ではなく、ユーザー入力を基にした参考用ツール。
 - 会社の清算期間・法定残業・有給休憩の扱いは確認できていないためMVP外。
+
+## Three-way review and forecast rest consumption
+- 未確認区間の訂正は、**勤務継続 / 実際の無給休憩 / 非勤務ギャップ**の3種類を提供する。
+- 休憩だけが累積休憩実績を増やす。非勤務ギャップは勤務・休憩のどちらにも入らず、既定の休憩60分の消化とみなさない。
+- 11:30開始、16:30〜17:30を非勤務ギャップとし17:30現在の場合：実働5時間、最短19:30、標準休憩60分込み退勤20:30。
+- 同区間を休憩とする場合：実働5時間、休憩実績60分、退勤見込み19:30。
+- 将来の休憩予定残り30分を設定し、その後10分の休憩を記録したら将来の残りは20分。40分の休憩を記録したら将来の残りは0分（マイナスにしない）。
+- 11:30開始、休憩予定残り30分設定後に実績40分を取得した場合、最短達成19:10、退勤見込み19:10。追加で予定30分を加算しない。

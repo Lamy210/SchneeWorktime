@@ -125,3 +125,14 @@ The system SHALL include only explicitly forecast future break seconds when prod
 #### Scenario: Thirty-minute remaining break
 - **WHEN** 11:30開始、未取得休憩60分で今後の休憩見込みだけを30分に変更する
 - **THEN** 最短達成は18:30、休憩込み見込みは19:00、休憩実績は0分となる
+
+### Requirement: Non-work gaps do not satisfy planned rest
+The system SHALL exclude explicitly classified non-working gaps from both actual work and recorded break; unlike an actual break they SHALL not reduce the default remaining expected rest.
+
+#### Scenario: One-hour non-working gap before the target
+- **WHEN** 11:30出社、16:30〜17:30を非勤務ギャップと記録し17:30時点で休憩実績0分である
+- **THEN** 実働5時間、最短達成19:30、既定の予定休憩込み退勤見込み20:30となる
+
+#### Scenario: Same interval classified as an actual break
+- **WHEN** 同じ16:30〜17:30を休憩として記録する
+- **THEN** 実働5時間、休憩実績60分、最短達成と退勤見込みは19:30となる

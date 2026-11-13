@@ -77,3 +77,14 @@ The system SHALL count explicitly recorded unpaid rest as zero work, and SHALL N
 #### Scenario: Unpaid break interval
 - **WHEN** 13:00〜13:45を休憩として記録する
 - **THEN** 実働に45分加算せず、標準休憩60分との差は将来予測にのみ使用する
+
+### Requirement: Future-rest override is consumed by actual breaks
+The system SHALL interpret an active-day future-rest override as rest seconds still planned at the moment of entry, and SHALL reduce that balance by subsequently completed actual break time without becoming negative. It SHALL anchor the override to the recorded-break total at the time it was set.
+
+#### Scenario: Actual break exceeds remaining override
+- **WHEN** 休憩予定残り30分を設定した後40分の休憩実績を記録する
+- **THEN** 休憩実績40分、今後の予定休憩0分となり、追加の予定休憩30分を二重計上しない
+
+#### Scenario: Part of remaining override consumed
+- **WHEN** 休憩予定残り30分を設定した後10分の休憩実績を記録する
+- **THEN** 休憩実績10分、将来の予定休憩残り20分として計算する

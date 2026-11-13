@@ -32,7 +32,7 @@ View/Panel never writes directly to local repository; notification gateway never
 ## Domain and state
 - Workday(id UUID, logicalLocalDate, timezoneIDAtStart, profileSnapshot, workIntervals, breakIntervals, state, plannedDeparture, revision, correctionAudit).
 - State transitions: notStarted->working; working->onBreak/ended; onBreak->working/ended (break-end clock-out requires confirmation and closes the break without creating work); ended->working by explicit resume of the same workday UUID, including after midnight when no later workday exists and no intervals overlap.
-- Work/break intervals are half-open [start,end); at most one open interval; completed intervals have start<end; no overlaps. A workday never automatically splits at midnight.
+- Work/break/non-working-gap intervals are half-open [start,end); at most one active open interval; completed intervals have start<end; categories never overlap. A workday never automatically splits at midnight.
 - UTC-comparable `Instant` for math; local wall time only for display and user inputs. DST nonexistent local times are rejected, duplicated local times explicitly disambiguated.
 - At most one unfinished logical workday; use revision-based optimistic updates; invalid edits do not persist or schedule notifications.
 - Current workday holds a configuration snapshot; global setting edits apply next day unless explicitly applied to the active workday.
@@ -137,7 +137,7 @@ Each explicit workday has one canonical Workday UUID and a captured start-date/t
 - If a target crossing precedes every uncertain span, keep the original precise actual achievement time.
 - On explicit confirmation/correction, update the canonical workday revision, preserve before/after and derive the new goal status. Never treat an OS sleep flag as evidence of unpaid leave.
 
-A planned future break override is an optional nonnegative amount of **rest still intended from now**, replacing only the profile-derived future-rest assumption, never changing actual break history. Clearing the override returns to default. While the goal is already achieved, future rest has no effect on the goal time.
+A future-break override is a forecast-only plan anchored at creation time: `(remainingPlannedRestAtSet, recordedBreakSecondsAtSet, setAtInstant)`. Remaining forecast rest at `now` is `max(0, remainingPlannedRestAtSet - max(0, recordedBreakSecondsNow-recordedBreakSecondsAtSet))`. A completed break after setting the override **consumes** that planned remaining rest; it must not be double-counted. Clearing the override restores the profile-derived future-rest calculation. A goal already achieved is never delayed by future rest.
 
 ### Lifecycle, day boundary and state-machine rules
 - A graceful app exit does NOT imply clock-out. An open session survives app restarts, subject to an explicit review for any unobserved gap.
@@ -173,3 +173,10 @@ A planned future break override is an optional nonnegative amount of **rest stil
 - Forced-write-failure tests show no mixed audit/revision states, even after application restart.
 - macOS wake/sleep, permission denied, no-network, external monitor removal and accessibility are verified manually in addition to pure tests.
 - CPU, memory, battery and UI refresh are measured on a real Mac; thresholds are chosen after baseline measurement rather than asserted without evidence.
+
+### v0.4.1 uncertainty classification: work / rest / non-work gap
+- An unresolved interval has three explicit outcomes: **勤務継続** (adds to work), **実際の休憩** (adds only to recorded unpaid break), or **非勤務ギャップ** (adds to neither work nor rest).
+- A non-work gap must split work intervals and be classified in the canonical workday/audit. It does not satisfy any expected unpaid rest; do not label it a break for convenience.
+- Example: 11:30開始、16:30〜17:30未確認、17:30時点の実働は5h。分類を非勤務ギャップにすると最短19:30・残り予定休憩60m込み退勤20:30。分類を休憩にすると最短19:30・休憩実績60m・退勤19:30。
+- UI must offer the three choices with a preview and explicit save; all corrections use the same revision, atomic envelope, and future notification reconciliation.
+- App shutdown, lock, sleep or wake by itself never determines which of these classifications is correct.

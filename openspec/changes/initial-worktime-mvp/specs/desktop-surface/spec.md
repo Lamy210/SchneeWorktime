@@ -73,3 +73,10 @@ The system SHALL expose work-time lower/upper bounds and goal achievement window
 #### Scenario: Goal might or might not be achieved
 - **WHEN** 実働下限6時間、上限7時間のとき
 - **THEN** 「7時間到達の可能性あり・要確認」と表示し、達成確定を表示しない
+
+### Requirement: Review UI offers distinct uncertainty resolutions
+The system SHALL offer separate explicit review actions for continued work, an actual unpaid break and a non-working gap, and SHALL preview the resulting work and estimated departure differences before saving.
+
+#### Scenario: User resolves a sleep interval
+- **WHEN** スリープ由来の要確認区間を訂正画面で開く
+- **THEN** 「勤務継続」「休憩」「非勤務ギャップ」を区別して選択でき、保存前に実働と退勤見込みへの影響を確認できる

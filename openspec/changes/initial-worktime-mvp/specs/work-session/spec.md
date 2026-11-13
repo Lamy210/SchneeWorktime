@@ -118,3 +118,14 @@ The system SHALL accept actual clock-in, break and clock-out instants only at or
 #### Scenario: Future correction entered as actual
 - **WHEN** 現在15:00なのに実績の退勤を18:00へ訂正しようとする
 - **THEN** 実績としての保存を拒否し、将来の退勤予定として別操作を案内する
+
+### Requirement: Three-way uncertain-time resolution
+The system SHALL allow explicitly resolving an uncertain interval as worked, an actual unpaid break, or a non-working gap. It SHALL NOT count a non-working gap toward recorded rest or worked time, and SHALL preserve the chosen classification in the correction audit.
+
+#### Scenario: Resolve as non-working gap
+- **WHEN** 16:30〜17:30の未確認区間を「非勤務ギャップ」として訂正する
+- **THEN** その60分を勤務から除外し、休憩実績にも加算しない
+
+#### Scenario: Reclassify non-working gap as actual break
+- **WHEN** 訂正済みの非勤務ギャップをさらに休憩へ訂正する
+- **THEN** 勤務実績は増やさず、休憩実績に60分加え、訂正の履歴を保存する
