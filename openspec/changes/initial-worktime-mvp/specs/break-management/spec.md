@@ -44,3 +44,14 @@ The system SHALL offer a nonbinding review hint when recorded breaks look insuff
 #### Scenario: Seven hours without break
 - **WHEN** 7時間の勤務実績があるが休憩記録は0分である
 - **THEN** 目標達成を維持しつつ休憩記録の確認を促す
+
+### Requirement: Forecast rest must stop delaying achieved work
+The system SHALL expose remaining expected rest as a forecast assumption only while the daily target is not yet achieved, and SHALL not deduct any unrecorded break from actual work.
+
+#### Scenario: Target achieved without a break
+- **WHEN** 11:30から休憩なしで18:30に7時間の実働を記録する
+- **THEN** 目標達成と表示し、未取得60分によって到達表示を19:30に遅らせない
+
+#### Scenario: Recorded rest exceeds assumption
+- **WHEN** 標準休憩60分に対して休憩実績が90分となる
+- **THEN** 残り予定休憩を0分とし、マイナス30分の予定休憩を作らない

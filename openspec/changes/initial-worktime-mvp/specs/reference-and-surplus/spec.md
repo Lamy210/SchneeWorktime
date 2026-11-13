@@ -37,3 +37,14 @@ The system SHALL snapshot target, break assumption, reference time and reference
 #### Scenario: Settings changed midshift
 - **WHEN** 勤務中に通常定時を18:00から17:30へ変更する
 - **THEN** 既存の勤務日は変更確認なしでは元の18:00を保持する
+
+### Requirement: Reference clock and rest are independent
+The system SHALL compare reference time using the workday's captured date and timezone without adding or subtracting work time, even while the user is on break.
+
+#### Scenario: Reference reached during break
+- **WHEN** 基準18:00の勤務日で17:45〜18:15に休憩を記録する
+- **THEN** 基準18:00を過ぎたことだけを表示し、休憩中の実働を増加させない
+
+#### Scenario: Timezone changes during shift
+- **WHEN** 勤務開始後にOSのタイムゾーンが変わる
+- **THEN** 勤務日開始時点のタイムゾーンに対応した基準Instantを維持する

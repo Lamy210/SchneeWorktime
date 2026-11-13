@@ -59,3 +59,29 @@ The system SHALL flag potentially unverified time after sleep, system clock jump
 #### Scenario: Long open shift
 - **WHEN** 16時間以上の未終了勤務を復元する
 - **THEN** 要確認を提示し、自動退勤を行わない
+
+### Requirement: Explicit clock-out from break
+The system SHALL require explicit confirmation for clock-out during an open break and SHALL close that break at the selected end Instant without inventing an additional work interval.
+
+#### Scenario: Confirm break-end clock-out
+- **WHEN** 17:00から休憩中に17:15の退勤を選択し確認する
+- **THEN** 休憩を17:15で閉じ、勤務区間を追加せずendedとなる
+
+#### Scenario: Cancel break-end clock-out
+- **WHEN** 休憩中の退勤確認をキャンセルする
+- **THEN** 休憩状態と勤務実績は変更されない
+
+### Requirement: Unverified elapsed spans
+The system SHALL flag active work intervals intersecting a detected sleep, clock anomaly or unexpectedly long interruption as unverified until the user explicitly confirms or corrects them. It SHALL NOT silently generate a break or clock-out.
+
+#### Scenario: Wake during work
+- **WHEN** workingのまま16:30〜17:30にMacがスリープして復帰する
+- **THEN** 区間を要確認として保持し、自動休憩・自動退勤を行わない
+
+#### Scenario: Confirm actual work
+- **WHEN** 利用者が要確認区間を勤務継続として明示確認する
+- **THEN** 該当区間を確認済みとし、目標達成と通知を再評価する
+
+#### Scenario: Correct sleep as break
+- **WHEN** 要確認の16:30〜17:30を休憩へ訂正する
+- **THEN** 実働から60分除外し、見込みと未来通知を再計算する

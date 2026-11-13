@@ -32,7 +32,7 @@ The system SHALL distinguish earliestGoalAt=now+remainingNetWork under continuou
 - **THEN** 両方の将来時刻を未確定とし、残り実働時間だけ表示する
 
 ### Requirement: Actual achievement supersedes plans
-The system SHALL locate the first exact recorded cumulative-work crossing of the goal and SHALL replace pending forecasts with actual achievement once crossed.
+The system SHALL calculate a threshold crossing from validated recorded intervals, distinguishing verified achievement from an unreviewed provisional crossing.
 
 #### Scenario: No break taken
 - **WHEN** 11:30開始から無休憩で18:30になる
@@ -66,3 +66,25 @@ The system SHALL compare a user-entered future departure Instant against project
 #### Scenario: 20:00 planned
 - **WHEN** 11:30開始、12:00〜13:00休憩、退勤予定20:00、追加休憩なし
 - **THEN** 見込み実働450分、日次目標超過見込み30分を予定として表示する
+
+### Requirement: Provisional versus confirmed achievement
+The system SHALL keep arithmetic elapsed work separate from confirmed recorded achievement if a contributing interval remains unverified. It SHALL NOT present an unverified threshold crossing as confirmed attainment.
+
+#### Scenario: Threshold includes unverified sleep
+- **WHEN** 60分の未確認スリープを含む勤務記録が7時間相当の経過に到達する
+- **THEN** 達成確定を表示せず「計算上の目標到達・要確認」とする
+
+#### Scenario: Uncertainty resolved
+- **WHEN** 利用者が要確認区間を訂正または明示確認する
+- **THEN** 最初の累積実働420分の到達時刻を再計算し、確定可否を更新する
+
+### Requirement: Ended workday remains frozen
+The system SHALL display a completed workday as achieved or shortfall from the final recorded net work. It SHALL NOT continue a goal countdown after clock-out.
+
+#### Scenario: Clock out with shortfall
+- **WHEN** 実働6時間30分で退勤が確定する
+- **THEN** 「日次目標まで30分不足」と固定表示し未来の到達予測は表示しない
+
+#### Scenario: Explicit resume
+- **WHEN** 実働6時間30分で退勤した勤務日を利用者が明示的に再開する
+- **THEN** 残り30分として新たな最短目標時刻を計算する

@@ -6,7 +6,7 @@
 ## ADDED Requirements
 
 ### Requirement: Independent notification categories
-The system SHALL make reference end, earliest net-work target pre-alert, goal achievement, and daily surplus thresholds independently configurable and distinguish predicted from recorded time.
+The system SHALL make reference-end, earliest-goal pre-alert, forecast at goal, and conditional daily surplus reminders independently configurable, and SHALL distinguish predictions from confirmed records.
 
 #### Scenario: Before goal
 - **WHEN** 休憩実績60分、目標時刻19:30、15分前通知が有効
@@ -56,3 +56,40 @@ The system SHALL persist an accepted change before notification reconciliation. 
 #### Scenario: Notification fails
 - **WHEN** 勤務訂正保存は成功し通知追加のみ失敗する
 - **THEN** 記録は保持し、再試行できる非致命的警告を示す
+
+### Requirement: Scheduled reminders are forecasts only
+The system SHALL label pre-scheduled goal and surplus notifications as conditional forecasts, not proof of attendance. It SHALL issue confirmed-achievement messaging only after validated committed intervals reach the target without unresolved uncertainty.
+
+#### Scenario: Future goal reminder when suspended
+- **WHEN** OSが予約済みの18:30目標通知をアプリ休止中に配信する
+- **THEN** 「目標到達の見込みです。記録をご確認ください」と表現し、7時間達成を断定しない
+
+#### Scenario: Confirmed goal in running process
+- **WHEN** 計測済み勤務が420分に達し未確認区間がない
+- **THEN** アプリは実績達成として表示し、見込み通知と区別できる
+
+#### Scenario: Unverified target
+- **WHEN** 累積時間に未確認のスリープ区間が含まれる
+- **THEN** 確定達成通知を出さず記録確認を案内する
+
+### Requirement: Trigger-sensitive request reconciliation
+The system SHALL compare each owned pending notification's identifier, trigger Instant and payload revision when reconciling, and SHALL replace outdated requests rather than trusting matching identifiers alone.
+
+#### Scenario: Same ID different time
+- **WHEN** 目標時刻が19:30から20:00へ変わる
+- **THEN** 旧19:30の予約を削除対象とし新20:00のリクエストへ収束させる
+
+#### Scenario: Crash after commit before schedule
+- **WHEN** 履歴の新revisionを保存後、通知変更前にアプリが終了する
+- **THEN** 次回起動時に保存済みrevisionから未来予約を再構築する
+
+### Requirement: Bounded and privacy-safe reminders
+The system SHALL configure a finite set of threshold reminders and SHALL hide employer name and detailed attendance history from default lock-screen notification text.
+
+#### Scenario: Surplus thresholds
+- **WHEN** 超過見込みの通知閾値を15分、30分、60分とする
+- **THEN** 各閾値につき最大1件の予定通知を管理し毎分通知しない
+
+#### Scenario: Locked screen
+- **WHEN** 画面ロック中に勤務通知が配信される
+- **THEN** 会社名・出社時刻・休憩履歴を本文に含めない

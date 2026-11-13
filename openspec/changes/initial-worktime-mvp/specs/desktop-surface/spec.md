@@ -40,3 +40,14 @@ The system SHALL derive displayed countdown from absolute time without persistin
 #### Scenario: Panel hidden
 - **WHEN** 長時間パネルを非表示にする
 - **THEN** 非表示中に毎秒描画を要求せず、再表示時に現在時刻から再計算する
+
+### Requirement: Show forecast and evidence states
+The system SHALL clearly label confirmed worked time, forecast departure and unverified time, and SHALL replace active countdown with achieved or shortfall when a workday ends.
+
+#### Scenario: Unverified work period
+- **WHEN** スリープ由来の要確認区間を含む実働を表示する
+- **THEN** 「要確認」ラベルを出し確定達成時刻として扱わない
+
+#### Scenario: Early clock-out
+- **WHEN** 実働6時間30分で退勤する
+- **THEN** パネルに「30分不足」と終了時刻を示しタイマーを停止する

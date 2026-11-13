@@ -34,3 +34,13 @@
 - [ ] 端末のsleep/wake、通知拒否、長時間稼働、位置復元をmacOS実機確認
 - [ ] 用途と費用に合わせて配布（ad-hoc/署名/公証/Homebrew）を別途決定
 - [ ] CIで真正のアプリビルド・テストを合格させる
+
+## PR #4 review hardening checklist (specification work only)
+- [ ] 区間の要確認品質（スリープ・時刻異常）、明示確認と履歴訂正をFakeClockでテスト
+- [ ] 休憩中の退勤確認、取消、区間重複ゼロの状態遷移を検証
+- [ ] 6時間30分退勤による不足固定、再開による残り再計算を検証
+- [ ] 通知本文は「見込み」と「実績達成」を区別し、未確認区間では確定を禁止
+- [ ] 通知IDだけでなく発火時刻・payload revisionが変わったら再登録する
+- [ ] 予約失敗や状態保存直後クラッシュで、再起動時に未来通知へ再収束する
+- [ ] notification stale delivery raceを実機QAしOS非保証を説明する
+- [ ] 既存template release identity fixtureによるCI失敗は安全策を緩めず別PRで修正

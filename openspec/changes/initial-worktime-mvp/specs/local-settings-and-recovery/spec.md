@@ -40,3 +40,24 @@ The system SHALL support explicit JSON/CSV export and confirm before destructive
 #### Scenario: Erase
 - **WHEN** ユーザーが履歴全削除を選ぶ
 - **THEN** 確認の前には削除しない
+
+### Requirement: Rebuild schedule after interrupted commit
+The system SHALL derive intended future notifications from last validated committed workday state during startup rather than trusting the previously cached pending request list.
+
+#### Scenario: Persisted event without scheduled notification
+- **WHEN** 状態保存直後にアプリが異常終了し通知予約が未更新となる
+- **THEN** 次回起動で保存済みrevisionを基準に将来の通知を再同期する
+
+### Requirement: Preserve provenance of uncertainty correction
+The system SHALL record the original unverified span, confirmation or correction action and revision without deleting original history silently.
+
+#### Scenario: Resolve a sleep interval
+- **WHEN** スリープ由来の要確認区間を休憩に訂正する
+- **THEN** 原本の時刻と訂正内容を追跡できる
+
+### Requirement: Export only on explicit destination
+The system SHALL export work history only to a user-confirmed local destination and SHALL keep canonical records unchanged if destination selection is cancelled.
+
+#### Scenario: Export cancelled
+- **WHEN** エクスポートの保存先選択をキャンセルする
+- **THEN** 出力を作成せず勤務履歴を変更しない
