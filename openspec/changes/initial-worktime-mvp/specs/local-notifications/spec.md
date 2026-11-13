@@ -13,8 +13,8 @@ The system SHALL make reference-end, earliest-goal pre-alert, forecast at goal, 
 - **THEN** 19:15に目標接近の通知を予約する
 
 #### Scenario: No rest projected
-- **WHEN** 11:30出社・休憩未取得で最短目標18:30、休憩込み見込み19:30
-- **THEN** 目標15分前通知は18:15を使い、仮定の退勤19:30は目標到達通知に使わない
+- **WHEN** 11:30出社・休憩未取得で最短目標18:30、休憩込み退勤見込み19:30
+- **THEN** 既定の退勤準備15分前通知は19:15に予約し、最短達成の18:15通知は別カテゴリを明示的に有効化した場合に限る
 
 #### Scenario: Reference reached
 - **WHEN** 基準終業時刻18:00、勤務中で通知許可あり
@@ -141,3 +141,29 @@ The system SHALL request macOS notification authorization only after a user enab
 #### Scenario: Notification permission denied
 - **WHEN** 利用者が通知権限を拒否する
 - **THEN** ローカルの勤務計算・履歴保存・Glass表示を継続し、許可ダイアログを繰り返さない
+
+### Requirement: Planned departure and earliest target have separate notifications
+The system SHALL use the feasible break-adjusted estimated departure as the default 15-minute departure-preparation reminder target, independently from the earliest uninterrupted-work goal. An optional earliest-goal reminder SHALL be a different configurable category, with clear forecast-only language. If a user explicitly saves a feasible planned departure, the departure-preparation reminder SHALL use that explicit plan and label any projected shortfall.
+
+#### Scenario: Standard plan and earliest target differ
+- **WHEN** 出社11:30・休憩実績0分・残り予定休憩60分で最短18:30・退勤見込み19:30である
+- **THEN** 既定通知は19:15に「退勤見込みまで15分」と予約し、最短達成通知18:15は明示オプトインの場合のみ予約する
+
+#### Scenario: User saves earlier planned departure
+- **WHEN** 利用者が19:00退勤予定を明示保存し、記録上の目標不足が予想される
+- **THEN** 設定された退勤準備リマインダーは予定19:00基準に変更し「実働目標には不足見込み」と区別する
+
+#### Scenario: Achieved early without the expected break
+- **WHEN** 11:30出社・休憩0分で18:30に7時間相当の勤務記録が確認され、アプリが稼働している
+- **THEN** 未達を前提とする19:15の退勤見込み予報を削除対象にし、休憩記録の確認は別に案内する
+
+#### Scenario: Break-adjusted departure is impossible
+- **WHEN** 退勤希望時刻までの時間に将来予定休憩が収まらない
+- **THEN** その実現不能な退勤候補を正しい予報として通知予約しない
+
+### Requirement: Reference reminder is distinct from departure preparation
+The system SHALL keep the user-defined reference end reminder independent from any estimated or explicitly planned departure, without labeling the reference as overtime.
+
+#### Scenario: Reference arrives before estimated departure
+- **WHEN** 参考終業18:00で退勤見込み19:30であり両方の通知が有効
+- **THEN** 18:00は「参考時刻到達」、19:15は「退勤見込み15分前」と別ラベルで管理し残業確定と表現しない

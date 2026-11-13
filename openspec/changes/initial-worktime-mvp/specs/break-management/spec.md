@@ -79,7 +79,7 @@ The system SHALL count explicitly recorded unpaid rest as zero work, and SHALL N
 - **THEN** 実働に45分加算せず、標準休憩60分との差は将来予測にのみ使用する
 
 ### Requirement: Future-rest override is consumed by actual breaks
-The system SHALL interpret an active-day future-rest override as rest seconds still planned at the moment of entry, and SHALL reduce that balance by subsequently completed actual break time without becoming negative. It SHALL anchor the override to the recorded-break total at the time it was set.
+The system SHALL interpret the active-day rest override as remaining planned rest at the moment it was set, and SHALL consume it only with real break intervals occurring after that planning Instant. Past break corrections SHALL NOT consume or restore planned future rest merely by changing a pre-plan aggregate total. Consumption SHALL be recomputed from effective intervals after the anchor and SHALL never become negative.
 
 #### Scenario: Actual break exceeds remaining override
 - **WHEN** 休憩予定残り30分を設定した後40分の休憩実績を記録する
@@ -88,3 +88,22 @@ The system SHALL interpret an active-day future-rest override as rest seconds st
 #### Scenario: Part of remaining override consumed
 - **WHEN** 休憩予定残り30分を設定した後10分の休憩実績を記録する
 - **THEN** 休憩実績10分、将来の予定休憩残り20分として計算する
+
+### Requirement: Break advisory does not certify legal compliance
+The system SHALL distinguish a user-configured 60-minute expected break from an informational break-record review advisory. It SHALL NOT claim legal compliance or noncompliance solely from recorded intervals, and SHALL NOT block valid work history recording if an advisory is present.
+
+#### Scenario: Seven hours with only thirty minutes recorded
+- **WHEN** 日次実働7時間で休憩実績30分、標準休憩60分の勤務記録がある
+- **THEN** 目標達成を維持しつつ、休憩実績の確認と適用ルールの確認を案内する
+
+#### Scenario: Work recorded beyond eight hours with short rest
+- **WHEN** 実働が8時間を超え、休憩実績45分である
+- **THEN** 休憩実績を確認する注意を示すが、自動的に休憩を捏造せず違法確定と断定しない
+
+#### Scenario: Historical rest correction predates override
+- **WHEN** 13:00に残り休憩予定30分を設定した後、午前中の休憩実績を10分増やして訂正する
+- **THEN** 13:00以後に実際の休憩を取っていなければ、将来の予定休憩残り30分を保持する
+
+#### Scenario: Actual later break consumes override
+- **WHEN** 13:00に残り休憩予定30分を設定し、その後14:00〜14:20に実績休憩を記録する
+- **THEN** 残り休憩予定10分とし、同じ20分を複数回消費しない

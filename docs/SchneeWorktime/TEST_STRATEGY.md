@@ -18,6 +18,7 @@
 - AC-76〜84: 設定・省電力・通知・プライバシー・表示。
 - AC-85〜89: 未確認時間の3分類と予定休憩の取得済み分による消費、訂正UIの結果プレビュー。
 - AC-90〜104: 過去始業入力、非破壊退勤試算、未来休憩を含めた予測、メニューバー操作、通知許可とリード時間。
+- AC-105〜121: 未来休憩の実現可能性、試算失効、既定退勤通知と最短達成通知の分離、過去休憩訂正、休憩実績の確認表示。
 - それ以外の既存P1はリリース前QAで確認する。
 
 ## 3. Properties to verify
@@ -42,3 +43,11 @@
 - macOS real hardware QA demonstrates correct behavior; template-only CI green is insufficient.
 - Runtime CPU/RAM/battery and app start-up are measured before quantitative performance thresholds are accepted.
 - Template Release Isolation failure is corrected without relaxing security checks, in a separate change.
+
+### 新たに必須となる境界テスト
+- `candidate<now`: future what-ifを拒否。`candidate==now`: 実績だけ算定。`candidate>now`: 未来休憩が差分に収まるかを確認。
+- `futureBreak>availableWindow`: 実現不能。`==`: 将来の実働増分0。`<`: 条件付き算定。
+- Workday revisionが変わると既存previewは無効。予定保存前に再試算する。
+- デフォルト通知：最短18:30/退勤見込み19:30で19:15のみ予約。最短の18:15はユーザー設定後だけ。
+- 予定休憩入力前の休憩実績の訂正ではoverrideの消費量を変えない。入力後の休憩時間増加・減少に追随する。
+- 7時間実働・休憩記録30分で警告しても日次目標達成は取り消さず、法的違反の断定もしない。

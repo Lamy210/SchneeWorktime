@@ -153,9 +153,43 @@ The system SHALL calculate a hypothetical net-work result for a candidate depart
 - **THEN** 記録済み実働・退勤予定・通知計画と勤務日revisionは変わらない
 
 #### Scenario: Hypothetical departure with future break
-- **WHEN** 11:30開始、休憩実績なし、残り予定休憩60分で19:00退勤を試算する
-- **THEN** 想定実働6時間30分、目標不足30分と表示し、その根拠に将来休憩60分を明記する
+- **WHEN** 11:30開始、現在12:00で休憩実績なし、残り予定休憩60分で19:00退勤を試算する
+- **THEN** 残り7時間内に予定休憩60分を取得可能であり、想定実働6時間30分・目標不足30分と表示して将来休憩の仮定を明記する
 
 #### Scenario: Uncertain past work in leave-at preview
 - **WHEN** 過去の未確認時間がある勤務日で19:00退勤を試算する
 - **THEN** 想定実働と過不足を範囲で示し、単一の確定値として表示しない
+
+### Requirement: What-if feasibility is a precondition for numeric results
+The system SHALL validate that a hypothetical departure Instant is not earlier than the current clock and that all forecast future break time can fit between now and the candidate under the stated uninterrupted-work assumptions. It SHALL distinguish feasible, infeasible and unknown projections. It SHALL NOT silently clamp planned rest to the available horizon, generate negative future work, or claim a single precise result from unresolved work spans.
+
+#### Scenario: Rest cannot fit before departure
+- **WHEN** 11:30開始・休憩実績0分・現在18:10・残り予定休憩60分・退勤候補19:00
+- **THEN** 未来の空き時間50分より予定休憩60分が長いため「この条件では実現不可」と表示し、想定実働6時間30分を有効な見込みとして提示しない
+
+#### Scenario: Change break plan to fit candidate
+- **WHEN** 上記の試算で残り休憩予定を明示的に30分へ変更する
+- **THEN** 19:00までに30分の休憩が収まり、見込み実働7時間・日次目標との差0分と表示するが休憩要件の確認は別に促す
+
+#### Scenario: Departure before current time
+- **WHEN** 現在18:10で退勤候補18:00を入力する
+- **THEN** 未来予測として扱わず、入力を拒否または履歴訂正へ案内する
+
+#### Scenario: Departure right now
+- **WHEN** workingで現在18:10に「今帰る」を試算する
+- **THEN** 将来休憩を勝手に控除せず現在までの実績を基に過不足を示し、実績は変更しない
+
+#### Scenario: Short horizon with unresolved break
+- **WHEN** 終了予定不明の休憩中に19:00退勤の見込みを要求する
+- **THEN** 休憩終了が未確定と説明し、明示的な予定復帰時刻がなければ確定的な予測を出さない
+
+### Requirement: Preview is bound to current workday revision
+The system SHALL label each what-if result with the workday revision and observation Instant used to derive it. The system SHALL invalidate a shown projection when the workday changes or when its candidate Instant has passed, and SHALL require re-evaluation before saving it as an explicit planned departure.
+
+#### Scenario: Break starts after preview
+- **WHEN** 19:30退勤プレビューを表示した後に休憩開始が保存される
+- **THEN** 古いプレビューを無効化し、保存前に新しい状態から再試算する
+
+#### Scenario: Candidate passes while preview open
+- **WHEN** 19:00候補の試算を開いたまま現在時刻が19:01になる
+- **THEN** 19:00を新しい退勤予定としてそのまま保存させず、再計算または訂正へ誘導する

@@ -1,4 +1,4 @@
-# Workday Contract — SchneeWorktime v0.4
+# Workday Contract — SchneeWorktime v0.6
 
 ## Purpose
 本書はOpenSpecの補足設計資料であり、実装コードではない。MVPの事実・予測・不明を混同しないためのデータ契約を明文化する。
@@ -10,7 +10,7 @@
 - `state`: `notStarted | working | onBreak | ended`（各workdayの保存時はnotStarted無しでも可）。
 - `workIntervals`、`breakIntervals`、`nonWorkGapIntervals`: half-open absolute intervals `[startInstant,endInstant)`。3つの種別は互いに重ならず、最後のアクティブ区間のみend=null可。
 - `uncertainSpans`: 元の勤務区間に含まれ、勤務か非勤務か未確認のintervalとその観測理由。
-- `futureRestPlan?`: 入力時の残り予定休憩秒数、入力時の休憩実績累積、入力Instantを保持。入力後に実際に取った休憩分だけ予定残りを減らす。実績休憩ではない。
+- `futureRestPlan?`: `restRemainingSecondsAtSet`、`setAtInstant`、`workdayRevisionAtSet`。入力以後に**実際の休憩区間と重なった時間**だけ予定休憩を消費する。入力以前の休憩の訂正で消費量を誤更新しない。
 - `plannedDepartureAt?`: 退勤予定。実際のclock-outと区別。
 - `correctionAudit`: revision、before/after、訂正時刻、訂正の由来、任意のコメント。
 - `schemaVersion`、`revision`: 単一の原子的保存単位に含める。
@@ -71,3 +71,24 @@
 - 同区間を休憩とする場合：実働5時間、休憩実績60分、退勤見込み19:30。
 - 将来の休憩予定残り30分を設定し、その後10分の休憩を記録したら将来の残りは20分。40分の休憩を記録したら将来の残りは0分（マイナスにしない）。
 - 11:30開始、休憩予定残り30分設定後に実績40分を取得した場合、最短達成19:10、退勤見込み19:10。追加で予定30分を加算しない。
+
+## v0.6 — departure forecast contract
+- `previewResult` is read-only `{workdayRevision,observedAtInstant,candidateDepartureInstant,feasibility,knownWorkRange,plannedRestAssumption,shortfallOrSurplus}`. It is never canonical history.
+- Feasibility values: `feasible | infeasible | unknown`. `candidate<now` is invalid for a **future** forecast; `candidate==now` is valid and ignores future rest.
+- Let `futureWindowSeconds=candidate-now`. If planned future break exceeds the window, `feasibility=infeasible`, not a misleading numeric result.
+- If the break end is unknown or historical work has unresolved ranges, a precise forecast may be `unknown`; show the reason and review action.
+- `earliestGoalAt`, `estimatedDepartureAt`, `plannedDepartureAt`, `referenceEndAt` are distinct Instants and must never be treated as interchangeable.
+- Default departure preparation reminders use estimated departure (or user-saved feasible planned departure); earliest-goal reminder is independent and opt-in.
+- Each preview is invalidated on workday revision/observed time expiry; a Save As Plan request re-evaluates the constraints.
+- `futureRestPlan` consumption: sum of actual break intervals intersected with `[setAtInstant,now]`. Edits before `setAtInstant` do not count toward future rest. Preserve audit and validation on every correction.
+- The default 60-minute anticipated break is a personal planning assumption. A brief break-advisory may draw attention to the recorded duration without claiming formal legal compliance.
+
+### Calculation examples
+| Situation | Candidate | Outcome |
+|---|---|---|
+| 11:30出社、12:00現在、実績休憩0、今後休憩60分 | 19:00 | 未来7時間に休憩が収まる。実働6時間30分見込み、30分不足 |
+| 11:30出社、18:10現在、実績休憩0、今後休憩60分 | 19:00 | 未来50分に休憩60分を置けず**実現不能** |
+| 上記で今後休憩を明示30分に変更 | 19:00 | 実働7時間見込み。ただし休憩記録の確認は別表示 |
+| 上記で「今帰る」 | 18:10 | 既に記録した実働6時間40分。未取得休憩を控除しない |
+
+Detailed rationale: `FORECAST_SEMANTICS.md`, `NOTIFICATION_POLICY.md`.

@@ -1,4 +1,4 @@
-# Design: SchneeWorktime MVP v0.5 — Daily usability and correctness
+# Design: SchneeWorktime MVP v0.6 — Feasible forecast and notification semantics
 
 ## Goals / constraints
 - macOS 15+ / Swift 6。SwiftUI + AppKit(NSPanel)。`Lamy210/template` は CI/リリース雛形で、アプリ本体はまだない。
@@ -48,7 +48,7 @@ View/Panel never writes directly to local repository; notification gateway never
 - If actual time moves behind the start of an open interval, surface clock anomaly and suppress unreliable forecast, without silently rewriting persisted Instants.
 
 ## Notification strategy
-- UserNotification authorization is optional. Notification categories: referenceAt; earliestGoalForecastAt-15m; earliestGoalForecastAt; conditionalSurplusAt[15,30,60]. OS-scheduled notifications only express forecasts. Confirmed achievements require app-side validation of committed intervals.
+- UserNotification authorization is optional. Categories: departurePreparationAt (default 15 minutes before feasible break-adjusted departure or saved plan), optional earliestGoalForecastAt (separate opt-in), referenceAt, conditionalSurplusAt[15,30,60]. OS-scheduled notifications express forecasts only. Confirmed achievements require app-side validation.
 - Only times strictly in future are scheduled. Use stable logical IDs `workdayId:type:threshold`, comparing ID + trigger Instant + payload version against the **committed** revision. A matching ID alone is insufficient when forecast time moves.
 - Reconcile on confirmed changes, app launch, wake, time zone/clock changes and configuration application; remove obsolete pending IDs, add missing future IDs, query OS pending afterward if useful.
 - OS removal is asynchronous; delivered requests may not be cancellable. Best-effort pending consistency ≠ exactly-once OS presentation or precise delivery time.
@@ -137,7 +137,7 @@ Each explicit workday has one canonical Workday UUID and a captured start-date/t
 - If a target crossing precedes every uncertain span, keep the original precise actual achievement time.
 - On explicit confirmation/correction, update the canonical workday revision, preserve before/after and derive the new goal status. Never treat an OS sleep flag as evidence of unpaid leave.
 
-A future-break override is a forecast-only plan anchored at creation time: `(remainingPlannedRestAtSet, recordedBreakSecondsAtSet, setAtInstant)`. Remaining forecast rest at `now` is `max(0, remainingPlannedRestAtSet - max(0, recordedBreakSecondsNow-recordedBreakSecondsAtSet))`. A completed break after setting the override **consumes** that planned remaining rest; it must not be double-counted. Clearing the override restores the profile-derived future-rest calculation. A goal already achieved is never delayed by future rest.
+A future-break override is a forecast-only plan with `(restRemainingSecondsAtSet, setAtInstant, workdayRevisionAtSet)`. Its consumption is the sum of **actual break intervals intersecting `[setAtInstant,now]`**, recomputed after any history correction. `remaining = max(0, restRemainingSecondsAtSet - consumedBreakSeconds)`. Changing a break that occurred strictly before the plan must NOT consume future rest. Clearing the override restores the profile-derived calculation. An achieved goal is never delayed by future rest.
 
 ### Lifecycle, day boundary and state-machine rules
 - A graceful app exit does NOT imply clock-out. An open session survives app restarts, subject to an explicit review for any unobserved gap.
@@ -206,9 +206,9 @@ A future-break override is a forecast-only plan anchored at creation time: `(rem
 | uncertain | 区間確認, 訂正, 予測を見る | 未確認の実績を確定と断定する動作 |
 
 ### Notification lead controls
-- Default is 15 minutes before the earliest calculated goal; offer optional 30- and 5-minute leads as separately enabled choices. Suppress duplicates and skip elapsed lead times without retroactive delivery.
+- Default notification lead is 15 minutes before the **break-adjusted departure estimate** (or explicitly saved departure plan) when it is feasible. Offer optional 30/5-minute leads. The earliest no-more-break 7h milestone is a distinct opt-in notification; never silently substitute it for departure preparation.
 - Ask for authorization **in context** when the user enables reminders, not automatically on first launch. Continue all other features on denied permissions.
-- Only one precise goal timestamp may drive reminders; uncertain time spans, an open break with unknown end, or invalid clock causes suppression and the UI explains why.
+- Each notification category must have its own eligible single trigger Instant. Suppress precise departure/earliest-goal forecasts if a required forecast is infeasible, historical uncertainty changes the time, break end is unknown or system clock is invalid; keep independent reference reminders.
 - OS scheduling may deliver a previously booked forecast despite changed real-world work. Notification content must always say `見込み`, not confirmed attainment.
 
 ### Scope boundary
@@ -229,3 +229,40 @@ A future-break override is a forecast-only plan anchored at creation time: `(rem
 - https://developer.apple.com/design/human-interface-guidelines/app-shortcuts
 - https://developer.apple.com/documentation/UserNotifications/asking-permission-to-use-notifications
 - https://developer.apple.com/documentation/eventkit/accessing-the-event-store
+
+## v0.6 — Feasibility first; forecast vs. schedule
+
+### Correctness finding corrected
+The prior v0.5 `leave at 19:00` scenario had no explicit current time and could appear mathematically valid even if it was already 18:10 and a full 60-minute break was still required in the remaining 50 minutes. **Future breaks must fit in future elapsed time**; forecasts shall not travel backward or subtract 60 minutes from already accumulated actual work.
+
+### Forecast eligibility
+- `availableFutureSeconds = candidateDepartureAt - observedAt`; require `>=0`. `0` is an allowed leave-now query.
+- A conditional forecast assuming full future rest is eligible only if `0 <= remainingPlannedRestSeconds <= availableFutureSeconds`; otherwise mark `infeasible` with the mismatched durations and offer an explicit change to rest/departure time. Do not auto-clamp.
+- An unknown open-break end or unresolved historical attendance yields `unknown` or a **range**, not one precise predicted departure. If the user provides a hypothetical return time, label it forecast-only; do not record the break end as an actual event.
+- Check feasibility even when there is enough remaining work time: input constraints can conflict independently from whether 420 minutes have been recorded.
+- `previewDeparture` is pure: neither workday intervals, plannedDepartureAt, notifications, revision nor audit changes. The preview carries `(workdayRevision, observedAt)` and expires on workday mutation or candidate time passing. Explicit Save As Plan must revalidate against latest state and show warnings, especially if the planned break is infeasible.
+
+### Worked examples (Asia/Tokyo)
+| Start / now / candidate | Recorded break | Future rest assumption | Outcome |
+|---|---:|---:|---|
+| 11:30 / 12:00 / 19:00 | 0 | 60m | feasible: 30m worked before now + 360m future work = 390m, 30m short |
+| 11:30 / 18:10 / 19:00 | 0 | 60m | **infeasible**: only 50m available for 60m of rest |
+| 11:30 / 18:10 / 19:00 | 0 | 30m explicit override | feasible: 400m worked before now + 20m future work = 420m |
+| 11:30 / 18:10 / now | 0 | 60m | leave-now preview uses worked 400m; 20m short; does not subtract rest |
+| 11:30 / 18:10 / 19:00 | 60m recorded 12:00–13:00 | 0 | feasible: 340m + 50m = 390m, 30m short |
+
+### Distinguish reminders
+- **Departure preparation (default)**: break-adjusted departure 19:30 → lead 15m at **19:15**.
+- **Earliest goal (opt-in)**: uninterrupted-goal 18:30 → lead 15m at **18:15**.
+- **Reference (optional)**: independent reference 18:00, unrelated to actual work attainment or official overtime.
+- **Explicit planned departure**: if saved, it is distinct from the computed estimate; the default preparation reminder follows the saved intent, showing any projected shortfall. An impossible forecast is never presented as feasible simply because the user saved a plan.
+- If actual target attainment is validated earlier than the forecast, cancel future goal/unfinished-plan reminders best effort; preserve a separate break-record advisory without claiming employer compliance.
+
+### Break duration advisories
+The default break assumption is 60 minutes, but it is not always identical to a legal minimum. According to the Ministry of Health, Labour and Welfare, for work exceeding 6 hours the legal minimum is 45 minutes; for work exceeding 8 hours it is 60 minutes (subject to actual employment conditions and exceptions). Present this as **check your recorded break and rules** rather than inferring a statutory violation from a personal log. Never fabricate breaks, auto-clock out or block saving an otherwise valid work record.
+
+### Supporting documents
+- docs/SchneeWorktime/FORECAST_SEMANTICS.md
+- docs/SchneeWorktime/NOTIFICATION_POLICY.md
+- docs/SchneeWorktime/ACCEPTANCE_MATRIX.md (AC-105 to AC-121)
+- https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/koyou_roudou/roudoukijun/roudouzikan/index.html
