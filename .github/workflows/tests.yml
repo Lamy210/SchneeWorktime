@@ -17,6 +17,22 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  worktime-domain:
+    name: Worktime Domain
+    runs-on: macos-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Run Worktime Domain tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          swift --version
+          swift test --package-path Packages/WorktimeDomain
+
   classify:
     name: Classify tests
     runs-on: ubuntu-latest
@@ -345,6 +361,7 @@ jobs:
   required-gate:
     name: Tests / Required Gate
     needs:
+      - worktime-domain
       - classify
       - unit
       - integration
@@ -356,6 +373,14 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: Require Worktime Domain tests
+        shell: bash
+        env:
+          DOMAIN_RESULT: ${{ needs.worktime-domain.result }}
+        run: |
+          set -euo pipefail
+          [[ "${DOMAIN_RESULT}" == "success" ]]
+
       - name: Checkout policy evaluator
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
