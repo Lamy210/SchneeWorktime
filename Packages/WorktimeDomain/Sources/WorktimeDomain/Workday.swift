@@ -14,7 +14,7 @@ public struct WorkdayProfile: Sendable, Equatable {
     public let target: Int64
     public let expectedRest: Int64
 
-    public init(target: Int64 = 25_200, expectedRest: Int64 = 3600) throws {
+    public init(target: Int64 = 25200, expectedRest: Int64 = 3600) throws {
         guard target > 0, expectedRest >= 0 else { throw WorkdayError.invalidProfile }
         self.target = target
         self.expectedRest = expectedRest

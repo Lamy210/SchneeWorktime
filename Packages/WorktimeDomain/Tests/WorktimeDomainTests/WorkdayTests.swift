@@ -74,15 +74,15 @@ struct WorkdayTests {
     }
 
     @Test func `cross midnight resume keeps identity and excludes gap`() throws {
-        var catalog = try started(at: 75_600)
+        var catalog = try started(at: 75600)
         let id = try #require(catalog.activeID)
-        try catalog.apply(.clockOut(confirmBreak: false), at: 88_200, now: 88_200, expectedRevision: 1)
-        try catalog.apply(.resume(id: id), at: 90_000, now: 90_000, expectedRevision: 2)
+        try catalog.apply(.clockOut(confirmBreak: false), at: 88200, now: 88200, expectedRevision: 1)
+        try catalog.apply(.resume(id: id), at: 90000, now: 90000, expectedRevision: 2)
         let day = try #require(catalog.days.last)
         #expect(catalog.days.count == 1)
         #expect(day.id == id)
-        let result = try day.snapshot(now: 91_800)
-        #expect(result.bounds.lower == 14_400)
+        let result = try day.snapshot(now: 91800)
+        #expect(result.bounds.lower == 14400)
         #expect(result.recordedRest == 0)
     }
 
