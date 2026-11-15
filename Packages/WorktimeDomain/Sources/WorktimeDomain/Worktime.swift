@@ -39,14 +39,14 @@ public enum DeparturePreview: Sendable, Equatable {
 }
 
 public enum Worktime {
-    private static func add(_ a: Int64, _ b: Int64) throws -> Int64 {
-        let (value, overflow) = a.addingReportingOverflow(b)
+    private static func add(_ lhs: Int64, _ rhs: Int64) throws -> Int64 {
+        let (value, overflow) = lhs.addingReportingOverflow(rhs)
         guard !overflow else { throw WorktimeError.overflow }
         return value
     }
 
-    private static func difference(_ a: Int64, _ b: Int64) throws -> Int64 {
-        let (value, overflow) = a.subtractingReportingOverflow(b)
+    private static func difference(_ lhs: Int64, _ rhs: Int64) throws -> Int64 {
+        let (value, overflow) = lhs.subtractingReportingOverflow(rhs)
         guard !overflow else { throw WorktimeError.overflow }
         return value
     }
@@ -60,7 +60,9 @@ public enum Worktime {
         var previousEnd: Int64?
         for span in spans.sorted(by: { $0.start < $1.start }) {
             guard span.start < span.end, span.end <= now else { throw WorktimeError.invalidInterval }
-            if let previousEnd, span.start < previousEnd { throw WorktimeError.overlappingIntervals }
+            if let previousEnd, span.start < previousEnd {
+                throw WorktimeError.overlappingIntervals
+            }
             previousEnd = span.end
             let length = try difference(span.end, span.start)
             let newUpper = try add(upper, length)
@@ -76,12 +78,17 @@ public enum Worktime {
                 lower = newLower
             }
         }
-        let attainment: Attainment = lower >= target ? .reached : upper >= target ? .possible : .notReached
-        let crossing: Crossing
-        if let earliest, let latest {
-            crossing = earliest == latest ? .exact(earliest) : .range(earliest...latest)
+        let attainment: Attainment = if lower >= target {
+            .reached
+        } else if upper >= target {
+            .possible
         } else {
-            crossing = .unavailable
+            .notReached
+        }
+        let crossing: Crossing = if let earliest, let latest {
+            earliest == latest ? .exact(earliest) : .range(earliest ... latest)
+        } else {
+            .unavailable
         }
         return WorkBounds(lower: lower, upper: upper, attainment: attainment, crossing: crossing)
     }
@@ -93,7 +100,7 @@ public enum Worktime {
         guard state != .ended else { return .ended }
         guard candidate >= now else { return .invalidCandidate }
         if candidate == now {
-            return .feasible(worked: bounds.lower...bounds.upper, futureRest: 0)
+            return .feasible(worked: bounds.lower ... bounds.upper, futureRest: 0)
         }
         let window = try difference(candidate, now)
         let requiredRest: Int64
@@ -103,14 +110,14 @@ public enum Worktime {
         case let .onBreak(returnAt):
             guard let returnAt else { return .unknown }
             guard returnAt >= now, returnAt <= candidate else { return .infeasible }
-            requiredRest = max(remainingRest, try difference(returnAt, now))
+            requiredRest = try max(remainingRest, difference(returnAt, now))
         case .ended:
             return .ended
         }
         guard requiredRest <= window else { return .infeasible }
         let futureWork = window - requiredRest
         return try .feasible(
-            worked: add(bounds.lower, futureWork)...add(bounds.upper, futureWork), futureRest: requiredRest
+            worked: add(bounds.lower, futureWork) ... add(bounds.upper, futureWork), futureRest: requiredRest
         )
     }
 }

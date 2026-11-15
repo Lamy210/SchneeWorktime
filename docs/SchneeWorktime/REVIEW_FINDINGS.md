@@ -96,3 +96,5 @@ templateのRelease Isolation CI失敗は別のセキュリティ・テスト移�
 - P0: 仮復帰時刻と残り休憩のmax計算、leave-now/endedの区別を規定。
 - P1: 518文字のRequirementを短縮し、各タスクに検証条件を追記。翌日参考終業の明示オフセットを規定。
 - Domain初期実装（6テスト成功、Linux Swift 6.2.1）。仕様・テストの全件合格を意味しない。CLI strict、アプリ実装、CI移植問題は未完了。
+
+- CI追記: 初期Domain導入後のSwift QualityはSwiftFormat違反で失敗。既存ルールを緩和せず書式・命名・行長を修正し、ローカルSwift 6.2.1で6件を再実行成功。CIの再確認は別途必要。

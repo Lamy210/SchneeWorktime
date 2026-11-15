@@ -1,4 +1,4 @@
-# Verification Strategy — SchneeWorktime v0.4
+# Verification Strategy — SchneeWorktime v0.7
 
 ## 1. Test layers
 | 層 | 実行環境 | 主要検証 |
@@ -32,7 +32,7 @@
 8. No official overtime/pay language appears as a calculation result.
 
 ## 4. Fault injection
-- Crash during per-workday atomic write, disk full, invalid schema, backup restore, stale revision commit.
+- Crash during app-wide transaction, disk full, invalid schema, catalog/active ID consistency, backup restore, erase epoch and stale revision commit.
 - Sleep/wake with open work and open break, app forced quit and resume, system clock rollback, timezone/DST transition.
 - Notification authorization denied/revoked, request already fired during cancel, repeated schedule calls.
 - Display disconnected, app panel hidden, multiple UI commands racing.
@@ -55,10 +55,10 @@
 ## v0.7 実装済み単体テストの対応（部分カバレッジ）
 | Test | 対応する計算・境界 |
 |---|---|
-| attainmentAndCrossing | AC-63/122 の上下限と到達範囲 |
-| possibleNotConfirmed | AC-62/44（下限未達） |
-| exactBeforeLaterUncertainty | AC-83 |
-| rejectOverlapAndFuture | AC-18/61 の一部（正規化済み区間） |
-| impossibleRestAndLeaveNow | AC-105〜108（計算のみ） |
-| activeBreakConsumesBudgetOnce | AC-109/126〜129（計算のみ） |
+| attainment and crossing | AC-63/122 の上下限と到達範囲 |
+| possible not confirmed | AC-62/44（下限未達） |
+| exact before later uncertainty | AC-83 |
+| reject overlap and future | AC-18/61 の一部（正規化済み区間） |
+| impossible rest and leave now | AC-105〜108（計算のみ） |
+| active break consumes budget once | AC-109/126〜129（計算のみ） |
 ローカルLinux Swift 6.2.1で6件成功。UI、監査、実際の通知、保存競合、タイムゾーン、残休憩消費などは未実装・未検証。AC-130〜140の未実装分は個別テストに追加する。

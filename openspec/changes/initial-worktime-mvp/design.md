@@ -22,7 +22,7 @@ SchneeWorktimeApp (SwiftUI)
  └ CompositionRoot
      ├ WorktimeDomain: pure interval rules, projections, reference/surplus
      ├ WorktimeApplication: commands, FSM, correction validation
-     ├ WorktimePersistence: versioned local atomic snapshots + backups
+     ├ WorktimePersistence: transactional local store + versioned backups
      ├ NotificationGateway: UNUserNotificationCenter pending reconciliation
      ├ Clock/Calendar: injectable Instant/time zone/monotonic observation
      └ SystemEvents: wake, clock/time zone changes
@@ -56,7 +56,7 @@ View/Panel never writes directly to local repository; notification gateway never
 - No notifications scheduled for already ended workdays, and no stale pre-alerts sent retrospectively.
 
 ## Storage / failure handling
-- Store each canonical workday's intervals, audit changes and revision in a single validated atomic envelope under app-owned Application Support; write temporary file -> flush as appropriate -> atomic replace -> validation/recovery; retain bounded last-known-good backups. Liveness markers are separate non-attendance metadata and may be lost without making records inconsistent.
+- Store canonical intervals, active ID, catalog, audit and revisions together in a single app-wide transaction under app-owned Application Support. Retain validated last-known-good backups subject to the erase epoch. Liveness markers are separate non-attendance metadata; losing them cannot assert working time.
 - Canonical state write succeeds before OS notification changes. If persistence fails, keep prior state; if notification fails after persistence, preserve records, show retry.
 - Crash recovery scans last valid snapshot, preserves corrupt data for user-reviewed recovery. Never silently initialize empty data on corruption.
 - Explicit export via user-selected destination; local deletion requires confirmation. Keep employer names, meeting titles, geolocation and screen activity out of data model.
@@ -67,7 +67,7 @@ View/Panel never writes directly to local repository; notification gateway never
 - User can hide panel while menu bar stays interactive. Topmost and all-spaces behavior opt-in. Auto-recover lost display placement.
 - Accessibility: VoiceOver, keyboard, high contrast, Reduce Motion, labels separating 実績/予定/未確定.
 - Proposed quality gates (not measured SLO): P0 domain/application AC 100%; no lost committed records in forced-write-failure QA; CPU/memory and sleep/wake profiles measured on real Mac before setting quantitative ceiling.
-- Major failure modes: macOS sleep during active work, clock/DST changes, notification race, JSON corruption, duplicated session actions, reconfiguration of screens; every case has explicit fallback and test.
+- Major failure modes: macOS sleep during active work, clock/DST changes, notification race, store/database corruption, duplicated session actions, reconfiguration of screens; every case has explicit fallback and test.
 
 ## References (verified as documentation, not executed)
 - https://openspec.dev/docs/schemas/spec-driven
@@ -167,6 +167,7 @@ A future-break override is a forecast-only plan with `(restRemainingSecondsAtSet
 | On break / unknown end | 時刻未確定 | 残り実働 | 休憩終了・退勤 |
 | Ended / shortfall | 不足の固定時間 | 退勤時刻、記録実働 | 修正・再開 |
 | Ended / achieved | 達成済み | 達成時刻（確定または範囲） | 履歴確認 |
+| Ended / possible | 達成の可能性あり・要確認 | 固定実働範囲、未来予測なし | 履歴訂正 |
 
 ### Revised quality gates
 - All P0 arithmetic/transition/reconciliation cases pass deterministic FakeClock/FakeStore/FakeNotification tests; check numeric boundary values and nonoverlap properties.
@@ -178,7 +179,7 @@ A future-break override is a forecast-only plan with `(restRemainingSecondsAtSet
 - An unresolved interval has three explicit outcomes: **勤務継続** (adds to work), **実際の休憩** (adds only to recorded unpaid break), or **非勤務ギャップ** (adds to neither work nor rest).
 - A non-work gap must split work intervals and be classified in the canonical workday/audit. It does not satisfy any expected unpaid rest; do not label it a break for convenience.
 - Example: 11:30開始、16:30〜17:30未確認、17:30時点の実働は5h。分類を非勤務ギャップにすると最短19:30・残り予定休憩60m込み退勤20:30。分類を休憩にすると最短19:30・休憩実績60m・退勤19:30。
-- UI must offer the three choices with a preview and explicit save; all corrections use the same revision, atomic envelope, and future notification reconciliation.
+- UI must offer the three choices with a preview and explicit save; all corrections use the same revision, app-wide atomic transaction, and future notification reconciliation.
 - App shutdown, lock, sleep or wake by itself never determines which of these classifications is correct.
 
 ## v0.5 product usability decisions

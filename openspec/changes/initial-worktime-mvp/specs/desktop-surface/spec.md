@@ -42,7 +42,7 @@ The system SHALL derive displayed countdown from absolute time without persistin
 - **THEN** 非表示中に毎秒描画を要求せず、再表示時に現在時刻から再計算する
 
 ### Requirement: Show forecast and evidence states
-The system SHALL clearly label confirmed worked time, forecast departure and unverified time, and SHALL replace active countdown with achieved or shortfall when a workday ends.
+The system SHALL clearly label confirmed worked time, forecast departure and unverified time, and SHALL replace active countdown with a frozen attained, possible or not-reached result when a workday ends.
 
 #### Scenario: Unverified work period
 - **WHEN** スリープ由来の要確認区間を含む実働を表示する

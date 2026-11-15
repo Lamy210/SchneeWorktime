@@ -19,8 +19,8 @@ The system SHALL persist versioned, validated records atomically with revision c
 - **WHEN** 記録書き込み中にアプリが異常終了する
 - **THEN** 次回起動で完了済みの整合データを復元し、部分記録で上書きしない
 
-#### Scenario: Bad JSON
-- **WHEN** 設定ファイルが破損して正常バックアップがある
+#### Scenario: Corrupt store or settings
+- **WHEN** ストアまたは設定が破損して現行世代の正常バックアップがある
 - **THEN** 破損原本を保護して復旧選択肢を示し、空データで上書きしない
 
 ### Requirement: Explicit correction audit
@@ -63,7 +63,7 @@ The system SHALL export work history only to a user-confirmed local destination 
 - **THEN** 出力を作成せず勤務履歴を変更しない
 
 ### Requirement: Save each workday and its audit atomically
-The system SHALL commit the canonical workday intervals, correction audit and revision as one validated atomic unit per workday. It SHALL not expose a new workday revision when its corresponding audit record has not been durably committed.
+The system SHALL commit canonical workday intervals, correction audit and per-day revision within the app-wide store transaction. It SHALL not expose a new workday revision when its corresponding audit record has not been durably committed.
 
 #### Scenario: Crash between revision and audit write
 - **WHEN** 訂正中にアプリが異常終了する
