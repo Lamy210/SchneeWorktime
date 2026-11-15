@@ -51,3 +51,14 @@
 - デフォルト通知：最短18:30/退勤見込み19:30で19:15のみ予約。最短の18:15はユーザー設定後だけ。
 - 予定休憩入力前の休憩実績の訂正ではoverrideの消費量を変えない。入力後の休憩時間増加・減少に追随する。
 - 7時間実働・休憩記録30分で警告しても日次目標達成は取り消さず、法的違反の断定もしない。
+
+## v0.7 実装済み単体テストの対応（部分カバレッジ）
+| Test | 対応する計算・境界 |
+|---|---|
+| attainmentAndCrossing | AC-63/122 の上下限と到達範囲 |
+| possibleNotConfirmed | AC-62/44（下限未達） |
+| exactBeforeLaterUncertainty | AC-83 |
+| rejectOverlapAndFuture | AC-18/61 の一部（正規化済み区間） |
+| impossibleRestAndLeaveNow | AC-105〜108（計算のみ） |
+| activeBreakConsumesBudgetOnce | AC-109/126〜129（計算のみ） |
+ローカルLinux Swift 6.2.1で6件成功。UI、監査、実際の通知、保存競合、タイムゾーン、残休憩消費などは未実装・未検証。AC-130〜140の未実装分は個別テストに追加する。

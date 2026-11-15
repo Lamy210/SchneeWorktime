@@ -59,3 +59,14 @@ The system SHALL describe the 18:00 default as a user-configured reference end t
 #### Scenario: Reference disabled
 - **WHEN** 利用者が参考終業時刻を無効化する
 - **THEN** 基準時刻差分と対応通知を非表示にし、日次実働計算は変わらない
+
+### Requirement: Explicit next-day reference
+The system SHALL allow the reference wall time to carry an explicit dayOffset of 0 or 1 relative to the captured start date. It SHALL resolve the reference in the captured timezone, never infer next-day intent solely because the time precedes clock-in. Nonexistent or ambiguous local times SHALL require explicit resolution.
+
+#### Scenario: Night shift with next-day reference
+- **WHEN** 21:00開始で参考終業を翌06:00（dayOffset=1）に設定する
+- **THEN** 翌06:10の参考差分を10分とする
+
+#### Scenario: Same-day reference before start
+- **WHEN** 21:00開始で参考18:00、dayOffset=0
+- **THEN** 不適用とし翌日18:00へ自動移動しない

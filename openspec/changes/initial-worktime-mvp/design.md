@@ -1,4 +1,4 @@
-# Design: SchneeWorktime MVP v0.6 — Feasible forecast and notification semantics
+# Design: SchneeWorktime MVP v0.7 — Consistent contracts and tested domain foundation
 
 ## Goals / constraints
 - macOS 15+ / Swift 6。SwiftUI + AppKit(NSPanel)。`Lamy210/template` は CI/リリース雛形で、アプリ本体はまだない。
@@ -40,8 +40,8 @@ View/Panel never writes directly to local repository; notification gateway never
 ## Deterministic time equations
 - `worked(now)=Σ closed work seconds + max(0,now-openWorkStart)` when working; current break/ended contributes no further duration.
 - `remaining=max(0,target-worked)`; `surplus=max(0,worked-target)`.
-- `recordedBreak=Σ completed actual break intervals`; expected remaining break `max(0,expectedBreak-recordedBreak)` **is an assumption and never actual attendance**.
-- When working, target is not met and all historical spans are resolved: `earliestGoalAt=now+remaining`; `estimatedDepartureAt=earliestGoalAt+forecastFutureBreakSeconds`, using the explicit active-day rest override if present, otherwise `max(0,expectedBreak-recordedBreak)`. An open break without a known end or unresolved historical time prevents a single exact forecast.
+- `recordedBreak=Σ actual break intervals clipped to the observation Instant`; expected remaining break `max(0,expectedBreak-recordedBreak)` **is an assumption and never actual attendance**.
+- When working, target is not met and all historical spans are resolved: `earliestGoalAt=now+remaining`; `estimatedDepartureAt=earliestGoalAt+forecastFutureBreakSeconds`, using the explicit active-day rest override if present, otherwise `max(0,expectedBreak-recordedBreak)`. An open break without a hypothetical return or unresolved historical time prevents a single exact forecast.
 - For workdays with uncertain time, calculate `knownWorkLowerBound` and `recordedWorkUpperBound`; if the lower bound already reaches target, attainment is certain even though the exact crossing time may remain unknown. Only show a single `actualAchievedAt` if invariant under all valid interpretations. Label all results as based on the user's recorded work.
 - Reference end uses logical workday's local date + captured zone. If reference precedes clock-in, mark not applicable; after clock-out fix delta at actual end. Never equate with legal overtime.
 - Display duration arithmetic uses seconds; remaining rounds up to minutes, positive earned surplus rounds down; never negative or false completion.
@@ -95,7 +95,7 @@ working --clockOut--> ended
 onBreak --clockOut+confirmation--> ended (close break at chosen Instant)
 ended --explicit resume--> working (same identified workday)
 ```
-Canceling break-end clock-out preserves the open break. Closed workdays show frozen surplus or shortfall, never a running clock. The application shall prohibit a second open workday while one exists.
+Canceling break-end clock-out preserves the open break. Closed workdays show frozen work bounds and attainment status, never a running clock. The application shall prohibit a second open workday while one exists.
 
 ### Notification forecast/confirmed split
 1. An advance OS request is a **forecast** and its text shall clearly indicate that attendance requires verification. It cannot prove uninterrupted work while the app is suspended.
@@ -113,7 +113,7 @@ Apple platform events to consider: NSWorkspace sleep/wake and NSSystemClockDidCh
 - For ended days, `actualWorked(now1) == actualWorked(now2)` for all later wall times.
 - An open break without defined end yields `futureGoalAt=unknown`.
 - For working days with viable forecasts, `estimatedDepartureAt >= earliestGoalAt`.
-- An unresolved anomaly prevents a claim of confirmed goal achievement.
+- An unresolved anomaly prevents confirmed attainment only when the verified lower bound is below target; it prevents exact crossing time only when it can change that time.
 - Same notification ID with changed fire time shall produce a replacement request.
 - Failed persistence cannot produce successful new state or associated notification changes.
 
@@ -147,9 +147,9 @@ A future-break override is a forecast-only plan with `(restRemainingSecondsAtSet
 - Historical **actual** events must not have timestamps later than the reliable current Instant; future clock-out belongs to planned departure only.
 
 ### Atomic persistence and privacy
-- The last valid committed per-workday envelope includes intervals + correction audit + schemaVersion + revision. Commit/rollback is indivisible, not an independent update of a snapshot followed by audit append.
+- The committed application-wide catalog includes all workday envelopes (intervals, audit, schemaVersion, per-day revision), active ID and global generation. Commit/rollback is indivisible, not an independent update of a snapshot followed by audit append.
 - A saved state commit is authoritative for notification re-scheduling; OS scheduled notifications are derived state, not the attendance database.
-- Updating the same workday from two UI contexts requires serial execution/expected-revision comparison. Failed stale writes cannot silently overwrite.
+- All write commands, including across processes, require store-wide serialization and expected global revision/epoch comparison. Failed stale writes cannot silently overwrite.
 - User-requested erase removes app-managed history, audit, backups, and locally managed derived attendance artifacts. File exports and Time Machine/system backups remain outside app control and must be disclosed. Do not claim cryptographic security or tamper-proof legal attendance.
 
 ### Notification safety contract
@@ -255,8 +255,8 @@ The prior v0.5 `leave at 19:00` scenario had no explicit current time and could 
 - **Departure preparation (default)**: break-adjusted departure 19:30 → lead 15m at **19:15**.
 - **Earliest goal (opt-in)**: uninterrupted-goal 18:30 → lead 15m at **18:15**.
 - **Reference (optional)**: independent reference 18:00, unrelated to actual work attainment or official overtime.
-- **Explicit planned departure**: if saved, it is distinct from the computed estimate; the default preparation reminder follows the saved intent, showing any projected shortfall. An impossible forecast is never presented as feasible simply because the user saved a plan.
-- If actual target attainment is validated earlier than the forecast, cancel future goal/unfinished-plan reminders best effort; preserve a separate break-record advisory without claiming employer compliance.
+- **Explicit planned departure**: if saved, it is distinct from the computed estimate; the default preparation reminder follows the saved intent, showing any projected shortfall. An impossible forecast is never presented as feasible simply because the user saved a plan. Saving infeasible or unknown intent requires warning acknowledgement; suppress its preparation reminder rather than silently reverting to a different time.
+- If actual target attainment is validated earlier than the forecast, cancel future derived goal-based preparation reminders best effort. Retain eligible explicit desired-departure reminders; preserve separate break-record advisory.
 
 ### Break duration advisories
 The default break assumption is 60 minutes, but it is not always identical to a legal minimum. According to the Ministry of Health, Labour and Welfare, for work exceeding 6 hours the legal minimum is 45 minutes; for work exceeding 8 hours it is 60 minutes (subject to actual employment conditions and exceptions). Present this as **check your recorded break and rules** rather than inferring a statutory violation from a personal log. Never fabricate breaks, auto-clock out or block saving an otherwise valid work record.
@@ -266,3 +266,13 @@ The default break assumption is 60 minutes, but it is not always identical to a 
 - docs/SchneeWorktime/NOTIFICATION_POLICY.md
 - docs/SchneeWorktime/ACCEPTANCE_MATRIX.md (AC-105 to AC-121)
 - https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/koyou_roudou/roudoukijun/roudouzikan/index.html
+
+## v0.7 consolidated contracts (supersedes conflicting earlier examples)
+
+- Attainment and crossing are orthogonal: lower >= target implies reached even if crossing is a range. If upper >= target but lower < target, status is possible and no guaranteed crossing instant exists. Never call the record employer-certified. Ended records freeze these values at clock-out, not an invented single value.
+- `plannedDepartureAt` represents explicit user intent, not calculated `estimatedDepartureAt`. Future infeasible/unknown intent can be saved after acknowledging a warning. A passed plan remains historical intent and is not clock-out. Never create a future plan at or before now.
+- A saved plan takes preparation priority only when presently feasible with precise projected work. Otherwise show the conflict and suppress that reminder (do not fall back silently). Reference and earliest-goal categories are evaluated independently. An eligible saved plan can remain after target attainment; derived target-based preparation is retired.
+- Break elapsed to now consumes rest. For active break return assumption R, future obligatory break = R-now. With remaining budget B after elapsed rest, future rest=max(B,R-now) rather than B+(R-now). R must be in [now,candidate]. A leave-now preview ignores future rest; ended records allow no future preview until explicit resume. Never create a real event from a preview. Work bounds use a fixed stated rest assumption based on recorded rest only, not speculative rest classifications.
+- Reference configuration includes explicit dayOffset 0 or 1, default 0, in the captured timezone. Resolve DST ambiguity explicitly, reject nonexistent local times.
+- Persistence: choose **one application-wide transactional store** containing catalog/active ID, records/audit and store generation. A single database transaction (SQLite is the proposed adapter) enforces cross-workday nonoverlap and max one active, serialized writer and stale-generation rejection. Backup restore validates every invariant and rejects ambiguous active days. An erase commits an epoch boundary before deleting old backups; incomplete erase is reported and old generations are fenced off from automatic restoration. The adapter, crash-safety tests and backup design remain unimplemented.
+- The initial dependency-free SwiftPM module `Packages/WorktimeDomain` accepts disjoint normalized work spans clipped to now and computes bounds/crossing and conditional departure feasibility. It does not yet implement normalization of raw intervals, Workday commands, rest budget calculation, persistence, timezone resolution or notification delivery. Test via `swift test --package-path Packages/WorktimeDomain`. Do not infer app completion from these unit tests.

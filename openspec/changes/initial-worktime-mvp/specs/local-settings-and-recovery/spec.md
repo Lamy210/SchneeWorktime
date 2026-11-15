@@ -94,3 +94,29 @@ The system SHALL include canonical workday records, correction audit, app-owned 
 #### Scenario: User exports remain
 - **WHEN** アプリの全履歴を削除するが、利用者が過去に別フォルダーへエクスポートしたファイルがある
 - **THEN** アプリは外部ファイルを削除せず、削除対象外であることを事前に案内する
+
+### Requirement: Transaction covers all workdays
+The system SHALL serialize all mutations across processes and commit the complete workday catalog, active identifier, per-day revisions and audit in one atomic store transaction. It SHALL validate at most one active workday and nonoverlap globally before commit. Recovery SHALL never choose a new active workday by guessing.
+
+#### Scenario: Concurrent clock-in across separate windows or processes
+- **WHEN** 未開始状態から2つの操作が異なる勤務日を同時作成しようとする
+- **THEN** 片方のみ成功し、他方は競合を返す。activeは最大1件
+
+#### Scenario: Crash during active pointer change
+- **WHEN** 勤務日作成または再開の保存中にアプリが異常終了する
+- **THEN** カタログ・active ID・監査が一致する旧または新の完全な状態を復元する
+
+#### Scenario: Invalid backup with two active days
+- **WHEN** 復元候補が2つのactive勤務日を含む
+- **THEN** 自動採用せず復旧を保留する
+
+### Requirement: Erase is a recovery boundary
+The system SHALL serialize erasure with ordinary writes, invalidate all pre-erase pending edits, and prevent automatic restoration of erased generations. It SHALL cancel app-owned pending work reminders after erase. It SHALL report incomplete deletion rather than claiming success.
+
+#### Scenario: Crash during history erase
+- **WHEN** 全削除確定後にバックアップ削除途中で異常終了する
+- **THEN** 削除済み世代を自動復元せず削除の続行または失敗を明示する
+
+#### Scenario: Stale edit after erase
+- **WHEN** 全削除以前の訂正画面が保存を試みる
+- **THEN** 旧世代の更新を拒否し削除した勤務日を復活させない

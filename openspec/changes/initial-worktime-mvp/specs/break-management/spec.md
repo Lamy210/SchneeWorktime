@@ -28,7 +28,7 @@ The system SHALL support multiple nonoverlapping break intervals within one work
 - **THEN** 境界一致を重複とみなさず90分を保持する
 
 ### Requirement: Open break has unknown end
-The system SHALL freeze net work while a break is active and SHALL not provide an exact future goal time until the return time is known.
+The system SHALL freeze net work while a break is active. Without an explicit return assumption, future goal times SHALL be unavailable; a hypothetical return time SHALL NOT end the actual break.
 
 #### Scenario: Unknown break end
 - **WHEN** 15:00に休憩開始して終了予定がない
@@ -46,7 +46,7 @@ The system SHALL offer a nonbinding review hint when recorded breaks look insuff
 - **THEN** 目標達成を維持しつつ休憩記録の確認を促す
 
 ### Requirement: Forecast rest must stop delaying achieved work
-The system SHALL expose remaining expected rest as a forecast assumption only while the daily target is not yet achieved, and SHALL not deduct any unrecorded break from actual work.
+The system SHALL not delay historical goal attainment because of unrecorded planned rest. Future rest SHALL remain available for explicit what-if plans after attainment, but SHALL NOT be deducted from actual work.
 
 #### Scenario: Target achieved without a break
 - **WHEN** 11:30から休憩なしで18:30に7時間の実働を記録する
@@ -107,3 +107,10 @@ The system SHALL distinguish a user-configured 60-minute expected break from an 
 #### Scenario: Actual later break consumes override
 - **WHEN** 13:00に残り休憩予定30分を設定し、その後14:00〜14:20に実績休憩を記録する
 - **THEN** 残り休憩予定10分とし、同じ20分を複数回消費しない
+
+### Requirement: Open break consumption uses elapsed time
+The system SHALL count elapsed portions of an open recorded break through the observation Instant for rest consumption, limited to time after the override anchor for an override. The future remainder of the break SHALL be forecast-only.
+
+#### Scenario: Set override during active break
+- **WHEN** 12:00休憩開始、12:20に残り30分を上書き、12:30現在も休憩中
+- **THEN** 上書き以後に経過した10分だけ消費し残り20分とする

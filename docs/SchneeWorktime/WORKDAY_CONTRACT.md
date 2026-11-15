@@ -1,4 +1,4 @@
-# Workday Contract — SchneeWorktime v0.6
+# Workday Contract — SchneeWorktime v0.7
 
 ## Purpose
 本書はOpenSpecの補足設計資料であり、実装コードではない。MVPの事実・予測・不明を混同しないためのデータ契約を明文化する。
@@ -6,12 +6,12 @@
 ## Canonical workday envelope
 - `workdayId: UUID`: 明示的に作成した勤務記録の一意ID。日跨ぎで変更しない。
 - `logicalStartDate`、`capturedTimeZoneID`: 勤務開始時に確定した表示/基準時刻の文脈。
-- `profileSnapshot`: `dailyTargetSeconds=25200`、`expectedBreakSeconds=3600`、`referenceEndLocalTime=18:00?`。
+- `profileSnapshot`: `dailyTargetSeconds=25200`、`expectedBreakSeconds=3600`、`referenceEndLocalTime=18:00?`、`referenceDayOffset=0|1`。
 - `state`: `notStarted | working | onBreak | ended`（各workdayの保存時はnotStarted無しでも可）。
 - `workIntervals`、`breakIntervals`、`nonWorkGapIntervals`: half-open absolute intervals `[startInstant,endInstant)`。3つの種別は互いに重ならず、最後のアクティブ区間のみend=null可。
 - `uncertainSpans`: 元の勤務区間に含まれ、勤務か非勤務か未確認のintervalとその観測理由。
 - `futureRestPlan?`: `restRemainingSecondsAtSet`、`setAtInstant`、`workdayRevisionAtSet`。入力以後に**実際の休憩区間と重なった時間**だけ予定休憩を消費する。入力以前の休憩の訂正で消費量を誤更新しない。
-- `plannedDepartureAt?`: 退勤予定。実際のclock-outと区別。
+- `plannedDepartureAt?`: 本人が明示保存した希望退勤。未来かつ警告確認済みなら試算不整合でも保存可能。実際のclock-outや自動算定見込みとは区別。
 - `correctionAudit`: revision、before/after、訂正時刻、訂正の由来、任意のコメント。
 - `schemaVersion`、`revision`: 単一の原子的保存単位に含める。
 
@@ -78,7 +78,7 @@
 - Let `futureWindowSeconds=candidate-now`. If planned future break exceeds the window, `feasibility=infeasible`, not a misleading numeric result.
 - If the break end is unknown or historical work has unresolved ranges, a precise forecast may be `unknown`; show the reason and review action.
 - `earliestGoalAt`, `estimatedDepartureAt`, `plannedDepartureAt`, `referenceEndAt` are distinct Instants and must never be treated as interchangeable.
-- Default departure preparation reminders use estimated departure (or user-saved feasible planned departure); earliest-goal reminder is independent and opt-in.
+- Default departure preparation reminders use an eligible explicit saved plan, or the computed estimate only when no plan exists. Ineligible saved plan suppresses its reminder; earliest-goal is independent and opt-in.
 - Each preview is invalidated on workday revision/observed time expiry; a Save As Plan request re-evaluates the constraints.
 - `futureRestPlan` consumption: sum of actual break intervals intersected with `[setAtInstant,now]`. Edits before `setAtInstant` do not count toward future rest. Preserve audit and validation on every correction.
 - The default 60-minute anticipated break is a personal planning assumption. A brief break-advisory may draw attention to the recorded duration without claiming formal legal compliance.
@@ -92,3 +92,8 @@
 | 上記で「今帰る」 | 18:10 | 既に記録した実働6時間40分。未取得休憩を控除しない |
 
 Detailed rationale: `FORECAST_SEMANTICS.md`, `NOTIFICATION_POLICY.md`.
+
+## v0.7 store-wide invariants
+- アプリ全体のcatalog（active ID、store epoch/revision、全workday envelope/監査）を単一のトランザクションで保存する。workday単位の原子性だけでなく全体の最大1active・区間非重複を保つ。
+- 全削除と通常更新を直列化し、古いepochの再保存・バックアップ自動復元を拒否する。データ削除未完了は明示する。
+- 計算層の `WorkBounds` は確認済み下限、可能性上限、attainment、crossingを別々に持つ。possibleならcrossingは保証されずunavailable。reachedならexact/range。

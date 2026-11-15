@@ -1,9 +1,9 @@
-# Notification Policy v0.6 — カウントダウン通知契約
+# Notification Policy v0.7 — カウントダウン通知契約
 
 ## 通知カテゴリ
 | カテゴリ | 初期設定 | 基準時刻 | 表示文言 |
 |---|---|---|---|
-| 退勤準備 `departurePreparation` | 有効化した場合、15分前が既定 | 明示保存された実現可能な退勤予定、なければ休憩込み退勤見込み | 「退勤見込みまで15分」 |
+| 退勤準備 `departurePreparation` | 有効化した場合、15分前が既定 | 明示保存された未来の希望（有効な試算のときのみ）、希望なしなら休憩込み退勤見込み | 「退勤見込みまで15分」 |
 | 最短達成 `earliestGoalOptional` | 無効 | 休憩を増やさず続けたときの最短7時間到達 | 「最短7時間まで15分（見込み）」 |
 | 参考時刻 `referenceEnd` | ユーザーが有効化 | 参考終業18:00等 | 「参考終業時刻になりました」 |
 | 超過見込み `surplusForecast` | 無効 | 条件付きの日次7時間超過 | 「目標超過の可能性があります」 |
@@ -18,8 +18,8 @@
 - 「参考終業18:00」通知は別物。基準時刻から経過した分を正式な残業として扱わない。
 
 ## 不確実性と終了
-- 未確認スリープ等で退勤見込みが時刻範囲になる、休憩終了が不明、候補予定が実現不能、OS時計が不正なら、精密な退勤準備/最短達成/超過予報は予約しない。
-- 7時間の達成を記録上確認したら、未達に基づく未来の退勤準備通知は削除対象（アプリが動作中の場合）。休憩記録の確認は別途。
+- 各カテゴリの入力に不確実性がある場合にそのカテゴリの精密通知を抑止する。希望だけが実現不能なら退勤準備だけ抑止し、独立した有効な最短達成/参考通知は維持。OS時計不正の場合は全時刻予報を抑止。
+- 7時間の達成を記録上確認したら、自動算定の未達に基づく未来の退勤準備通知は削除対象（有効な明示希望の通知は維持）（アプリが動作中の場合）。休憩記録の確認は別途。
 - ユーザーが退勤した場合は、その勤務日に属する未来の未達・退勤準備予報を取り消す。
 - 同じIDでも発火Instantまたはpayload revisionが異なる予約は差し替え。
 - 予約処理前に必ず勤務日最新revisionを保存していること。
@@ -35,3 +35,5 @@
 - https://developer.apple.com/documentation/UserNotifications/scheduling-a-notification-locally-from-your-app
 - https://developer.apple.com/documentation/foundation/nsnotification/name-swift.struct/nssystemclockdidchange
 - https://developer.apple.com/documentation/foundation/timezone/systemtimezonedidchangemessage
+
+- 希望が保存済みでも条件不整合/範囲/期限経過なら、その希望の通知は抑止する。別時刻へ黙ってフォールバックしない。全履歴削除後はアプリ所有のpending通知を取消対象とする。

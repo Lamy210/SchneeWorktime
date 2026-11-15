@@ -1,4 +1,4 @@
-# Forecast Semantics v0.6 — 時刻予測・試算の契約
+# Forecast Semantics v0.7 — 時刻予測・試算の契約
 
 ## 位置付け
 本書は `initial-worktime-mvp` のOpenSpecを補完する実装契約。実装コードではない。規範的要件は同changeの `time-projection` / `break-management` / `local-notifications` のScenarioを正本とする。
@@ -13,7 +13,7 @@
 |---|---|---|
 | `earliestGoalAt` | これ以上休憩せず連続勤務したときの実働420分到達 | 最短7時間 |
 | `estimatedDepartureAt` | 残り予定休憩を全部取得する仮定で、実働420分を確保する時刻 | 休憩込み退勤見込み |
-| `plannedDepartureAt` | ユーザーが明示保存した退勤予定時刻。達成/不足の見込みは別計算 | 予定退勤 |
+| `plannedDepartureAt` | ユーザーが明示保存した希望退勤時刻。実現可能性・達成/不足の見込みは別計算 | 予定退勤 |
 | `referenceEndAt` | 勤務日開始時の設定に固定された任意の参考時刻（初期18:00） | 参考終業 |
 | `achievedAt` | 記録の有効な解釈で共通して得られる最初の実働420分到達Instant | 記録上達成 |
 
@@ -27,7 +27,7 @@
 - 実現可能な前提: `0 <= plannedFutureRestSeconds <= availableFutureSeconds`。実際の休憩予定が時間帯指定された場合は、その配置も検証する。
 - 実現可能・実現不能・算定不能を区別する。利用者が予定休憩を減らす操作を選ぶまで**予定を自動で短縮しない**。
 - 未確認時間が存在するときは、残り実働や目標差分を上下限で表現し、単一の確定値を出さない。
-- 試算は純粋関数であり `workdayRevision` や通知/実績を変更しない。ユーザーが明示保存する場合には、元revisionが最新かつ候補がまだ未来か再検証する。
+- 試算は純粋関数であり `workdayRevision` や通知/実績を変更しない。ユーザーが明示保存する場合には、元revisionが最新かつ候補がまだ厳密に未来か再検証する。実現不能/不明でも警告確認後は希望として保存可能。
 
 ## Example: invalid forecast
 - 出社11:30、休憩実績0分、現在18:10。記録上の実働6時間40分。
@@ -54,3 +54,8 @@
 
 ## Verification
 AC-105〜111、AC-118〜121、元のAC-93〜96に加え、境界 `candidate == now`、`plannedRest == availableFuture`、`plannedRest > availableFuture` をFakeClockで検証する。OpenSpec CLI実行は別途。
+
+## v0.7 境界
+- 休憩中に今帰る場合は現時点の実働のみ。未来を試算し、仮の復帰時刻 R が入力された場合は now <= R <= candidate が必要。残り休憩 B は経過実績を消費済みとし、未来休憩=max(B,R-now)。Rがなければ未来試算は不明。退勤済みは固定実績のみ。
+- 希望退勤と実現可能性は独立。警告確認後に保存した希望は、予測や実績を上書きしない。希望の条件が崩れたときは通知を抑止し、条件が再成立すれば再評価する。
+- 未確認時間による範囲は「現時点で記録済みの休憩から算定した残り予定休憩」という固定仮定のもとで表示し、将来の履歴訂正を想定して自動短縮しない。

@@ -79,7 +79,7 @@ The system SHALL distinguish provisional from confirmed recorded achievement whe
 - **THEN** 最初の累積実働420分の到達時刻を再計算し、確定可否を更新する
 
 ### Requirement: Ended workday remains frozen
-The system SHALL display a completed workday as achieved or shortfall from the final recorded net work. It SHALL NOT continue a goal countdown after clock-out.
+The system SHALL freeze the final recorded work bounds and attainment status at clock-out, including possible attainment when unresolved spans remain. It SHALL NOT continue a goal countdown after clock-out.
 
 #### Scenario: Clock out with shortfall
 - **WHEN** 実働6時間30分で退勤が確定する
@@ -90,7 +90,7 @@ The system SHALL display a completed workday as achieved or shortfall from the f
 - **THEN** 残り30分として新たな最短目標時刻を計算する
 
 ### Requirement: Bounded worked time under unresolved anomalies
-The system SHALL compute a nonnegative lower bound from verified recorded work spans and an upper bound by additionally including unresolved spans that may represent work. A goal is definitely not reached when upper bound is below target, possibly reached when lower bound is below target but upper bound meets target, and definitely reached in the user-recorded interval sense when lower bound meets target. An exact achievement Instant SHALL be shown only if invariant under all valid resolutions of uncertain spans.
+The system SHALL derive work bounds L and U from verified work and potentially worked unresolved spans. Attainment SHALL be notReached when U < target, possible when L < target <= U, and reached when L >= target. Achievement time SHALL be exact only if invariant across valid resolutions; otherwise it SHALL be a range or unavailable.
 
 #### Scenario: Possible achievement after unreviewed sleep
 - **WHEN** 11:30に開始し16:30〜17:30が未確認、現在18:30まで勤務記録が続く
@@ -161,7 +161,7 @@ The system SHALL calculate a hypothetical net-work result for a candidate depart
 - **THEN** 想定実働と過不足を範囲で示し、単一の確定値として表示しない
 
 ### Requirement: What-if feasibility is a precondition for numeric results
-The system SHALL validate that a hypothetical departure Instant is not earlier than the current clock and that all forecast future break time can fit between now and the candidate under the stated uninterrupted-work assumptions. It SHALL distinguish feasible, infeasible and unknown projections. It SHALL NOT silently clamp planned rest to the available horizon, generate negative future work, or claim a single precise result from unresolved work spans.
+For an active workday, the system SHALL validate that a hypothetical future departure is not earlier than the observation Instant and forecast rest fits in the future window. A leave-now query SHALL ignore all future assumptions. It SHALL distinguish feasible, infeasible and unknown projections. It SHALL NOT silently clamp planned rest to the available horizon, generate negative future work, or claim a single precise result from unresolved work spans.
 
 #### Scenario: Rest cannot fit before departure
 - **WHEN** 11:30開始・休憩実績0分・現在18:10・残り予定休憩60分・退勤候補19:00
@@ -193,3 +193,44 @@ The system SHALL label each what-if result with the workday revision and observa
 #### Scenario: Candidate passes while preview open
 - **WHEN** 19:00候補の試算を開いたまま現在時刻が19:01になる
 - **THEN** 19:00を新しい退勤予定としてそのまま保存させず、再計算または訂正へ誘導する
+
+### Requirement: Desired departure is independent of feasibility
+The system SHALL allow an explicitly saved future plannedDepartureAt even if its projection is infeasible or unknown, provided the warning is acknowledged. It SHALL preserve the user's intent, not change actual intervals or forecast rest, and never substitute the saved time for estimatedDepartureAt. A past or now candidate SHALL NOT be saved as a new future plan.
+
+#### Scenario: Save infeasible desire
+- **WHEN** 現在18:10に残り休憩60分のまま19:00の希望退勤を警告確認後に保存する
+- **THEN** 希望19:00・目標達成見込み19:30・条件不整合を別表示し、希望を実績/有効な予報として扱わない
+
+#### Scenario: Plan becomes feasible again
+- **WHEN** 保存済み希望に対して利用者が予定休憩を変更し条件が成立する
+- **THEN** 同じ希望時刻を保持したまま見込みを再計算する
+
+#### Scenario: Passed desired time
+- **WHEN** 19:00の希望を保存したまま19:01になる
+- **THEN** 希望を過去の予定と表示し、退勤実績を生成せず未来通知も予約しない
+
+### Requirement: Preview during an active break
+The system SHALL accept an optional hypothetical return Instant for an active break, strictly between or equal to now and candidate. The future active-break duration SHALL consume the remaining rest budget first; total future rest SHALL be max(mandatory active-break duration, remaining rest budget). It SHALL not save a break-end event from a preview.
+
+#### Scenario: Return assumption consumes rest budget
+- **WHEN** 11:30開始、12:00休憩開始、12:20現在、休憩実績経過20分、標準60分、13:00復帰仮定、19:30退勤候補
+- **THEN** 残り休憩40分を一度だけ控除し、実働7時間見込みとする。休憩は実際には終了しない
+
+#### Scenario: Candidate before hypothetical return
+- **WHEN** 12:20休憩中で13:00に復帰する仮定、12:45退勤候補を指定する
+- **THEN** 仮定と矛盾するため実現不能とする
+
+#### Scenario: Leave now on break
+- **WHEN** 12:20休憩中に今帰るを試算する
+- **THEN** 現時点までの実働30分を表示し、未来休憩を控除しない
+
+#### Scenario: Ended day projection
+- **WHEN** 退勤済みの勤務日を閲覧する
+- **THEN** 固定した実績の範囲を表示し、将来の退勤試算は明示再開まで無効とする
+
+### Requirement: Forecast rest assumptions with unresolved history
+The system SHALL compute future rest from recorded rest and explicit plans only, not speculative reclassification of unresolved historical work. It SHALL label the assumption and expose hypothetical work bounds under that assumption. A forecast range SHALL not silently become an exact prediction.
+
+#### Scenario: Uncertain time could have been rest
+- **WHEN** 過去60分が未確認で休憩実績0分のまま試算する
+- **THEN** 未確認時間を休憩実績へ加算せず、予定休憩の根拠を示して実働範囲を返す

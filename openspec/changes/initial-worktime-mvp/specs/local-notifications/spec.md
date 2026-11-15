@@ -58,7 +58,7 @@ The system SHALL persist an accepted change before notification reconciliation. 
 - **THEN** 記録は保持し、再試行できる非致命的警告を示す
 
 ### Requirement: Scheduled reminders are forecasts only
-The system SHALL label pre-scheduled goal and surplus notifications as conditional forecasts, not proof of attendance. It SHALL issue confirmed-achievement messaging only after validated committed intervals reach the target without unresolved uncertainty.
+The system SHALL label pre-scheduled goal and surplus notifications as conditional forecasts, not proof of attendance. It SHALL issue recorded-attainment messaging only if the verified lower bound reaches the target, and SHALL omit an exact achievement timestamp when uncertain.
 
 #### Scenario: Future goal reminder when suspended
 - **WHEN** OSが予約済みの18:30目標通知をアプリ休止中に配信する
@@ -69,8 +69,8 @@ The system SHALL label pre-scheduled goal and surplus notifications as condition
 - **THEN** アプリは実績達成として表示し、見込み通知と区別できる
 
 #### Scenario: Unverified target
-- **WHEN** 累積時間に未確認のスリープ区間が含まれる
-- **THEN** 確定達成通知を出さず記録確認を案内する
+- **WHEN** 確認済み実働の下限が目標未満で、未確認スリープを含む上限だけが目標以上である
+- **THEN** 達成確定通知を出さず記録確認を案内する
 
 ### Requirement: Trigger-sensitive request reconciliation
 The system SHALL compare each owned pending notification's identifier, trigger Instant and payload revision when reconciling, and SHALL replace outdated requests rather than trusting matching identifiers alone.
@@ -143,7 +143,7 @@ The system SHALL request macOS notification authorization only after a user enab
 - **THEN** ローカルの勤務計算・履歴保存・Glass表示を継続し、許可ダイアログを繰り返さない
 
 ### Requirement: Planned departure and earliest target have separate notifications
-The system SHALL use the feasible break-adjusted estimated departure as the default 15-minute departure-preparation reminder target, independently from the earliest uninterrupted-work goal. An optional earliest-goal reminder SHALL be a different configurable category, with clear forecast-only language. If a user explicitly saves a feasible planned departure, the departure-preparation reminder SHALL use that explicit plan and label any projected shortfall.
+The system SHALL default to a 15-minute lead before the feasible break-adjusted estimate. A saved future desire SHALL take priority only if its projection is feasible and precise; otherwise suppress its preparation reminder without silently falling back. Earliest-goal and reference categories SHALL remain independent. A saved-plan reminder SHALL label projected shortfall.
 
 #### Scenario: Standard plan and earliest target differ
 - **WHEN** 出社11:30・休憩実績0分・残り予定休憩60分で最短18:30・退勤見込み19:30である
@@ -167,3 +167,18 @@ The system SHALL keep the user-defined reference end reminder independent from a
 #### Scenario: Reference arrives before estimated departure
 - **WHEN** 参考終業18:00で退勤見込み19:30であり両方の通知が有効
 - **THEN** 18:00は「参考時刻到達」、19:15は「退勤見込み15分前」と別ラベルで管理し残業確定と表現しない
+
+### Requirement: Saved intent reminder lifecycle
+The system SHALL recompute eligibility from current clock, committed records and preferences. It SHALL retain a valid saved departure reminder after the daily target is achieved, unless the user ends the workday or the plan is no longer eligible. A derived goal-based preparation alert SHALL cease at recorded attainment.
+
+#### Scenario: Target achieved before saved departure
+- **WHEN** 希望20:00が実現可能で保存され、18:30に実働目標を達成する
+- **THEN** 本人の希望20:00の通知19:45を維持し、自動算定の未達通知だけを取消対象とする
+
+#### Scenario: Saved plan infeasible while earliest goal valid
+- **WHEN** 希望退勤時刻までに予定休憩が収まらず最短目標は一意である
+- **THEN** 希望退勤準備通知だけ抑止し、有効な独立カテゴリは保持する
+
+#### Scenario: Reached with uncertain time
+- **WHEN** 確認済み実働7時間だが到達時刻は範囲となる
+- **THEN** アプリ内で記録上の達成を表示し、正確な達成時刻は断定しない
