@@ -73,7 +73,7 @@
 - [x] 10.7 Domain packageのCIをRequired Gateに組み込む（検証: a8c5b5d1のWorktime Domain macOSジョブ、Swift 6.3.3で11件成功）
 
 ## 11. v0.8 — 勤務日コマンドの先行実装
-- [x] 11.1 UUID/目標・予定休憩profileを持つ値型WorkdayとCatalog、通常出社/休憩/退勤/再開を実装（検証: WorkdayTestsの7テスト、AC-15〜18/41/42/59/60/90の一部）
-- [x] 11.2 同一秒・未来・重複UUID・古いrevision/勤務日を拒否し、終了時刻でsnapshotを固定（検証: AC-143/144/146と既存退勤/未来テスト。AC-145の独立回帰は追加予定）
-- [ ] 11.3 timezone/論理開始日、信頼済み時計、同時刻境界の追加テスト、当日profile/休憩overrideの操作（検証: AC-15/29/67〜69/138/145）
+- [x] 11.1 UUID/目標・予定休憩profileを持つ値型WorkdayとCatalog、通常出社/休憩/退勤/再開を実装（検証: WorkdayTestsの9テスト、AC-15〜18/41/42/59/60/90の一部）
+- [x] 11.2 同一秒・未来・重複UUID・古いrevision/勤務日を拒否し、終了時刻でsnapshotを固定（検証: AC-143〜147と既存退勤/未来テスト）
+- [ ] 11.3 timezone/論理開始日、信頼済み時計、当日profile/休憩overrideの操作（検証: AC-15/29/67〜69/138）
 - [ ] 11.4 監査付き履歴訂正、観測世代、明示希望退勤、永続化側とcatalog revision/epochの整合（検証: AC-19〜22/45〜46/72〜75/123〜125/131〜135/146の統合）

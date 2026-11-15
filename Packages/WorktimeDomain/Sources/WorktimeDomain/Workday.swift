@@ -33,8 +33,16 @@ public struct Workday: Sendable, Equatable {
         if let end = last.end, now < end {
             throw WorkdayError.invalidEventTime
         }
+        let evaluation = last.end ?? now
+        var relevant: [ObservationGap] = []
+        for gap in uncertainty {
+            guard gap.start < gap.end, gap.end <= now else { throw WorktimeError.invalidInterval }
+            if gap.start < evaluation {
+                relevant.append(.init(start: gap.start, end: min(gap.end, evaluation)))
+            }
+        }
         return try Timeline.snapshot(
-            intervals: intervals, uncertainty: uncertainty, now: last.end ?? now,
+            intervals: intervals, uncertainty: relevant, now: evaluation,
             target: profile.target, expectedRest: profile.expectedRest
         )
     }

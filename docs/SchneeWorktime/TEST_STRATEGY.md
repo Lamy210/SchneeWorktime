@@ -82,5 +82,7 @@
 | same second and future transitions are rejected without mutation | AC-61/143 |
 | cross midnight resume keeps identity and excludes gap | AC-15/18/59（絶対秒の境界、timezone未実装） |
 | cannot resume old day or reuse its identity | AC-60/144とUUIDの一意性 |
-| profile targets are fixed and clock rollback is refused | AC-90の遡り時刻/入力済みprofile/開始前への逆転 |
-Linux Swift 6.2.1で追加7件・既存11件の計18件成功。AC-145の独立回帰、実際の競合、databaseの原子性、監査付き訂正、local date/timezone、時計検出、通知/UIはいずれも未検証。
+| profile targets are fixed and time before start is refused | AC-90の遡り時刻/入力済みprofile/開始前への逆転 |
+| touching workday boundaries are valid | AC-145と同時刻再開 |
+| closed snapshot clips valid observations at actual end | AC-147、未来観測の拒否 |
+Linux Swift 6.2.1で追加9件・既存11件の計20件成功。実際の競合、databaseの原子性、監査付き訂正、local date/timezone、時計検出、通知/UIはいずれも未検証。

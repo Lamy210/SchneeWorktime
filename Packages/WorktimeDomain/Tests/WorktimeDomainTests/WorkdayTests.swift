@@ -106,7 +106,7 @@ struct WorkdayTests {
         #expect(catalog == original)
     }
 
-    @Test func `profile targets are fixed and clock rollback is refused`() throws {
+    @Test func `profile targets are fixed and time before start is refused`() throws {
         let profile = try WorkdayProfile(target: 300, expectedRest: 100)
         var catalog = WorkdayCatalog()
         try catalog.apply(.clockIn(id: UUID(), profile: profile), at: 100, now: 120, expectedRevision: 0)
@@ -120,6 +120,38 @@ struct WorkdayTests {
         }
         #expect(throws: WorkdayError.invalidProfile) {
             try WorkdayProfile(target: 0)
+        }
+    }
+
+    @Test func `touching workday boundaries are valid`() throws {
+        var catalog = try started()
+        let first = try #require(catalog.activeID)
+        try catalog.apply(.clockOut(confirmBreak: false), at: 200, now: 200, expectedRevision: 1)
+        try catalog.apply(.resume(id: first), at: 200, now: 200, expectedRevision: 2)
+        try catalog.apply(.clockOut(confirmBreak: false), at: 300, now: 300, expectedRevision: 3)
+        let next = UUID()
+        let profile = try WorkdayProfile()
+        try catalog.apply(.clockIn(id: next, profile: profile), at: 300, now: 300, expectedRevision: 4)
+        #expect(catalog.activeID == next)
+        #expect(catalog.days.count == 2)
+        let previous = try #require(catalog.days.first)
+        let result = try previous.snapshot(now: 300)
+        #expect(result.bounds.lower == 200)
+        let active = try #require(catalog.days.last)
+        let initial = try active.snapshot(now: 300)
+        #expect(initial.bounds.lower == 0)
+    }
+
+    @Test func `closed snapshot clips valid observations at actual end`() throws {
+        var catalog = try started()
+        try catalog.apply(.clockOut(confirmBreak: false), at: 200, now: 300, expectedRevision: 1)
+        let day = try #require(catalog.days.last)
+        let gaps = [ObservationGap(start: 150, end: 250), ObservationGap(start: 260, end: 280)]
+        let result = try day.snapshot(now: 300, uncertainty: gaps)
+        #expect(result.bounds.lower == 50)
+        #expect(result.bounds.upper == 100)
+        #expect(throws: WorktimeError.invalidInterval) {
+            try day.snapshot(now: 300, uncertainty: [.init(start: 260, end: 301)])
         }
     }
 }

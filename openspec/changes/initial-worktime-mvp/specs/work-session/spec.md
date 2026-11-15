@@ -169,3 +169,10 @@ The system SHALL validate each explicit mutation against the expected applicatio
 #### Scenario: Competing stale command
 - **WHEN** 同じrevisionを読んだ二画面のうち最初の打刻が成功し、残った画面が旧revisionで操作する
 - **THEN** 後続を競合拒否し、先行の記録のみ保持する
+
+### Requirement: Clip valid observations to the recorded end
+The system SHALL validate observation endpoints against the trusted current Instant. A valid observation spanning a historical clock-out SHALL be intersected with recorded work only; its portion after clock-out SHALL NOT invalidate the closed snapshot or count as work.
+
+#### Scenario: Downtime spans a backdated clock-out
+- **WHEN** 退勤実績17:00、現在18:00、未確認観測16:30〜17:30が存在する
+- **THEN** 16:30〜17:00のみを勤務との交差として評価し、退勤以後の観測は実働計算に影響しない。現在より未来の観測端点は拒否する
