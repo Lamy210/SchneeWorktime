@@ -72,3 +72,15 @@
 | open work at clock in has zero duration | AC-142 |
 | invalid timelines fail rather than being guessed | 重複・複数open interval拒否 |
 11件のSwift TestingテストをLinux Swift 6.2.1で実行成功。既存の6テストと合わせた件数であり全ACの合格ではない。Testsワークフローに実際のDomain packageを必須ジョブとして追加。a8c5b5d1のmacOS CI（Apple Swift 6.3.3）で11件成功し、Tests/Required Gateも成功。最新コミットの結果はChecksを確認する。
+
+## v0.8 WorkdayCatalog 単体テスト
+| テスト | 計算/コマンド部分の対象 |
+|---|---|
+| work break and clock out freeze recorded time | AC-48と打刻遷移の固定 |
+| clock out during break requires confirmation | AC-41/42 |
+| stale and duplicate actions leave state unchanged | AC-16/17/146（値型のみ） |
+| same second and future transitions are rejected without mutation | AC-61/143 |
+| cross midnight resume keeps identity and excludes gap | AC-15/18/59（絶対秒の境界、timezone未実装） |
+| cannot resume old day or reuse its identity | AC-60/144とUUIDの一意性 |
+| profile targets are fixed and clock rollback is refused | AC-90の遡り時刻/入力済みprofile/開始前への逆転 |
+Linux Swift 6.2.1で追加7件・既存11件の計18件成功。AC-145の独立回帰、実際の競合、databaseの原子性、監査付き訂正、local date/timezone、時計検出、通知/UIはいずれも未検証。

@@ -104,3 +104,9 @@ templateのRelease Isolation CI失敗は別のセキュリティ・テスト移�
 - 11件のDomain単体テストがLinux Swift 6.2.1およびmacOS CI Apple Swift 6.3.3で成功（a8c5b5d1）。Tests Required Gateは実際のDomainテストを必須にした。
 - テンプレートのリポジトリ識別テストに実リポジトリ名を依存させないhermetic fixtureを導入。a8c5b5d1のRelease Isolation TDD/Quality成功。保護コード・品質閾値は緩和していない。
 - 旧設計の未確認区間と達成確定、無効時計と独立通知の記述を統一し、観測世代による試算失効と通知の逐次再調整を設計へ記載。実装はApplication層で行う。OpenSpec CLI、全受入条件、実機QAは未完。
+
+## v0.8 — 通常打刻の実装レビュー
+- 同じ秒に出社→退勤/休憩をすると正の長さという不変条件に反するため、閉鎖を拒否し、開いた区間を維持と定義。
+- 新規通常出社は最新終了以後に限定し、古い履歴への穴埋めと訂正を別操作にした。
+- 状態遷移とrevisionを値型Catalogにまとめ、失敗時に状態の一部だけが変更されないようにした。永続競合保証ではなく、SQLite等のadapterで再検証が必要。
+- Linux Swift 6.2.1で18件成功。時計の信頼性判定、timezone、訂正監査、通知、実機、OpenSpec CLIは未完。

@@ -144,3 +144,28 @@ The system SHALL let a user clock in using the current time by default or explic
 #### Scenario: Reject future actual clock-in
 - **WHEN** 現在11:45なのに当日12:00の出社時刻を実績として確定しようとする
 - **THEN** 実績の保存を拒否し、必要なら将来の予定として別入力するよう案内する
+
+### Requirement: Reject zero-length closed intervals
+The system SHALL accept a zero-elapsed open interval immediately after creation, but SHALL reject a clock-out or break transition that would close it at the same Instant or earlier. A rejected command SHALL leave the whole catalog, revisions and notifications unchanged.
+
+#### Scenario: Close on same second
+- **WHEN** 11:30:00に出社し同じ秒に退勤又は休憩開始を操作する
+- **THEN** ゼロ長の閉区間を生成せず、元のworking状態を保持して再操作を案内する
+
+### Requirement: Append-only ordinary workday creation
+The system SHALL permit a new ordinary clock-in only when there is no active day, the UUID is unused, and its start is at or after the latest recorded end. Earlier historical insertion or alteration SHALL use explicit correction, not the ordinary clock-in command.
+
+#### Scenario: Backdated start intersects or precedes newer history
+- **WHEN** 最新の勤務日が17:00に退勤済みなのに通常出社で16:59を入力する
+- **THEN** 拒否し、既存履歴を変更しない
+
+#### Scenario: New day at touching boundary
+- **WHEN** 最新の終了時刻と同じInstantに新しいUUIDで明示出社する
+- **THEN** 半開区間として重複せず、新しい勤務日の開区間を作成する
+
+### Requirement: Catalog revision checks on command
+The system SHALL validate each explicit mutation against the expected application-wide catalog revision before applying it. A stale command or failed transition SHALL change neither a workday nor the global revision. The durable adapter SHALL revalidate the store epoch and revision within its transaction.
+
+#### Scenario: Competing stale command
+- **WHEN** 同じrevisionを読んだ二画面のうち最初の打刻が成功し、残った画面が旧revisionで操作する
+- **THEN** 後続を競合拒否し、先行の記録のみ保持する

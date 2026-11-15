@@ -102,3 +102,9 @@ Detailed rationale: `FORECAST_SEMANTICS.md`, `NOTIFICATION_POLICY.md`.
 - Effective recorded intervals are globally disjoint within the day; completed intervals are positive and cannot end in the future. A single final open work/rest interval may have zero elapsed seconds at the observation Instant. An open gap is invalid.
 - Observation gaps have valid, nonfuture endpoints; overlapping or touching gaps are unioned before intersection with work. They do not change actual rest or explicit nonwork gaps. An invalid clock endpoint fails calculation rather than fabricating a span.
 - Remaining rest is derived from total recorded rest or the overlap of recorded rest with the explicit anchor-to-now window, including elapsed open rest. No negative remaining rest.
+
+## v0.8 ordinary commands (initial pure aggregate)
+- `WorkdayCatalog` の通常コマンドは `clockIn(id,profile)` / `startBreak` / `endBreak` / `clockOut(confirmBreak)` / `resume(id)`。入力には選択した実績Instant、信頼済みnow、期待catalog revisionを渡す。
+- 同時刻の開区間開始は許可するが、その区間の閉鎖には開始より後の秒が必要。ゼロ長閉区間、未来、開始より前の閉鎖、重複UUID、後続勤務を持つ日への再開はエラー。通常の新規作成は最新終了時刻以降のみ、古い履歴の挿入は訂正機能へ分離。
+- 受理した操作だけcatalog revisionを1増加。変更された日にはそのrevisionを記録する。未受理操作は値全体を変更しない。終了済みのsnapshotは退勤Instantで固定する。
+- 今回の実装はメモリ内の純粋な値型であり、永続化・複数プロセス排他・削除epoch・監査・履歴訂正を実装したものではない。時計の信頼性は呼出元で確認し、観測空白は対象勤務日に対応するものを渡す。タイムゾーン/論理開始日と参考時刻、当日休憩overrideの保存は未実装（既存Timelineの計算は利用可能）。
