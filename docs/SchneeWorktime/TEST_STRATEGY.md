@@ -42,7 +42,7 @@
 - OpenSpec strict validation succeeds on exact PR HEAD (currently not executed).
 - macOS real hardware QA demonstrates correct behavior; template-only CI green is insufficient.
 - Runtime CPU/RAM/battery and app start-up are measured before quantitative performance thresholds are accepted.
-- Template Release Isolation failure is corrected without relaxing security checks, in a separate change.
+- Template Release Isolation failure is corrected without relaxing security checks (hermetic git/gh fixture; a8c5b5d1 Release Isolation TDD/Quality passed).
 
 ### 新たに必須となる境界テスト
 - `candidate<now`: future what-ifを拒否。`candidate==now`: 実績だけ算定。`candidate>now`: 未来休憩が差分に収まるかを確認。
@@ -61,7 +61,7 @@
 | reject overlap and future | AC-18/61 の一部（正規化済み区間） |
 | impossible rest and leave now | AC-105〜108（計算のみ） |
 | active break consumes budget once | AC-109/126〜129（計算のみ） |
-ローカルLinux Swift 6.2.1で6件成功。UI、監査、実際の通知、保存競合、タイムゾーン、残休憩消費などは未実装・未検証。AC-130〜140の未実装分は個別テストに追加する。
+初期6件はLinux Swift 6.2.1で成功。後述のTimeline実装により残休憩消費の計算部分も追加検証。UI、監査、実際の通知、保存競合、タイムゾーンは未実装・未検証。
 
 ## Timeline実装の追加検証
 | Test | 対応する計算境界 |
@@ -71,4 +71,4 @@
 | nonworking gap does not consume expected rest | AC-85の区間集計 |
 | open work at clock in has zero duration | AC-142 |
 | invalid timelines fail rather than being guessed | 重複・複数open interval拒否 |
-11件のSwift TestingテストをLinux Swift 6.2.1で実行成功。既存の6テストと合わせた件数であり全ACの合格ではない。Testsワークフローに実際のDomain packageを必須ジョブとして追加。CIの実行結果はChecksを確認する。
+11件のSwift TestingテストをLinux Swift 6.2.1で実行成功。既存の6テストと合わせた件数であり全ACの合格ではない。Testsワークフローに実際のDomain packageを必須ジョブとして追加。a8c5b5d1のmacOS CI（Apple Swift 6.3.3）で11件成功し、Tests/Required Gateも成功。最新コミットの結果はChecksを確認する。

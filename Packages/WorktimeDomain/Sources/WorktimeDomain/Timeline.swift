@@ -63,7 +63,8 @@ public enum Timeline {
             case .rest:
                 recordedRest = try addingDuration(recordedRest, start: interval.start, end: end)
                 if let override, end > override.anchor {
-                    consumedRest = try addingDuration(consumedRest, start: max(interval.start, override.anchor), end: end)
+                    let start = max(interval.start, override.anchor)
+                    consumedRest = try addingDuration(consumedRest, start: start, end: end)
                 }
             case .gap:
                 break

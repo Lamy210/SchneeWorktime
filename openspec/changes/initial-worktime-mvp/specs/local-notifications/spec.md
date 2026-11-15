@@ -95,7 +95,7 @@ The system SHALL configure a finite set of threshold reminders and SHALL hide em
 - **THEN** 会社名・出社時刻・休憩履歴を本文に含めない
 
 ### Requirement: Do not schedule precise goal reminders when time is ambiguous
-The system SHALL cancel unexpired precise goal and surplus forecasts when unresolved uncertainty makes a single target Instant impossible, while leaving independently valid reference-time reminders unaffected.
+The system SHALL cancel unexpired precise goal and surplus forecasts when unresolved uncertainty makes a single target Instant impossible, while leaving independently valid reference-time reminders unaffected if the clock is trustworthy. An unreliable clock SHALL suppress all time-based reminders until verified.
 
 #### Scenario: Sleep creates uncertain goal range
 - **WHEN** 目標達成時刻が未確認スリープによって18:30〜19:30の範囲になる
@@ -103,7 +103,7 @@ The system SHALL cancel unexpired precise goal and surplus forecasts when unreso
 
 #### Scenario: User resolves uncertain time
 - **WHEN** 利用者が未確認区間を修正して目標時刻が再び一意になる
-- **THEN** 最新のcommitted revisionから将来の見込み通知を再生成する
+- **THEN** 最新のcommitted revisionから、なお未来で適格な場合にだけ見込み通知を再生成する
 
 ### Requirement: Avoid double achievement alerts
 The system SHALL default to one user-visible OS forecast reminder per goal threshold and SHALL show subsequent verified achievement as an in-app state, not a second automatic OS notice, unless explicitly enabled by user preferences.

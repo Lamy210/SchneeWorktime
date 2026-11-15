@@ -98,3 +98,9 @@ templateのRelease Isolation CI失敗は別のセキュリティ・テスト移�
 - Domain初期実装（6テスト成功、Linux Swift 6.2.1）。仕様・テストの全件合格を意味しない。CLI strict、アプリ実装、CI移植問題は未完了。
 
 - CI追記: 初期Domain導入後のSwift QualityはSwiftFormat違反で失敗。既存ルールを緩和せず書式・命名・行長を修正し、ローカルSwift 6.2.1で6件を再実行成功。CIの再確認は別途必要。
+
+## v0.7 — Timelineとテスト基盤の追加
+- 不確実区間の和集合と仕事区間の交差を定義・実装し、スリープとdowntimeを二重算入しない。開区間の経過秒・休憩アンカー以後の消費を純粋計算として実装。AC-141/142追加。
+- 11件のDomain単体テストがLinux Swift 6.2.1およびmacOS CI Apple Swift 6.3.3で成功（a8c5b5d1）。Tests Required Gateは実際のDomainテストを必須にした。
+- テンプレートのリポジトリ識別テストに実リポジトリ名を依存させないhermetic fixtureを導入。a8c5b5d1のRelease Isolation TDD/Quality成功。保護コード・品質閾値は緩和していない。
+- 旧設計の未確認区間と達成確定、無効時計と独立通知の記述を統一し、観測世代による試算失効と通知の逐次再調整を設計へ記載。実装はApplication層で行う。OpenSpec CLI、全受入条件、実機QAは未完。

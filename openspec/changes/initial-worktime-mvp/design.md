@@ -81,7 +81,7 @@ View/Panel never writes directly to local repository; notification gateway never
 ## v0.3: record provenance and trust levels
 A local recorded work interval is evidence of the user's **entered schedule**, not independent verification of active work. Use separate quality labels:
 - `recorded`: validated interval structure with no unresolved OS anomaly.
-- `unverified`: an interval crossing an observed sleep, clock jump, or unexpected long interruption. Display arithmetic and an explicit review prompt but do not assert achievement as confirmed.
+- `unverified`: an interval crossing an observed sleep, clock jump, or unexpected long interruption. Display arithmetic and a review prompt. The span cannot be counted as verified work; attainment may nevertheless be certain if other verified work meets the target.
 - `forecast`: hypothetical future working/rest behavior. Never written to the work history as an actual interval.
 
 Wake detection must not automatically subtract a sleep span or assume that the user was not working. The user explicitly confirms the whole time as work or corrects the interval using regular history editing. Retain the source anomaly, correction and revision in the audit trail.
@@ -95,7 +95,7 @@ working --clockOut--> ended
 onBreak --clockOut+confirmation--> ended (close break at chosen Instant)
 ended --explicit resume--> working (same identified workday)
 ```
-Canceling break-end clock-out preserves the open break. Closed workdays show frozen work bounds and attainment status, never a running clock. The application shall prohibit a second open workday while one exists.
+Canceling break-end clock-out preserves the open break. Closed workdays show frozen work bounds and attainment status, never a running clock; an explicitly committed history correction may recompute them. The application shall prohibit a second open workday while one exists.
 
 ### Notification forecast/confirmed split
 1. An advance OS request is a **forecast** and its text shall clearly indicate that attendance requires verification. It cannot prove uninterrupted work while the app is suspended.
@@ -194,7 +194,7 @@ A future-break override is a forecast-only plan with `(restRemainingSecondsAtSet
 - `previewDeparture(candidateInstant, optionalForecastRest)` is a **pure query**, not a command: it must not update the canonical workday, planned departure, notification generation, revision, or audit.
 - Candidate is in the future relative to the currently displayed clock time and not earlier than workday start. A 'leave now' preview is valid with candidate=now.
 - Result is a prediction of actual net work at the candidate Instant given the remaining planned break budget. A preview with previously unresolved work shows lower/upper bounds and assumption labels, not a single exact surplus.
-- A separate **Save as planned departure** confirmation may update `plannedDepartureAt` and only then trigger notification reconciliation (if dependent). Closing/dismissing the preview must change no persistent state.
+- A separate **Save as planned departure** confirmation (with explicit warning acknowledgement for infeasible/unknown projections) may update `plannedDepartureAt` and only then trigger notification reconciliation (if dependent). Closing/dismissing the preview must change no persistent state.
 - Example (Asia/Tokyo): 11:30 clock-in, 12:00–13:00 break, at 18:10: leave 19:00 -> projected net 390 minutes, 30 minutes short; leave 20:00 -> 450 minutes, 30 minutes above the 420-minute *personal target*. No legal overtime statement.
 
 ### Quick control / UI state
@@ -209,7 +209,7 @@ A future-break override is a forecast-only plan with `(restRemainingSecondsAtSet
 ### Notification lead controls
 - Default notification lead is 15 minutes before the **break-adjusted departure estimate** (or explicitly saved departure plan) when it is feasible. Offer optional 30/5-minute leads. The earliest no-more-break 7h milestone is a distinct opt-in notification; never silently substitute it for departure preparation.
 - Ask for authorization **in context** when the user enables reminders, not automatically on first launch. Continue all other features on denied permissions.
-- Each notification category must have its own eligible single trigger Instant. Suppress precise departure/earliest-goal forecasts if a required forecast is infeasible, historical uncertainty changes the time, break end is unknown or system clock is invalid; keep independent reference reminders.
+- Each notification category must have its own eligible single trigger Instant. Suppress each precise forecast whose inputs are infeasible, ambiguous or missing while preserving other independently eligible reminders. If the system clock is unreliable, suppress all time-based reminders including reference until it is trustworthy.
 - OS scheduling may deliver a previously booked forecast despite changed real-world work. Notification content must always say `見込み`, not confirmed attainment.
 
 ### Scope boundary
@@ -277,3 +277,6 @@ The default break assumption is 60 minutes, but it is not always identical to a 
 - Reference configuration includes explicit dayOffset 0 or 1, default 0, in the captured timezone. Resolve DST ambiguity explicitly, reject nonexistent local times.
 - Persistence: choose **one application-wide transactional store** containing catalog/active ID, records/audit and store generation. A single database transaction (SQLite is the proposed adapter) enforces cross-workday nonoverlap and max one active, serialized writer and stale-generation rejection. Backup restore validates every invariant and rejects ambiguous active days. An erase commits an epoch boundary before deleting old backups; incomplete erase is reported and old generations are fenced off from automatic restoration. The adapter, crash-safety tests and backup design remain unimplemented.
 - The dependency-free SwiftPM module `Packages/WorktimeDomain` validates raw recorded intervals, unions overlapping observation gaps, clips open intervals to the observation time, and computes work bounds/crossing, anchored rest budget and conditional departure feasibility. It does not yet implement Workday commands, persistence, timezone resolution or notification delivery. Test via `swift test --package-path Packages/WorktimeDomain`. Do not infer app completion from these unit tests.
+
+### Observation and revision consistency
+Lifecycle observation gaps are separate, versioned local metadata, not evidence of attendance and not user edits. A derived preview is invalidated when either the committed workday revision or the observation generation changes; revalidate at the current Instant before saving. Notification reconciliations must be serialized and generation-fenced against both sources, including after an asynchronous OS operation returns. A backward clock or invalid gap endpoint yields unavailable arithmetic rather than invented valid Instants. No automatic historical edit or legal attendance claim is made. The Application/OS adapters that enforce these rules are not yet implemented.

@@ -12,7 +12,7 @@
 ## 2. app target・品質基盤
 - [ ] 2.1 Swift 6/macOS 15+のXcode app targetとlocal SwiftPM domain/applicationを構築する（検証: SwiftPM testおよびXcode app build）
 - [ ] 2.2 template由来CIを実際のscheme/targetへ接続する（空fixtureの成功は検証扱いしない）（検証: 実際のpackage/appのCIログ）
-- [ ] 2.3 template固有のRelease Isolation fixtureリポジトリ名依存を別PRで安全に修正する（検証: 拒否経路の回帰テストと既存CI）
+- [x] 2.3 template固有のRelease Isolation fixtureリポジトリ名依存を安全な独立fixtureに修正（検証: a8c5b5d1のRelease Isolation TDD/Quality成功）
 
 ## 3. 勤務計算エンジン
 - [ ] 3.1 実働/休憩/非勤務ギャップ区間と状態遷移、勤務日UUID、UTC instant、履歴revisionを実装する（検証: AC-10〜20/41/59〜61/85〜86）
@@ -70,4 +70,4 @@
 - [ ] 10.4 希望保存・失効・通知適格性をapplicationに実装（検証: AC-123〜125/136〜137、FakeClock/FakeNotifier）
 - [ ] 10.5 store全体の競合/復元/削除epochを実装（検証: AC-131〜135、クラッシュ注入）
 - [ ] 10.6 参考翌日オフセット・DST解決を実装（検証: AC-138、calendar adapter test）
-- [ ] 10.7 Domain packageのCIを対象に組み込む（検証: packageそのもののswift testログ）
+- [x] 10.7 Domain packageのCIをRequired Gateに組み込む（検証: a8c5b5d1のWorktime Domain macOSジョブ、Swift 6.3.3で11件成功）

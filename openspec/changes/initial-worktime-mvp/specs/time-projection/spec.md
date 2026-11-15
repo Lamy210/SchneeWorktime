@@ -43,7 +43,7 @@ The system SHALL calculate a threshold crossing from validated recorded interval
 - **THEN** 実際の達成時刻18:30を保持し新たな未達通知を生成しない
 
 ### Requirement: Freeze on exit
-The system SHALL freeze actual duration, achievedAt and reference delta after clock-out. It SHALL NOT keep incrementing closed workdays from wall time.
+The system SHALL freeze actual duration, achievedAt and reference delta at clock-out, and recompute them only after explicit accepted correction or reopening. It SHALL NOT keep incrementing closed workdays from wall time.
 
 #### Scenario: Historical view
 - **WHEN** 17:00退勤した日の履歴を21:00に開く
@@ -210,7 +210,7 @@ The system SHALL allow an explicitly saved future plannedDepartureAt even if its
 - **THEN** 希望を過去の予定と表示し、退勤実績を生成せず未来通知も予約しない
 
 ### Requirement: Preview during an active break
-The system SHALL accept an optional hypothetical return Instant for an active break, strictly between or equal to now and candidate. The future active-break duration SHALL consume the remaining rest budget first; total future rest SHALL be max(mandatory active-break duration, remaining rest budget). It SHALL not save a break-end event from a preview.
+The system SHALL accept an optional hypothetical return Instant for an active break, in the closed interval from now to candidate. The future active-break duration SHALL consume the remaining rest budget first; total future rest SHALL be max(mandatory active-break duration, remaining rest budget). It SHALL not save a break-end event from a preview.
 
 #### Scenario: Return assumption consumes rest budget
 - **WHEN** 11:30開始、12:00休憩開始、12:20現在、休憩実績経過20分、標準60分、13:00復帰仮定、19:30退勤候補
