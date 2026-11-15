@@ -62,3 +62,13 @@
 | impossible rest and leave now | AC-105〜108（計算のみ） |
 | active break consumes budget once | AC-109/126〜129（計算のみ） |
 ローカルLinux Swift 6.2.1で6件成功。UI、監査、実際の通知、保存競合、タイムゾーン、残休憩消費などは未実装・未検証。AC-130〜140の未実装分は個別テストに追加する。
+
+## Timeline実装の追加検証
+| Test | 対応する計算境界 |
+|---|---|
+| overlapping observations count once and only within work | AC-141 |
+| historical rest does not consume anchored plan | AC-120/121/130の区間消費 |
+| nonworking gap does not consume expected rest | AC-85の区間集計 |
+| open work at clock in has zero duration | AC-142 |
+| invalid timelines fail rather than being guessed | 重複・複数open interval拒否 |
+11件のSwift TestingテストをLinux Swift 6.2.1で実行成功。既存の6テストと合わせた件数であり全ACの合格ではない。Testsワークフローに実際のDomain packageを必須ジョブとして追加。CIの実行結果はChecksを確認する。

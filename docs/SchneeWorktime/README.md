@@ -23,4 +23,4 @@
 - 仕様上の仮定: 18:00参考時刻、ローカル手動記録、macOS 15+。
 - 未確認: 会社の正式な清算期間・残業規則、macOS実機でのUI/通知/性能。
 
-Domain単体テスト: `swift test --package-path Packages/WorktimeDomain`。Linux Swift 6.2.1で6件成功。OpenSpec CLIおよびMac実機は未検証。
+Domain単体テスト: `swift test --package-path Packages/WorktimeDomain`。Linux Swift 6.2.1で11件成功（実働・退勤試算・区間正規化・残り休憩）。OpenSpec CLIおよびMac実機は未検証。

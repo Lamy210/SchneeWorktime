@@ -66,7 +66,7 @@
 ## 10. v0.7 — レビュー修正と先行Domain
 - [x] 10.1 達成状態・到達時刻、希望保存、休憩中試算、全体保存と翌日基準の規範文を整理（検証: AC-122〜140と文書構造の静的確認）
 - [x] 10.2 dependency-free SwiftPMで正規化済み勤務区間の上下限・到達時刻・退勤候補試算を実装（検証: `swift test --package-path Packages/WorktimeDomain` の6テスト、Linux Swift 6.2.1）
-- [ ] 10.3 raw intervalの正規化と現時点の勤務/break区間のclip、残り予定休憩の実績消費を実装（検証: AC-01〜09/120〜121/130）
+- [x] 10.3 raw intervalの正規化、開区間のclip、残り予定休憩の実績消費を実装（検証: LinuxのTimeline 5テスト、AC-141/142およびAC-85/120/121/130の計算部分）
 - [ ] 10.4 希望保存・失効・通知適格性をapplicationに実装（検証: AC-123〜125/136〜137、FakeClock/FakeNotifier）
 - [ ] 10.5 store全体の競合/復元/削除epochを実装（検証: AC-131〜135、クラッシュ注入）
 - [ ] 10.6 参考翌日オフセット・DST解決を実装（検証: AC-138、calendar adapter test）

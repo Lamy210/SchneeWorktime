@@ -234,3 +234,14 @@ The system SHALL compute future rest from recorded rest and explicit plans only,
 #### Scenario: Uncertain time could have been rest
 - **WHEN** 過去60分が未確認で休憩実績0分のまま試算する
 - **THEN** 未確認時間を休憩実績へ加算せず、予定休憩の根拠を示して実働範囲を返す
+
+### Requirement: Normalize uncertainty without duplicate elapsed work
+The system SHALL validate disjoint recorded work, rest and gap intervals and allow at most one final open work or rest interval. It SHALL union overlapping observation gaps, intersect them with work intervals only, and split work into verified and unverified spans without double counting. Invalid or future endpoints SHALL fail validation.
+
+#### Scenario: Overlapping sleep and downtime
+- **WHEN** two observation gaps overlap each other and intersect an actual break
+- **THEN** their union intersects only recorded work, and the recorded break is counted once as rest
+
+#### Scenario: Immediate clock-in
+- **WHEN** an open work interval starts exactly at the observation Instant
+- **THEN** the initial recorded work duration is zero without creating a zero-length closed interval

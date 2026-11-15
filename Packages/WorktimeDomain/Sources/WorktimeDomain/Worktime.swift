@@ -85,8 +85,10 @@ public enum Worktime {
         } else {
             .notReached
         }
-        let crossing: Crossing = if let earliest, let latest {
-            earliest == latest ? .exact(earliest) : .range(earliest ... latest)
+        let crossing: Crossing = if let earliest, let latest, earliest == latest {
+            .exact(earliest)
+        } else if let earliest, let latest {
+            .range(earliest ... latest)
         } else {
             .unavailable
         }

@@ -362,14 +362,36 @@ class ReleaseEnvironmentRuntimeProofTests(unittest.TestCase):
         self.assertIn("GITHUB_REPOSITORY must use canonical owner/repo", result.stderr)
 
     def test_refuses_local_checkout_repository(self) -> None:
-        result = run_script(
-            "--repository",
-            "Lamy210/template",
-            "--confirm-disposable",
-            "Lamy210/template",
-            env={"GITHUB_REPOSITORY": ""},
-        )
-        self.assertEqual(2, result.returncode)
+        # Use a hermetic origin and a gh stub: this test must never contact
+        # GitHub or execute a disposable-repository proof on a real repository.
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            fake_git = root / "git"
+            fake_git.write_text(
+                '#!/bin/sh\n'
+                'if [ "$#" -eq 5 ] && [ "$1" = "-C" ] && '
+                '[ "$3" = "remote" ] && [ "$4" = "get-url" ] && '
+                '[ "$5" = "origin" ]; then\n'
+                '  printf "%s\\n" "https://github.com/example/local-checkout.git"\n'
+                '  exit 0\n'
+                'fi\nexit 91\n',
+                encoding="utf-8",
+            )
+            fake_git.chmod(0o755)
+            fake_gh = root / "gh"
+            fake_gh.write_text("#!/bin/sh\nexit 92\n", encoding="utf-8")
+            fake_gh.chmod(0o755)
+            result = run_script(
+                "--repository",
+                "example/local-checkout",
+                "--confirm-disposable",
+                "example/local-checkout",
+                env={
+                    "GITHUB_REPOSITORY": "",
+                    "PATH": f"{root}:{os.environ['PATH']}",
+                },
+            )
+        self.assertEqual(2, result.returncode, result.stderr)
         self.assertIn("refuses the local checkout repository", result.stderr)
 
     def test_contract_requires_positive_default_and_negative_branch_tag_controls(self) -> None:

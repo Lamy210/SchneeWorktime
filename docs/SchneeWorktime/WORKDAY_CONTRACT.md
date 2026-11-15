@@ -97,3 +97,8 @@ Detailed rationale: `FORECAST_SEMANTICS.md`, `NOTIFICATION_POLICY.md`.
 - アプリ全体のcatalog（active ID、store epoch/revision、全workday envelope/監査）を単一のトランザクションで保存する。workday単位の原子性だけでなく全体の最大1active・区間非重複を保つ。
 - 全削除と通常更新を直列化し、古いepochの再保存・バックアップ自動復元を拒否する。データ削除未完了は明示する。
 - 計算層の `WorkBounds` は確認済み下限、可能性上限、attainment、crossingを別々に持つ。possibleならcrossingは保証されずunavailable。reachedならexact/range。
+
+### Timeline normalization contract
+- Effective recorded intervals are globally disjoint within the day; completed intervals are positive and cannot end in the future. A single final open work/rest interval may have zero elapsed seconds at the observation Instant. An open gap is invalid.
+- Observation gaps have valid, nonfuture endpoints; overlapping or touching gaps are unioned before intersection with work. They do not change actual rest or explicit nonwork gaps. An invalid clock endpoint fails calculation rather than fabricating a span.
+- Remaining rest is derived from total recorded rest or the overlap of recorded rest with the explicit anchor-to-now window, including elapsed open rest. No negative remaining rest.
