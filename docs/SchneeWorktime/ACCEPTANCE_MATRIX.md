@@ -161,6 +161,11 @@
 | AC-153 | P0 | 有効な訂正案を確定 | 対象日、区間、観測、監査、catalog revision/観測世代を一体として更新 |
 | AC-154 | P0 | 明示確認済み20〜70秒へ同じ観測又は10〜80秒が到着 | 同一観測はno-op。新観測は20〜70秒を除いた部分だけ有効 |
 | AC-155 | P0 | 最新active勤務日がある状態で過去のended日を訂正 | 過去日だけ変更、active IDと新しい勤務日revisionを維持 |
+| AC-156 | P0 | 保存後にSQLite接続を閉じ再オープン | 同一epoch/revisionとpayloadを取得 |
+| AC-157 | P0 | 独立接続による古い保存版での更新 | 拒否し先行のpayloadとversionを維持 |
+| AC-158 | P0 | 論理リセット後、旧epochで保存 | 拒否し新epochの空payloadを維持 |
+| AC-159 | P0 | 通常オープン時にDB消失、または既存の空DB | 自動生成・初期化せずエラー |
+| AC-160 | P0 | 空または上限超過のpayloadを保存 | 拒否して以前のsnapshotを維持 |
 
 ## Release criteria
 1. P0自動テスト全件成功。失敗時に原因が追跡可能。
