@@ -25,10 +25,10 @@ struct CatalogRepositoryTests {
             let start = try clockIn(repo, id: id)
             let observed = try repo.recordObservation(dayID: id, gap: .init(start: 120, end: 160),
                                                       now: 200, expected: start.version)
-            let preview = try observed.catalog.previewReview(
+            let preview = try observed.previewReview(
                 dayID: id, selection: .init(start: 130, end: 150), classification: .rest, now: 200
             )
-            let reviewed = try repo.commitReview(preview, now: 210, expected: observed.version)
+            let reviewed = try repo.commitReview(preview, now: 210)
             let ended = try repo.apply(.clockOut(confirmBreak: false), at: 220,
                                        now: 220, expected: reviewed.version)
             let restored = try CatalogRepository(url: url).load(now: 300)
@@ -101,6 +101,28 @@ struct CatalogRepositoryTests {
             let start = try clockIn(repo, id: UUID())
             #expect(throws: CatalogPersistenceError.futureEvent) { try repo.load(now: 99) }
             #expect(try repo.load(now: 100).version == start.version)
+        }
+    }
+    @Test func `review proposal cannot cross a reset epoch`() throws {
+        try withRepository { url, repo in
+            let id = UUID()
+            let start = try clockIn(repo, id: id)
+            let gap = ObservationGap(start: 120, end: 160)
+            let first = try repo.recordObservation(dayID: id, gap: gap, now: 200, expected: start.version)
+            let proposal = try first.previewReview(
+                dayID: id, selection: gap, classification: .work, now: 200
+            )
+            let store = try SnapshotStore(url: url)
+            _ = try store.reset(expected: first.version)
+            let restarted = try clockIn(repo, id: id)
+            let second = try repo.recordObservation(dayID: id, gap: gap, now: 200, expected: restarted.version)
+            #expect(first.catalog == second.catalog)
+            #expect(first.catalog.reviewVersion == second.catalog.reviewVersion)
+            #expect(first.version.epoch != second.version.epoch)
+            #expect(throws: SnapshotStoreError.staleVersion) {
+                try repo.commitReview(proposal, now: 200)
+            }
+            #expect(try repo.load(now: 200).version == second.version)
         }
     }
 }

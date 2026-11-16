@@ -91,3 +91,7 @@
 - [ ] 14.1 SQLite snapshotストア、schema版、epoch/revision CAS、明示初期化、論理リセットを実装し検証（AC-156〜160、Linuxの独立ストア6件成功、macOS CI確認待ち。上限超過の独立テストは追加予定）
 - [ ] 14.2 WorkdayCatalogのversioned codec・全不変条件の復元検証・アプリ側保存coordinatorを接続（検証: AC-131〜135/153/154、実際のカタログ往復、破損拒否）
 - [ ] 14.3 複数プロセス・ディスク満杯・強制終了時の障害注入、バックアップ復元・独立削除境界・権限とファイル保護を検証（AC-131〜135/158/159、復旧計画）
+
+## 15. v0.8 — 永続カタログの接続
+- [ ] 15.1 versioned journal・Domain replay・保存coordinator・store version付き訂正案（検証: CatalogRepositoryTests 7件、AC-161〜166、新規CI確認後に完了）
+- [ ] 15.2 journalの成長・再生性能・上限、schema互換性、起動時の時計異常表示、容量/書込み失敗時のUIを検証（計測、移行/回復手順）

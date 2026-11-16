@@ -8,6 +8,19 @@ public enum CatalogPersistenceError: Error, Equatable {
 public struct CatalogSession: Sendable {
     public let version: StoreVersion
     public let catalog: WorkdayCatalog
+
+    public func previewReview(
+        dayID: UUID, selection: ObservationGap, classification: ReviewClassification, now: Int64
+    ) throws -> StoredReviewPreview {
+        let preview = try catalog.previewReview(dayID: dayID, selection: selection,
+                                                classification: classification, now: now)
+        return StoredReviewPreview(version: version, preview: preview)
+    }
+}
+
+public struct StoredReviewPreview: Sendable {
+    public let version: StoreVersion
+    public let preview: CatalogReviewPreview
 }
 
 struct LoadedCatalog {
@@ -43,15 +56,16 @@ public struct CatalogRepository: Sendable {
     }
 
     public func commitReview(
-        _ preview: CatalogReviewPreview, now: Int64, expected: StoreVersion
+        _ proposal: StoredReviewPreview, now: Int64
     ) throws -> CatalogSession {
+        let preview = proposal.preview
         let selection = preview.review.selection
         let classification = JournalClassification(preview.review.classification)
         let action = JournalAction.review(dayID: preview.dayID, start: selection.start,
                                           end: selection.end, classification: classification)
         let event = JournalEvent(action: action, now: now)
         var loaded = try read(now: now)
-        guard loaded.session.version == expected else { throw SnapshotStoreError.staleVersion }
+        guard loaded.session.version == proposal.version else { throw SnapshotStoreError.staleVersion }
         var catalog = loaded.session.catalog
         try catalog.commitReview(preview, now: now)
         return try commit(event, catalog: catalog, loaded: &loaded)
