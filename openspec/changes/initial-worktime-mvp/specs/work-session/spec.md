@@ -198,3 +198,25 @@ The system SHALL derive the proposed intervals, remaining uncertainty, selected 
 #### Scenario: Review then cancel
 - **WHEN** 訂正案の計算後に保存せず閉じる
 - **THEN** 原本・未確認範囲・revision・通知が変化しない
+
+### Requirement: Version-fenced catalog review
+The system SHALL associate review proposals with the selected workday, catalog revision and observation generation. It SHALL recompute the selected correction at save time and reject stale or changed proposals without modifying intervals, observations or audit. Accepted reviews SHALL update these together, retaining the day identity and state.
+
+#### Scenario: Observation changes while reviewing
+- **WHEN** 訂正案表示後、勤務revisionを変えず新しい観測が追加される
+- **THEN** 旧観測世代の保存を拒否し最新状態から再確認を求める
+
+#### Scenario: Review an earlier ended day
+- **WHEN** 新しい勤務日がworkingの状態で以前のended勤務日を訂正する
+- **THEN** 以前の記録だけを訂正し新しいactive勤務日とその区間を維持する
+
+### Requirement: Do not resurrect explicitly resolved observation spans
+The system SHALL reject stale observation writes and exclude already reviewed ranges for the same workday from newly received observations. Duplicate covered observations SHALL be no-ops. Review evidence SHALL survive observation updates; only an explicit accepted correction may change the classification.
+
+#### Scenario: Replay an already reviewed range
+- **WHEN** 勤務確定した20〜70秒の観測が再送される
+- **THEN** 未確認時間を復活させず観測世代を増やさない
+
+#### Scenario: Newly received range partially overlaps reviewed range
+- **WHEN** 20〜70秒を解決済みの勤務日へ10〜80秒の観測が追加される
+- **THEN** 10〜20秒と70〜80秒だけを未確認の候補として保持する
