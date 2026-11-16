@@ -95,3 +95,8 @@
 ## 15. v0.8 — 永続カタログの接続
 - [ ] 15.1 versioned journal・Domain replay・保存coordinator・store version付き訂正案（検証: CatalogRepositoryTests 7件、AC-161〜166、新規CI確認後に完了）
 - [ ] 15.2 journalの成長・再生性能・上限、schema互換性、起動時の時計異常表示、容量/書込み失敗時のUIを検証（計測、移行/回復手順）
+
+## 16. v0.8 — 参考時刻と日次予測
+- [ ] 16.1 捕捉タイムゾーンに基づく参考時刻の厳密な解決（同日/翌日、DST、消失暦日、入力検証）を実装・検証（AC-167〜169、ReferenceTimeTests 6件、隔離Linux成功・統合macOS CI待ち）
+- [ ] 16.2 実働上下限から残り/超過範囲、最短達成と休憩込み退勤見込み、休憩/終了/不確定/達成済みを型で区別（AC-170〜172、DailyForecastTests 5件、隔離Linux成功・統合macOS CI待ち）
+- [ ] 16.3 開始時のtimezone・参考設定・解決済みInstantをprofile/journalに保存し、catalogの最新snapshotと予測を接続（タイムゾーン変更・設定変更・日跨ぎ・時計異常・通知との整合）
