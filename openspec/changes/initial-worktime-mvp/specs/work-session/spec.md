@@ -176,3 +176,25 @@ The system SHALL validate observation endpoints against the trusted current Inst
 #### Scenario: Downtime spans a backdated clock-out
 - **WHEN** 退勤実績17:00、現在18:00、未確認観測16:30〜17:30が存在する
 - **THEN** 16:30〜17:00のみを勤務との交差として評価し、退勤以後の観測は実働計算に影響しない。現在より未来の観測端点は拒否する
+
+### Requirement: Review exactly the selected uncertain work
+The system SHALL accept a positive selected review range only when it lies within one effective work interval and is fully covered by the union of unresolved observations. It SHALL reject an uncovered, already resolved, future or empty range. Cross-interval selections SHALL be reviewed as separate ranges.
+
+#### Scenario: Partial overlapping observations
+- **WHEN** 未確認観測20〜50秒と40〜70秒を持つ勤務のうち30〜60秒を勤務として確認する
+- **THEN** 確認部分だけを未確認から除外し、20〜30秒と60〜70秒を維持する
+
+#### Scenario: Review through the current Instant
+- **WHEN** 継続中の勤務の未確認末尾を実際の休憩として訂正する
+- **THEN** 訂正した部分だけを休憩にし、現在時刻に新しい開いた勤務区間を残す。実績の退勤を生成しない
+
+#### Scenario: Duplicate or uncovered review
+- **WHEN** 解決済み又は未確認から外れる範囲を未確認レビューとして操作する
+- **THEN** 拒否する。既存実績の再訂正は専用の訂正コマンドを使用する
+
+### Requirement: Review preview preserves before and after evidence
+The system SHALL derive the proposed intervals, remaining uncertainty, selected classification and review Instant without mutating the original evidence. The application SHALL revalidate the catalog revision and observation generation before committing the review and its audit atomically.
+
+#### Scenario: Review then cancel
+- **WHEN** 訂正案の計算後に保存せず閉じる
+- **THEN** 原本・未確認範囲・revision・通知が変化しない

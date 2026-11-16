@@ -86,3 +86,6 @@
 | touching workday boundaries are valid | AC-145と同時刻再開 |
 | closed snapshot clips valid observations at actual end | AC-147、未来観測の拒否 |
 Linux Swift 6.2.1で追加9件・既存11件の計20件成功。実際の競合、databaseの原子性、監査付き訂正、local date/timezone、時計検出、通知/UIはいずれも未検証。
+
+## 未確認レビューの先行テスト
+HistoryReviewTests 6件を追加。部分的な観測解決、休憩と非勤務ギャップの差、現在時刻までの開区間、閉区間終端、未来/ゼロ長/未確認外、重複レビューを対象とする。GitHub CI実行結果は未確認のためテスト成功とは扱わない。HistoryReviewResultは純粋な提案と前後証跡であり、永続監査・履歴訂正のcommit・観測世代・古い観測の再混入防止は未実装。
