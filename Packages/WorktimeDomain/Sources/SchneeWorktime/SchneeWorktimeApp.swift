@@ -15,8 +15,13 @@
                         Button(panel.visible ? "パネルを隠す" : "パネルを表示") {
                             panel.toggle(model: model)
                         }
-                        Button(panel.alwaysOnTop ? "最前面を解除" : "最前面にする") {
-                            panel.toggleAlwaysOnTop()
+                        Menu("パネル設定") {
+                            Button(panel.alwaysOnTop ? "最前面を解除" : "最前面にする") {
+                                panel.toggleAlwaysOnTop()
+                            }
+                            Button(panel.displayMode == .compact ? "詳細表示" : "コンパクト表示") {
+                                panel.toggleDisplayMode()
+                            }
                         }
                     }
                     .padding(8)
