@@ -355,6 +355,49 @@
     }
 
     extension DesktopModel {
+        func previewDesiredDeparture(at instant: Int64) throws -> DesiredDepartureProposal {
+            guard ready, !choosingBackupDestination, reviewProposal == nil, let controller else {
+                throw DesiredDepartureSaveError.staleProposal
+            }
+            return try controller.previewDesiredDeparture(at: instant, sample: Self.sample())
+        }
+
+        func confirmDesiredDeparture(_ proposal: DesiredDepartureProposal, warningAcknowledged: Bool) throws {
+            guard ready, !choosingBackupDestination, reviewProposal == nil, var current = controller else {
+                throw DesiredDepartureSaveError.staleProposal
+            }
+            do {
+                glance = try current.commitDesiredDeparture(
+                    proposal, warningAcknowledged: warningAcknowledged, sample: Self.sample()
+                )
+                controller = current
+                queueReminders(force: true)
+            } catch let error as DesiredDepartureSaveError {
+                throw error
+            } catch {
+                fail(error)
+                throw error
+            }
+        }
+
+        func clearDesiredDeparture(expectedDay: Workday) throws {
+            guard ready, !choosingBackupDestination, reviewProposal == nil, var current = controller else {
+                throw DesiredDepartureSaveError.staleProposal
+            }
+            do {
+                glance = try current.clearDesiredDeparture(expectedDay: expectedDay, sample: Self.sample())
+                controller = current
+                queueReminders(force: true)
+            } catch let error as DesiredDepartureSaveError {
+                throw error
+            } catch {
+                fail(error)
+                throw error
+            }
+        }
+    }
+
+    extension DesktopModel {
         func setFutureRest(minutes: Int?, expectedDay: Workday) throws {
             guard ready, !choosingBackupDestination, reviewProposal == nil,
                   glance?.day == expectedDay, var current = controller
