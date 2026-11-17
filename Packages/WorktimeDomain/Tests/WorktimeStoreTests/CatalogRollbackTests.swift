@@ -98,4 +98,58 @@ struct CatalogRollbackTests {
             }
         }
     }
+
+    @Test func `active backup cannot replace an ended catalog`() throws {
+        try withRepository { root, repo in
+            let initial = try repo.load(now: 100)
+            let command = try WorkdayCommand.clockIn(id: UUID(), profile: WorkdayProfile())
+            let active = try repo.apply(command, at: 100, now: 100, expected: initial.version)
+            let bytes = try repo.makeBackup(now: 100, expected: active.version)
+            let current = try repo.apply(.clockOut(confirmBreak: false), at: 110, now: 110, expected: active.version)
+            let store = try SnapshotStore(url: root.appendingPathComponent("live.sqlite"))
+            let before = try store.load()
+            #expect(throws: CatalogRollbackError.activeWorkday) {
+                try repo.previewRollback(from: bytes, now: 110, expected: current.version)
+            }
+            #expect(try store.load() == before)
+        }
+    }
+
+    @Test func `same epoch alone does not authorize divergent history`() throws {
+        try withRepository { root, repo in
+            let initial = try repo.load(now: 100)
+            let first = try endedDay(repo, at: 100, expected: initial.version)
+            let current = try endedDay(repo, at: 200, expected: first.version)
+            let store = try SnapshotStore(url: root.appendingPathComponent("live.sqlite"))
+            let before = try store.load()
+            let foreignURL = root.appendingPathComponent("other.sqlite")
+            let foreign = try CatalogRepository(url: foreignURL, createIfMissing: true)
+            let foreignInitial = try foreign.load(now: 50)
+            let foreignDay = try endedDay(foreign, at: 50, expected: foreignInitial.version)
+            let foreignSnapshot = try SnapshotStore(url: foreignURL).load()
+            let disguised = StoredSnapshot(
+                version: StoreVersion(epoch: current.version.epoch, revision: foreignDay.version.revision),
+                payload: foreignSnapshot.payload
+            )
+            let bytes = try CatalogBackup.encode(disguised, now: 220)
+            #expect(throws: CatalogRollbackError.divergentHistory) {
+                try repo.previewRollback(from: bytes, now: 220, expected: current.version)
+            }
+            #expect(try store.load() == before)
+        }
+    }
+
+    @Test func `current revision is not an earlier rollback target`() throws {
+        try withRepository { root, repo in
+            let initial = try repo.load(now: 100)
+            let current = try endedDay(repo, at: 100, expected: initial.version)
+            let bytes = try repo.makeBackup(now: 110, expected: current.version)
+            let store = try SnapshotStore(url: root.appendingPathComponent("live.sqlite"))
+            let before = try store.load()
+            #expect(throws: CatalogRollbackError.notEarlier) {
+                try repo.previewRollback(from: bytes, now: 110, expected: current.version)
+            }
+            #expect(try store.load() == before)
+        }
+    }
 }
