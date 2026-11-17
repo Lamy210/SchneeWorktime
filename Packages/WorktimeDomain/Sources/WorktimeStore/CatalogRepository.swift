@@ -71,6 +71,14 @@ public struct CatalogRepository: Sendable {
         return try commit(event, catalog: catalog, loaded: &loaded)
     }
 
+    public func loadObservationCheckpoint(expected: StoreVersion) throws -> ObservationCheckpoint? {
+        try store.loadObservationCheckpoint(expected: expected)
+    }
+
+    public func saveObservationCheckpoint(dayID: UUID, observedAt: Int64, expected: StoreVersion) throws {
+        try store.saveObservationCheckpoint(dayID: dayID, observedAt: observedAt, expected: expected)
+    }
+
     private func mutate(_ event: JournalEvent, expected: StoreVersion) throws -> CatalogSession {
         var loaded = try read(now: event.now)
         guard loaded.session.version == expected else { throw SnapshotStoreError.staleVersion }
