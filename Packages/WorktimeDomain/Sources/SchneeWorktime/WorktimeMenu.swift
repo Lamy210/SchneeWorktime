@@ -163,6 +163,7 @@
         private func summary(_ glance: WorktimeGlance) -> some View {
             Text(stateLabel(glance.day.state)).font(.headline)
             forecastLabel(glance.forecast.goal)
+            BreakRecordAdvisoryView(glance: glance)
             DepartureCountdownView(
                 countdown: DepartureCountdown(goal: glance.forecast.goal, observedAt: glance.observedAt)
             )
