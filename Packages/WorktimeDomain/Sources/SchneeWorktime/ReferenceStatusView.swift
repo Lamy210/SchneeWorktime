@@ -40,7 +40,7 @@
 
         private func differenceLabel(_ seconds: Int64) -> String {
             if seconds < 0 {
-                return "参考時刻まで\((-seconds) / 60)分"
+                return "参考時刻まで\(seconds.magnitude / 60)分"
             }
             return "参考時刻から\(seconds / 60)分経過"
         }
