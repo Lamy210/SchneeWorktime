@@ -13,11 +13,13 @@ public enum WorkdayError: Error, Equatable {
 public struct WorkdayProfile: Sendable, Equatable {
     public let target: Int64
     public let expectedRest: Int64
+    public let reference: CapturedReference?
 
-    public init(target: Int64 = 25200, expectedRest: Int64 = 3600) throws {
+    public init(target: Int64 = 25200, expectedRest: Int64 = 3600, reference: CapturedReference? = nil) throws {
         guard target > 0, expectedRest >= 0 else { throw WorkdayError.invalidProfile }
         self.target = target
         self.expectedRest = expectedRest
+        self.reference = reference
     }
 }
 
@@ -90,6 +92,7 @@ public struct WorkdayCatalog: Sendable, Equatable {
             if let end = days.last?.intervals.last?.end, instant < end {
                 throw WorkdayError.invalidEventTime
             }
+            try profile.reference?.validate(startedAt: instant)
             let day = Workday(id: id, profile: profile, state: .working,
                               intervals: [.init(start: instant, end: nil, kind: .work)], revision: next)
             _ = try day.snapshot(now: now)

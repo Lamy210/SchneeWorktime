@@ -4,17 +4,17 @@ public enum ReferenceTimeError: Error, Equatable {
     case invalidTimeZone, invalidWallTime, unsupportedInstant, calendarFailure
 }
 
-public enum RepeatedWallTime: Sendable, Equatable {
+public enum RepeatedWallTime: Sendable, Equatable, Codable {
     case earlier, later
 }
 
-public enum ReferenceResolution: Sendable, Equatable {
+public enum ReferenceResolution: Sendable, Equatable, Codable {
     case disabled, beforeStart, nonexistent
     case ambiguous(earlier: Int64, later: Int64)
     case resolved(Int64)
 }
 
-public struct ReferenceWallTime: Sendable, Equatable {
+public struct ReferenceWallTime: Sendable, Equatable, Codable {
     public let hour: Int
     public let minute: Int
     public let dayOffset: Int
