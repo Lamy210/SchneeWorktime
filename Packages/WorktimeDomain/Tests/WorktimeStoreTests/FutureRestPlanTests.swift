@@ -22,7 +22,7 @@ struct FutureRestPlanTests {
             let rest = try repo.apply(.startBreak, at: 200, now: 200, expected: started.version)
             let work = try repo.apply(.endBreak, at: 800, now: 800, expected: rest.version)
             let planned = try repo.setFutureRest(dayID: day, remainingSeconds: 1800,
-                                                now: 1000, expected: work.version)
+                                                 now: 1000, expected: work.version)
             let before = try planned.catalog.snapshot(dayID: day, now: 1000)
             #expect(before.recordedRest == 600)
             #expect(before.remainingRest == 1800)
@@ -35,7 +35,7 @@ struct FutureRestPlanTests {
             #expect(after.recordedRest == 1800)
             #expect(after.remainingRest == 600)
             let cleared = try repo.setFutureRest(dayID: day, remainingSeconds: nil,
-                                                now: 2300, expected: restored.version)
+                                                 now: 2300, expected: restored.version)
             let standard = try cleared.catalog.snapshot(dayID: day, now: 2300)
             #expect(standard.recordedRest == 1800)
             #expect(standard.remainingRest == 1800)
@@ -52,9 +52,9 @@ struct FutureRestPlanTests {
             let gap = try repo.recordObservation(dayID: day, gap: .init(start: 200, end: 800),
                                                  now: 1000, expected: started.version)
             let planned = try repo.setFutureRest(dayID: day, remainingSeconds: 1800,
-                                                now: 1000, expected: gap.version)
+                                                 now: 1000, expected: gap.version)
             let proposal = try planned.previewReview(dayID: day, selection: .init(start: 200, end: 800),
-                                                    classification: .rest, now: 1001)
+                                                     classification: .rest, now: 1001)
             let corrected = try repo.commitReview(proposal, now: 1001)
             let snapshot = try corrected.catalog.snapshot(dayID: day, now: 1001)
             #expect(snapshot.recordedRest == 600)
