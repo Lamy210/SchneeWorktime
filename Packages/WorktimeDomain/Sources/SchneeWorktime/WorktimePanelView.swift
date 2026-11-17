@@ -59,6 +59,7 @@
 
         @ViewBuilder
         private func detailedForecast(_ glance: WorktimeGlance) -> some View {
+            ReferenceStatusView(glance: glance)
             Text("実働目標：\(DepartureCountdown.duration(glance.day.profile.target))").font(.caption)
             Text("残り予定休憩：\(DepartureCountdown.duration(glance.snapshot.remainingRest))").font(.caption)
             Text("日次目標超過：\(rangeLabel(glance.forecast.surplus))").font(.caption)

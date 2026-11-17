@@ -34,7 +34,9 @@ enum JournalCommand: Codable, Equatable {
         case let .clockIn(id, target, expectedRest):
             try .clockIn(id: id, profile: WorkdayProfile(target: target, expectedRest: expectedRest))
         case let .clockInWithReference(id, target, expectedRest, reference):
-            try .clockIn(id: id, profile: WorkdayProfile(target: target, expectedRest: expectedRest, reference: reference))
+            try .clockIn(
+                id: id, profile: WorkdayProfile(target: target, expectedRest: expectedRest, reference: reference)
+            )
         case .startBreak:
             .startBreak
         case .endBreak:

@@ -147,6 +147,7 @@
                 } else {
                     Text("設定値が無効です。既定値に戻してください。").font(.caption)
                 }
+                ReferenceSettingsView()
                 Button("既定値（実働420分・休憩60分）に戻す") {
                     targetMinutes = 420
                     restMinutes = 60
@@ -163,6 +164,7 @@
         private func summary(_ glance: WorktimeGlance) -> some View {
             Text(stateLabel(glance.day.state)).font(.headline)
             forecastLabel(glance.forecast.goal)
+            ReferenceStatusView(glance: glance)
             DepartureCountdownView(
                 countdown: DepartureCountdown(goal: glance.forecast.goal, observedAt: glance.observedAt)
             )

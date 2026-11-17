@@ -13,7 +13,8 @@ public struct CapturedReference: Sendable, Equatable, Codable {
         guard let zone = TimeZone(identifier: timeZoneID) else { throw ReferenceTimeError.invalidTimeZone }
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = zone
-        let fields = calendar.dateComponents([.year, .month, .day], from: Date(timeIntervalSince1970: Double(startedAt)))
+        let date = Date(timeIntervalSince1970: Double(startedAt))
+        let fields = calendar.dateComponents([.year, .month, .day], from: date)
         guard let year = fields.year, let month = fields.month, let day = fields.day else {
             throw ReferenceTimeError.calendarFailure
         }
