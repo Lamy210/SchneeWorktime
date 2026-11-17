@@ -8,6 +8,15 @@ public enum CatalogPersistenceError: Error, Equatable {
 public struct CatalogSession: Sendable {
     public let version: StoreVersion
     public let catalog: WorkdayCatalog
+    let validatedSnapshot: StoredSnapshot
+    let validatedAt: Int64
+
+    init(snapshot: StoredSnapshot, catalog: WorkdayCatalog, now: Int64) {
+        version = snapshot.version
+        self.catalog = catalog
+        validatedSnapshot = snapshot
+        validatedAt = now
+    }
 
     public func previewReview(
         dayID: UUID, selection: ObservationGap, classification: ReviewClassification, now: Int64
@@ -39,6 +48,17 @@ public struct CatalogRepository: Sendable {
 
     public func load(now: Int64) throws -> CatalogSession {
         try read(now: now).session
+    }
+
+    /// Reuse only an exact byte-for-byte validated snapshot. Revision equality alone is insufficient.
+    public func revalidate(_ cached: CatalogSession, now: Int64) throws -> CatalogSession {
+        let current = try store.load()
+        guard current.version == cached.version else { throw SnapshotStoreError.staleVersion }
+        guard current == cached.validatedSnapshot else { throw CatalogPersistenceError.invalidJournal }
+        if now < cached.validatedAt {
+            return try CatalogBackup.validateSnapshot(current, now: now)
+        }
+        return cached
     }
 
     /// Capture one committed snapshot, validate journal replay, then encode without writing to storage.
@@ -129,7 +149,7 @@ public struct CatalogRepository: Sendable {
             throw CatalogPersistenceError.invalidJournal
         }
         let catalog = try journal.replay(now: now)
-        return LoadedCatalog(session: CatalogSession(version: stored.version, catalog: catalog), journal: journal)
+        return LoadedCatalog(session: CatalogSession(snapshot: stored, catalog: catalog, now: now), journal: journal)
     }
 
     private func commit(
@@ -141,7 +161,8 @@ public struct CatalogRepository: Sendable {
         loaded.journal.events.append(event)
         let payload = try JSONEncoder().encode(loaded.journal)
         let version = try store.save(payload, expected: loaded.session.version)
-        return CatalogSession(version: version, catalog: catalog)
+        let snapshot = StoredSnapshot(version: version, payload: payload)
+        return CatalogSession(snapshot: snapshot, catalog: catalog, now: event.now)
     }
 }
 
