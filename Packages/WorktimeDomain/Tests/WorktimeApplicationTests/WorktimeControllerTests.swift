@@ -176,4 +176,39 @@ struct WorktimeControllerTests {
             #expect(laterSnapshot == accepted.snapshot)
         }
     }
+
+    @Test func `reminder uses committed store revision and forecast only`() throws {
+        try withDatabase { url in
+            let dayID = UUID()
+            var controller = try WorktimeController(url: url, createIfMissing: true, sample: sample(100))
+            #expect(try controller.reminderState(sample: sample(100)) == nil)
+            _ = try controller.perform(.clockIn(id: dayID, profile: WorkdayProfile()), sample: sample(100))
+            let planResult = try controller.reminderState(sample: sample(101))
+            let plan = try #require(planResult)
+            let stored = try CatalogRepository(url: url).load(now: 101)
+            #expect(plan.epoch == stored.version.epoch)
+            #expect(plan.revision == stored.version.revision)
+            #expect(plan.dayID == dayID)
+            #expect(plan.desired.map(\.trigger) == [28000])
+            _ = try controller.perform(.startBreak, sample: sample(110))
+            let pausedResult = try controller.reminderState(sample: sample(111))
+            let paused = try #require(pausedResult)
+            #expect(paused.revision > plan.revision)
+            #expect(paused.desired.isEmpty)
+        }
+    }
+
+    @Test func `unobserved gap suppresses and external revision rejects notification state`() throws {
+        try withDatabase { url in
+            var controller = try WorktimeController(url: url, createIfMissing: true, sample: sample(100))
+            _ = try controller.perform(.clockIn(id: UUID(), profile: WorkdayProfile()), sample: sample(100))
+            #expect(try controller.reminderState(sample: sample(120)) == nil)
+            let repo = try CatalogRepository(url: url)
+            let stored = try repo.load(now: 110)
+            _ = try repo.apply(.startBreak, at: 110, now: 110, expected: stored.version)
+            #expect(throws: SnapshotStoreError.staleVersion) {
+                try controller.reminderState(sample: sample(111))
+            }
+        }
+    }
 }
