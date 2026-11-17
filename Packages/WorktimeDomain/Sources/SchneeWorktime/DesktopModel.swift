@@ -236,6 +236,23 @@
             }
         }
 
+        private func databaseURL() throws -> URL {
+            let support = try FileManager.default.url(
+                for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: false
+            )
+            return support.appendingPathComponent("SchneeWorktime", isDirectory: true)
+                .appendingPathComponent("worktime.sqlite")
+        }
+
+        private static func sample() throws -> ClockSample {
+            guard let wall = Int64(exactly: Date().timeIntervalSince1970.rounded(.down)) else {
+                throw ApplicationClockError.invalidSample
+            }
+            return try ClockSample(wall: wall, uptime: ProcessInfo.processInfo.systemUptime)
+        }
+    }
+
+    extension DesktopModel {
         var remindersSupported: Bool {
             reminderCoordinator != nil
         }
@@ -325,21 +342,6 @@
             case .busy, .superseded, .cancellationPending:
                 reminderStatus = "通知予約を再確認します。"
             }
-        }
-
-        private func databaseURL() throws -> URL {
-            let support = try FileManager.default.url(
-                for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: false
-            )
-            return support.appendingPathComponent("SchneeWorktime", isDirectory: true)
-                .appendingPathComponent("worktime.sqlite")
-        }
-
-        private static func sample() throws -> ClockSample {
-            guard let wall = Int64(exactly: Date().timeIntervalSince1970.rounded(.down)) else {
-                throw ApplicationClockError.invalidSample
-            }
-            return try ClockSample(wall: wall, uptime: ProcessInfo.processInfo.systemUptime)
         }
     }
 
