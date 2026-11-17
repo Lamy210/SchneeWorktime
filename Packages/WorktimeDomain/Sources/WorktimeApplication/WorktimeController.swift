@@ -241,3 +241,60 @@ public struct WorktimeController {
         return try WorktimeGlance(catalog: session.catalog, now: now)
     }
 }
+
+public enum DesiredDepartureSaveError: Error, Equatable {
+    case staleProposal, confirmationRequired, invalidCandidate
+}
+
+public struct DesiredDepartureProposal: Sendable {
+    fileprivate let version: StoreVersion
+    fileprivate let dayID: UUID
+    public let assessment: DesiredDepartureAssessment
+}
+
+public extension WorktimeController {
+    /// Read-only preview; no observation or journal write occurs.
+    func previewDesiredDeparture(at candidate: Int64, sample: ClockSample) throws -> DesiredDepartureProposal {
+        var updated = clock
+        guard try updated.advance(to: sample) == nil else { throw DesiredDepartureSaveError.staleProposal }
+        let stored = try repository.load(now: sample.wall)
+        guard stored.version == session.version, stored.catalog.activeID != nil else {
+            throw DesiredDepartureSaveError.staleProposal
+        }
+        let glance = try WorktimeGlance(catalog: stored.catalog, now: sample.wall)
+        let assessment = try glance.assessDesiredDeparture(at: candidate)
+        guard assessment.canSave(warningAcknowledged: true) else {
+            throw DesiredDepartureSaveError.invalidCandidate
+        }
+        return DesiredDepartureProposal(version: stored.version, dayID: glance.day.id, assessment: assessment)
+    }
+
+    /// Recheck the latest forecast before saving an explicit intention.
+    mutating func commitDesiredDeparture(
+        _ proposal: DesiredDepartureProposal, warningAcknowledged: Bool, sample: ClockSample
+    ) throws -> WorktimeGlance? {
+        guard proposal.version == session.version, session.catalog.activeID == proposal.dayID,
+              sample.wall >= proposal.assessment.scenario.observedAt
+        else {
+            throw DesiredDepartureSaveError.staleProposal
+        }
+        let fresh = try previewDesiredDeparture(at: proposal.assessment.scenario.candidate, sample: sample)
+        guard fresh.assessment.status == proposal.assessment.status,
+              fresh.assessment.scenario.result == proposal.assessment.scenario.result
+        else {
+            throw DesiredDepartureSaveError.staleProposal
+        }
+        guard fresh.assessment.canSave(warningAcknowledged: warningAcknowledged) else {
+            throw DesiredDepartureSaveError.confirmationRequired
+        }
+        var updated = clock
+        guard try updated.advance(to: sample) == nil else { throw DesiredDepartureSaveError.staleProposal }
+        session = try repository.setDesiredDeparture(
+            dayID: proposal.dayID, candidate: proposal.assessment.scenario.candidate,
+            warningAcknowledged: warningAcknowledged, now: sample.wall, expected: proposal.version
+        )
+        clock = updated
+        try saveCheckpoint(sample: sample)
+        return try glance(now: sample.wall)
+    }
+}
