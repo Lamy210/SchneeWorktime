@@ -21,12 +21,18 @@ public struct WorkdayProfile: Sendable, Equatable {
     }
 }
 
+public struct FutureRestPlan: Sendable, Equatable {
+    public let plan: RestPlan
+    public let revision: UInt64
+}
+
 public struct Workday: Sendable, Equatable {
     public let id: UUID
     public let profile: WorkdayProfile
     public let state: WorkdayState
     public let intervals: [RecordedInterval]
     public internal(set) var revision: UInt64
+    public internal(set) var futureRestPlan: FutureRestPlan?
 
     public func snapshot(now: Int64, uncertainty: [ObservationGap] = []) throws -> TimelineSnapshot {
         guard let last = intervals.last, now >= last.start else { throw WorkdayError.invalidEventTime }
@@ -43,7 +49,7 @@ public struct Workday: Sendable, Equatable {
         }
         return try Timeline.snapshot(
             intervals: intervals, uncertainty: relevant, now: evaluation,
-            target: profile.target, expectedRest: profile.expectedRest
+            target: profile.target, expectedRest: profile.expectedRest, override: futureRestPlan?.plan
         )
     }
 }
@@ -98,6 +104,39 @@ public struct WorkdayCatalog: Sendable, Equatable {
         revision = next
     }
 
+    /// Forecast only. Nil restores the initial daily profile budget, not zero.
+    public mutating func setFutureRest(
+        dayID: UUID, remainingSeconds: Int64?, now: Int64, expectedRevision: UInt64
+    ) throws {
+        guard expectedRevision == revision else { throw WorkdayError.staleRevision }
+        guard let day = days.last, activeID == dayID else { throw WorkdayError.noActiveDay }
+        guard let last = day.intervals.last, now >= last.start,
+              now >= (day.futureRestPlan?.plan.anchor ?? last.start)
+        else {
+            throw WorkdayError.invalidEventTime
+        }
+        if let remainingSeconds, !(0 ... 86400).contains(remainingSeconds) {
+            throw WorkdayError.invalidProfile
+        }
+        if remainingSeconds == nil, day.futureRestPlan == nil {
+            return
+        }
+        guard revision < UInt64.max else {
+            throw WorkdayError.revisionOverflow
+        }
+        let next = revision + 1
+        let plan = remainingSeconds.map {
+            FutureRestPlan(plan: RestPlan(anchor: now, remainingAtAnchor: $0), revision: next)
+        }
+        let updated = Workday(
+            id: day.id, profile: day.profile, state: day.state, intervals: day.intervals,
+            revision: next, futureRestPlan: plan
+        )
+        _ = try updated.snapshot(now: now, uncertainty: observations[dayID] ?? [])
+        days[days.count - 1] = updated
+        revision = next
+    }
+
     private static func transition(
         _ day: Workday, command: WorkdayCommand, at instant: Int64, revision: UInt64
     ) throws -> Workday {
@@ -132,7 +171,10 @@ public struct WorkdayCatalog: Sendable, Equatable {
         case .clockIn:
             throw WorkdayError.invalidTransition
         }
-        return Workday(id: day.id, profile: day.profile, state: state, intervals: intervals, revision: revision)
+        return Workday(
+            id: day.id, profile: day.profile, state: state, intervals: intervals,
+            revision: revision, futureRestPlan: day.futureRestPlan
+        )
     }
 
     private static func close(_ intervals: inout [RecordedInterval], at instant: Int64) throws {
@@ -265,7 +307,8 @@ public extension WorkdayCatalog {
         }
         let old = days[index]
         let nextDay = Workday(id: old.id, profile: old.profile, state: old.state,
-                              intervals: fresh.afterIntervals, revision: revision + 1)
+                              intervals: fresh.afterIntervals, revision: revision + 1,
+                              futureRestPlan: old.futureRestPlan)
         _ = try nextDay.snapshot(now: now, uncertainty: fresh.afterUncertainty)
         let audit = WorkdayReviewAudit(dayID: old.id, revision: revision + 1,
                                        observationGeneration: observationGeneration + 1, review: fresh)

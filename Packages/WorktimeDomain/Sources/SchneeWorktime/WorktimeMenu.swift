@@ -10,6 +10,7 @@
         @ObservedObject var model: DesktopModel
         @State private var confirmCreate = false
         @State private var confirmBreakExit = false
+        @State private var pendingBreakExit: PanelActionContext?
         @AppStorage("nextDayTargetMinutes") private var targetMinutes = 420
         @AppStorage("nextDayRestMinutes") private var restMinutes = 60
 
@@ -29,9 +30,18 @@
             } message: {
                 Text("以前の記録が見つからない場合は、新規作成せずバックアップを確認してください。")
             }
-            .confirmationDialog("休憩を終了して退勤しますか？", isPresented: $confirmBreakExit) {
-                Button("退勤を確定") { model.perform(.clockOut(confirmBreak: true)) }
-                Button("キャンセル", role: .cancel) {}
+            .confirmationDialog(
+                "休憩を終了して退勤しますか？", isPresented: $confirmBreakExit, presenting: pendingBreakExit
+            ) { expected in
+                Button("退勤を確定") {
+                    pendingBreakExit = nil
+                    model.performAction(.clockOut, expected: expected, confirmed: true)
+                }
+                Button("キャンセル", role: .cancel) { pendingBreakExit = nil }
+            }
+            .onChange(of: model.actionContext) { _, _ in
+                pendingBreakExit = nil
+                confirmBreakExit = false
             }
         }
 
@@ -47,12 +57,16 @@
                         actions(glance.day).disabled(model.reviewProposal != nil)
                         reviewSection(glance)
                         if glance.day.state != .ended, model.reviewProposal == nil {
+                            FutureRestSettingsView(model: model, day: glance.day)
+                                .id(glance.day.id)
                             DepartureScenarioView(glance: glance)
                         }
                     }
                 } else if model.ready {
                     Text("勤務記録なし")
-                    Button("勤務開始") { start() }.disabled(!settingsValid)
+                    let context = model.actionContext
+                    Button("勤務開始") { start(expected: context) }
+                        .disabled(!settingsValid || !context.enabled)
                 } else {
                     Text(model.message ?? "記録を読み込めません")
                         .font(.caption)
@@ -159,8 +173,9 @@
             }
         }
 
-        private func start() {
-            model.start(targetMinutes: targetMinutes, restMinutes: restMinutes)
+        private func start(expected: PanelActionContext) {
+            let profile = try? NextDaySettings(targetMinutes: targetMinutes, restMinutes: restMinutes).profile
+            model.performAction(.start, expected: expected, profile: profile)
         }
 
         @ViewBuilder
@@ -261,16 +276,28 @@
 
         @ViewBuilder
         private func actions(_ day: Workday) -> some View {
+            let context = model.actionContext
+            let available = context.available(at: model.glance?.observedAt ?? 0)
             switch day.state {
             case .working:
-                Button("休憩開始") { model.perform(.startBreak) }
-                Button("退勤") { model.perform(.clockOut(confirmBreak: false)) }
+                Button("休憩開始") { model.performAction(.startBreak, expected: context) }
+                    .disabled(!available.contains(.startBreak))
+                Button("退勤") { model.performAction(.clockOut, expected: context, confirmed: true) }
+                    .disabled(!available.contains(.clockOut))
             case .onBreak:
-                Button("休憩終了") { model.perform(.endBreak) }
-                Button("退勤") { confirmBreakExit = true }
+                Button("休憩終了") { model.performAction(.endBreak, expected: context) }
+                    .disabled(!available.contains(.endBreak))
+                Button("退勤") {
+                    guard model.actionContext == context else { return }
+                    pendingBreakExit = context
+                    confirmBreakExit = true
+                }
+                .disabled(!available.contains(.clockOut))
             case .ended:
-                Button("新しい勤務日を開始") { start() }.disabled(!settingsValid)
-                Button("直前の勤務日を再開") { model.perform(.resume(id: day.id)) }
+                Button("新しい勤務日を開始") { start(expected: context) }
+                    .disabled(!settingsValid || !available.contains(.start))
+                Button("直前の勤務日を再開") { model.performAction(.resume, expected: context) }
+                    .disabled(!available.contains(.resume))
             }
         }
 

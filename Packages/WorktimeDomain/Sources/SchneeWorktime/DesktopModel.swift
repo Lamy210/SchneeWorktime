@@ -121,16 +121,25 @@
             try controller?.recentHistory(now: Self.sample().wall)
         }
 
-        func start(targetMinutes: Int, restMinutes: Int) {
-            do {
-                let defaults = try NextDaySettings(targetMinutes: targetMinutes, restMinutes: restMinutes)
-                perform(.clockIn(id: UUID(), profile: defaults.profile))
-            } catch {
-                message = "勤務設定を確認してください。"
-            }
+        var actionContext: PanelActionContext {
+            PanelActionContext(
+                day: glance?.day,
+                enabled: ready && reviewProposal == nil && !choosingBackupDestination
+            )
         }
 
-        func perform(_ command: WorkdayCommand) {
+        func performAction(
+            _ action: PanelWorkAction, expected: PanelActionContext,
+            confirmed: Bool = false, profile: WorkdayProfile? = nil
+        ) {
+            guard let command = actionContext.command(
+                for: action, matching: expected, at: glance?.observedAt ?? 0,
+                confirmed: confirmed, profile: profile
+            ) else { return }
+            perform(command)
+        }
+
+        private func perform(_ command: WorkdayCommand) {
             cancelReview()
             guard var current = controller else { return }
             do {
@@ -323,6 +332,24 @@
                 throw ApplicationClockError.invalidSample
             }
             return try ClockSample(wall: wall, uptime: ProcessInfo.processInfo.systemUptime)
+        }
+    }
+
+    extension DesktopModel {
+        func setFutureRest(minutes: Int?, expectedDay: Workday) throws {
+            guard ready, !choosingBackupDestination, reviewProposal == nil,
+                  glance?.day == expectedDay, var current = controller
+            else { throw FutureRestChangeError.staleContext }
+            do {
+                glance = try current.setFutureRest(minutes: minutes, expectedDay: expectedDay, sample: Self.sample())
+                controller = current
+                queueReminders(force: true)
+            } catch let error as FutureRestChangeError {
+                throw error
+            } catch {
+                fail(error)
+                throw error
+            }
         }
     }
 

@@ -34,23 +34,22 @@ public extension WorktimeGlance {
     /// Reassess against the latest committed snapshot. No hypothetical return time is persisted.
     func assessDesiredDeparture(at candidate: Int64) throws -> DesiredDepartureAssessment {
         let scenario = try departureScenario(candidate: candidate)
-        let status: DesiredDepartureStatus
-        if day.state == .ended {
-            status = .ended
+        let status: DesiredDepartureStatus = if day.state == .ended {
+            .ended
         } else if candidate <= observedAt {
-            status = .expired
+            .expired
         } else {
             switch scenario.result {
             case let .feasible(worked, _):
-                status = worked.lowerBound == worked.upperBound ? .feasible : .uncertain
+                worked.lowerBound == worked.upperBound ? .feasible : .uncertain
             case .infeasible:
-                status = .infeasible
+                .infeasible
             case .unknown:
-                status = .uncertain
+                .uncertain
             case .invalidCandidate:
-                status = .expired
+                .expired
             case .ended:
-                status = .ended
+                .ended
             }
         }
         return DesiredDepartureAssessment(scenario: scenario, status: status)

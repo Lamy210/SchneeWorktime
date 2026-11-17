@@ -61,8 +61,9 @@ enum JournalClassification: String, Codable, Equatable {
 enum JournalAction: Codable, Equatable {
     case command(JournalCommand, at: Int64)
     case observation(dayID: UUID, start: Int64, end: Int64)
-    case review(dayID: UUID, start: Int64, end: Int64, classification: JournalClassification)
+    case futureRest(dayID: UUID, remainingSeconds: Int64?)
     case desiredDeparture(dayID: UUID, candidate: Int64?, warningAcknowledged: Bool)
+    case review(dayID: UUID, start: Int64, end: Int64, classification: JournalClassification)
 }
 
 struct JournalEvent: Codable, Equatable {
@@ -73,6 +74,9 @@ struct JournalEvent: Codable, Equatable {
         switch action {
         case let .command(command, instant):
             try catalog.apply(command.command(), at: instant, now: now, expectedRevision: catalog.revision)
+        case let .futureRest(dayID, remainingSeconds):
+            try catalog.setFutureRest(dayID: dayID, remainingSeconds: remainingSeconds,
+                                      now: now, expectedRevision: catalog.revision)
         case let .observation(dayID, start, end):
             try catalog.recordObservation(dayID: dayID, gap: .init(start: start, end: end),
                                           now: now, expected: catalog.reviewVersion)
