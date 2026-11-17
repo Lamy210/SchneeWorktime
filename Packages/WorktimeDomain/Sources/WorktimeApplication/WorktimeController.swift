@@ -56,6 +56,10 @@ public struct WorktimeReviewProposal: Sendable {
     }
 }
 
+public enum FutureRestChangeError: Error, Equatable {
+    case staleContext, invalidMinutes
+}
+
 /// A single-owner application session. Callers must discard the controller after clock or storage errors.
 public struct WorktimeController {
     private let repository: CatalogRepository
@@ -81,6 +85,27 @@ public struct WorktimeController {
     public mutating func perform(_ command: WorkdayCommand, sample: ClockSample) throws -> WorktimeGlance? {
         try observe(sample)
         session = try repository.apply(command, at: sample.wall, now: sample.wall, expected: session.version)
+        try saveCheckpoint(sample: sample)
+        return try glance(now: sample.wall)
+    }
+
+    /// Save a remaining-rest forecast only, fenced by the displayed day and current store version.
+    public mutating func setFutureRest(
+        minutes: Int?, expectedDay: Workday, sample: ClockSample
+    ) throws -> WorktimeGlance? {
+        guard session.catalog.days.last == expectedDay, session.catalog.activeID == expectedDay.id else {
+            throw FutureRestChangeError.staleContext
+        }
+        if let minutes, !NextDaySettings.restRange.contains(minutes) {
+            throw FutureRestChangeError.invalidMinutes
+        }
+        var updated = clock
+        guard try updated.advance(to: sample) == nil else { throw FutureRestChangeError.staleContext }
+        session = try repository.setFutureRest(
+            dayID: expectedDay.id, remainingSeconds: minutes.map { Int64($0) * 60 },
+            now: sample.wall, expected: session.version
+        )
+        clock = updated
         try saveCheckpoint(sample: sample)
         return try glance(now: sample.wall)
     }

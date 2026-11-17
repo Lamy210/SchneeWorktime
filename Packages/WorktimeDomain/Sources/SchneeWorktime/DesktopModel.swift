@@ -336,6 +336,24 @@
     }
 
     extension DesktopModel {
+        func setFutureRest(minutes: Int?, expectedDay: Workday) throws {
+            guard ready, !choosingBackupDestination, reviewProposal == nil,
+                  glance?.day == expectedDay, var current = controller
+            else { throw FutureRestChangeError.staleContext }
+            do {
+                glance = try current.setFutureRest(minutes: minutes, expectedDay: expectedDay, sample: Self.sample())
+                controller = current
+                queueReminders(force: true)
+            } catch let error as FutureRestChangeError {
+                throw error
+            } catch {
+                fail(error)
+                throw error
+            }
+        }
+    }
+
+    extension DesktopModel {
         func previewRetrospectiveStart(
             at instant: Int64, targetMinutes: Int, restMinutes: Int
         ) throws -> RetrospectiveStartProposal {
