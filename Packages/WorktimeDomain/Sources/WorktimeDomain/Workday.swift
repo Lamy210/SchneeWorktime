@@ -159,10 +159,11 @@ public extension WorkdayCatalog {
                 bounds: snapshot.bounds, now: now, candidate: candidate,
                 remainingRest: snapshot.remainingRest, state: state
             )
-            if case let .feasible(worked, _) = preview, worked.lowerBound == worked.upperBound {
-                // A certain forecast can be saved without additional acknowledgement.
-            } else if !warningAcknowledged {
-                throw WorkdayError.confirmationRequired
+            switch preview {
+            case let .feasible(worked, _) where worked.lowerBound == worked.upperBound:
+                break
+            default:
+                guard warningAcknowledged else { throw WorkdayError.confirmationRequired }
             }
         }
         guard desiredDepartures[dayID] != candidate else { return }
