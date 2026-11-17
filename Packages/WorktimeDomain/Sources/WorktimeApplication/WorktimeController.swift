@@ -67,9 +67,7 @@ public struct WorktimeController {
         session = try repository.load(now: sample.wall)
         clock = ClockObservation(initial: sample)
         // No persisted observation heartbeat yet: conservatively review the open work interval on launch.
-        if let day = session.catalog.days.last, day.state == .working,
-           let start = day.intervals.last?.start, start < sample.wall
-        {
+        if let day = activeWorkingDay, let start = day.intervals.last?.start, start < sample.wall {
             try record(dayID: day.id, gap: .init(start: start, end: sample.wall), now: sample.wall)
         }
     }
@@ -112,12 +110,15 @@ public struct WorktimeController {
         return try glance(now: sample.wall)
     }
 
+    private var activeWorkingDay: Workday? {
+        guard let day = session.catalog.days.last, day.state == .working else { return nil }
+        return day
+    }
+
     private mutating func observe(_ sample: ClockSample) throws {
         var updated = clock
         let gap = try updated.advance(to: sample)
-        if let gap, let day = session.catalog.days.last, day.state == .working,
-           let start = day.intervals.last?.start
-        {
+        if let gap, let day = activeWorkingDay, let start = day.intervals.last?.start {
             let clipped = max(start, gap.start)
             if clipped < gap.end {
                 try record(dayID: day.id, gap: .init(start: clipped, end: gap.end), now: sample.wall)

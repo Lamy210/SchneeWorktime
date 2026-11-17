@@ -79,7 +79,9 @@
             guard var current = controller else { return }
             do {
                 let sample = try Self.sample()
-                let proposal = try current.previewReview(selection: selection, classification: classification, sample: sample)
+                let proposal = try current.previewReview(
+                    selection: selection, classification: classification, sample: sample
+                )
                 glance = proposal.before
                 controller = current
                 reviewProposal = proposal
