@@ -22,7 +22,8 @@ struct ReviewRangeSelectionTests {
         #expect(try ReviewRangeSelection.selection(in: gap, startOffset: 0, endOffset: 30) == gap)
         let middle = try ReviewRangeSelection.selection(in: gap, startOffset: 10, endOffset: 20)
         #expect(middle == ObservationGap(start: 120, end: 130))
-        for (start, end): (Int64, Int64) in [(-1, 20), (10, 10), (20, 10), (0, 31)] {
+        let invalid: [(Int64, Int64)] = [(-1, 20), (10, 10), (20, 10), (0, 31)]
+        for (start, end) in invalid {
             #expect(throws: HistoryReviewError.invalidSelection) {
                 try ReviewRangeSelection.selection(in: gap, startOffset: start, endOffset: end)
             }
