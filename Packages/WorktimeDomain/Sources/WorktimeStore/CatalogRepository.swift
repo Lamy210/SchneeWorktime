@@ -146,6 +146,11 @@ public struct CatalogRepository: Sendable {
 }
 
 public extension CatalogRepository {
+    /// Read a bounded private archive once; confirmation uses the captured bytes.
+    func previewRollback(file: URL, now: Int64, expected: StoreVersion) throws -> CatalogRollbackProposal {
+        try previewRollback(from: BackupFile.load(file), now: now, expected: expected)
+    }
+
     /// No writes or files are created during preview.
     func previewRollback(from data: Data, now: Int64, expected: StoreVersion) throws -> CatalogRollbackProposal {
         let current = try store.load()
