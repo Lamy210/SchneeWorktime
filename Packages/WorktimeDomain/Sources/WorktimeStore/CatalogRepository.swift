@@ -41,6 +41,13 @@ public struct CatalogRepository: Sendable {
         try read(now: now).session
     }
 
+    /// Capture one committed snapshot, validate journal replay, then encode without writing to storage.
+    public func makeBackup(now: Int64, expected: StoreVersion) throws -> Data {
+        let snapshot = try store.load()
+        guard snapshot.version == expected else { throw SnapshotStoreError.staleVersion }
+        return try CatalogBackup.encode(snapshot, now: now)
+    }
+
     public func apply(
         _ command: WorkdayCommand, at instant: Int64, now: Int64, expected: StoreVersion
     ) throws -> CatalogSession {
