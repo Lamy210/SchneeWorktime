@@ -6,10 +6,23 @@
     @MainActor
     struct SchneeWorktimeApp: App {
         @StateObject private var model = DesktopModel()
+        @StateObject private var panel = WorktimePanelCoordinator()
 
         var body: some Scene {
             MenuBarExtra {
-                WorktimeMenu(model: model)
+                VStack(spacing: 0) {
+                    HStack {
+                        Button(panel.visible ? "パネルを隠す" : "パネルを表示") {
+                            panel.toggle(model: model)
+                        }
+                        Button(panel.alwaysOnTop ? "最前面を解除" : "最前面にする") {
+                            panel.toggleAlwaysOnTop()
+                        }
+                    }
+                    .padding(8)
+                    Divider()
+                    WorktimeMenu(model: model)
+                }
             } label: {
                 Label(menuTitle, systemImage: "clock")
                     .monospacedDigit()
