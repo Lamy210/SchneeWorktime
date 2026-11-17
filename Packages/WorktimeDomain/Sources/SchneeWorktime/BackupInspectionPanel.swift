@@ -4,9 +4,9 @@
 
     @MainActor
     enum BackupInspectionPanel {
-        static func choose(initialDirectory: URL?) -> URL? {
+        static func choose(initialDirectory: URL?, forRollback: Bool = false) -> URL? {
             let panel = NSOpenPanel()
-            panel.title = "バックアップの内容を確認"
+            panel.title = forRollback ? "復元候補の選択" : "バックアップの内容を確認"
             panel.prompt = "確認"
             panel.message = "検証のみ行います。現在の勤務記録を置き換えることはありません。"
             panel.canChooseFiles = true

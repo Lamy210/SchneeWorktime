@@ -344,3 +344,47 @@ public extension WorktimeController {
         return try glance(now: sample.wall)
     }
 }
+
+public struct WorktimeRollbackProposal: Sendable {
+    fileprivate let stored: CatalogRollbackProposal
+
+    public var currentDays: Int {
+        stored.currentDays
+    }
+
+    public var restoredDays: Int {
+        stored.restoredDays
+    }
+
+    public var currentRevision: Int64 {
+        stored.currentVersion.revision
+    }
+
+    public var sourceRevision: Int64 {
+        stored.sourceVersion.revision
+    }
+}
+
+public extension WorktimeController {
+    /// Does not write, resolve observation gaps, or reopen a selected backup.
+    func previewRollback(file: URL, sample: ClockSample) throws -> WorktimeRollbackProposal {
+        var checked = clock
+        _ = try checked.advance(to: sample)
+        let proposal = try repository.previewRollback(file: file, now: sample.wall, expected: session.version)
+        return WorktimeRollbackProposal(stored: proposal)
+    }
+
+    func isCurrent(_ proposal: WorktimeRollbackProposal) -> Bool {
+        session.version == proposal.stored.currentVersion && session.catalog.activeID == nil
+    }
+
+    /// Caller must quiesce notification scheduling and all writers. Discard this controller afterwards.
+    func commitRollback(
+        _ proposal: WorktimeRollbackProposal, preserveCurrentAt destination: URL, sample: ClockSample
+    ) throws {
+        guard isCurrent(proposal) else { throw SnapshotStoreError.staleVersion }
+        var checked = clock
+        _ = try checked.advance(to: sample)
+        _ = try repository.commitRollback(proposal.stored, preserveCurrentAt: destination, now: sample.wall)
+    }
+}

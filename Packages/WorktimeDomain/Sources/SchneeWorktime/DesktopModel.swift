@@ -12,10 +12,13 @@
         @Published private(set) var message: String?
         @Published private(set) var reviewProposal: WorktimeReviewProposal?
         @Published private(set) var reviewNotice: String?
-        @Published private(set) var backupNotice: String?
-        @Published private(set) var choosingBackupDestination = false
-        @Published private(set) var backupInspection: BackupInspection?
-        @Published private(set) var inspectionNotice: String?
+        @Published var backupNotice: String?
+        @Published var choosingBackupDestination = false
+        @Published var backupInspection: BackupInspection?
+        @Published var inspectionNotice: String?
+        @Published var rollbackProposal: WorktimeRollbackProposal?
+        @Published var rollbackNotice: String?
+        @Published var rollbackInProgress = false
 
         @Published private(set) var remindersEnabled = UserDefaults.standard.bool(forKey: "departureReminderEnabled")
         @Published private(set) var departureLeads = ReminderLeadSettings.decode(
@@ -30,12 +33,12 @@
         @Published private(set) var reminderStatus = ""
         @Published private(set) var requestingReminderPermission = false
 
-        private var controller: WorktimeController?
-        private var sessionLock: LocalSessionLock?
-        private var reminderCoordinator: DesktopReminderCoordinator?
-        private var reminderRunning = false
+        private(set) var controller: WorktimeController?
+        private(set) var sessionLock: LocalSessionLock?
+        private(set) var reminderCoordinator: DesktopReminderCoordinator?
+        private(set) var reminderRunning = false
         private var nextReminderCheck: Double = 0
-        private var reminderClockUntrusted = false
+        private var reminderStateUntrusted = false
 
         init() {
             if DesktopReminderCoordinator.supported {
@@ -49,6 +52,8 @@
         }
 
         func open(create: Bool) {
+            guard !rollbackInProgress, !choosingBackupDestination else { return }
+            rollbackProposal = nil
             cancelReview()
             controller = nil
             ready = false
@@ -67,6 +72,8 @@
                 }
                 if create, FileManager.default.fileExists(atPath: url.path) {
                     message = "既存のデータベースがあります。初期化せず再読込してください。"
+                    reminderStateUntrusted = true
+                    queueReminders(force: true)
                     return
                 }
                 let sample = try Self.sample()
@@ -75,55 +82,15 @@
                 controller = opened
                 ready = true
                 message = nil
-                reminderClockUntrusted = false
+                reminderStateUntrusted = false
                 queueReminders(force: true)
             } catch {
                 fail(error)
             }
         }
 
-        func chooseBackupDestination(format: WorktimeExportFormat = .backup) {
-            guard ready, sessionLock != nil, controller != nil, !choosingBackupDestination else { return }
-            choosingBackupDestination = true
-            defer { choosingBackupDestination = false }
-
-            let initialDirectory = try? databaseURL().deletingLastPathComponent()
-            guard let directory = format.chooseDirectory(initialDirectory: initialDirectory) else { return }
-            // The modal panel may have allowed observation ticks; consult the current controller after selection.
-            guard ready, sessionLock != nil, let current = controller else {
-                backupNotice = "勤務記録の再読込が必要です。バックアップは作成していません。"
-                return
-            }
-            let name = format.filename
-            let destination = directory.appendingPathComponent(name)
-            do {
-                try format.write(controller: current, to: destination, now: Self.sample().wall)
-                backupNotice = "保存しました：\(name)"
-            } catch {
-                backupNotice = "保存できませんでした。保存先の所有者・権限、空き容量、勤務記録を確認してください。"
-            }
-        }
-
-        func chooseBackupForInspection() {
-            guard !choosingBackupDestination else { return }
-            choosingBackupDestination = true
-            defer { choosingBackupDestination = false }
-            backupInspection = nil
-            inspectionNotice = nil
-
-            let directory = try? databaseURL().deletingLastPathComponent()
-            guard let url = BackupInspectionPanel.choose(initialDirectory: directory) else { return }
-            do {
-                backupInspection = try BackupInspection(file: url, now: Self.sample().wall)
-                inspectionNotice = "構造と勤務履歴の整合性を確認しました。真正性は保証されません。"
-            } catch {
-                inspectionNotice = "確認できませんでした。形式・所有者・権限・ファイルサイズ・時刻を確認してください。"
-            }
-        }
-
-        func clearBackupInspection() {
-            backupInspection = nil
-            inspectionNotice = nil
+        func suspendForRollback() {
+            ready = false
         }
 
         func recentHistory() throws -> WorktimeHistory? {
@@ -223,6 +190,7 @@
         }
 
         private func tick() {
+            guard !rollbackInProgress else { return }
             guard var current = controller else {
                 queueReminders()
                 return
@@ -231,6 +199,10 @@
                 let previousGoal = glance?.forecast.goal
                 glance = try current.refresh(sample: Self.sample())
                 controller = current
+                if let proposal = rollbackProposal, !current.isCurrent(proposal) {
+                    rollbackProposal = nil
+                    rollbackNotice = "記録が更新されました。復元候補を再選択してください。"
+                }
                 queueReminders(force: previousGoal != glance?.forecast.goal)
                 if let proposal = reviewProposal, !current.isCurrent(proposal) {
                     invalidateReview()
@@ -241,14 +213,13 @@
         }
 
         private func fail(_ error: Error) {
+            rollbackProposal = nil
             cancelReview()
             controller = nil
             glance = nil
             ready = false
-            if error is ApplicationClockError {
-                reminderClockUntrusted = true
-                queueReminders(force: true)
-            }
+            reminderStateUntrusted = true
+            queueReminders(force: true)
             if let lockError = error as? LocalSessionLockError {
                 switch lockError {
                 case .alreadyLocked:
@@ -259,11 +230,11 @@
                     message = "保存先の排他ロックを取得できません。記録を停止しました。"
                 }
             } else {
-                message = "記録を停止：\(error)。時刻・データを確認して再読込してください。"
+                message = "記録を停止：\(error)。既存DBを上書きせず、時刻・権限・バックアップを確認してください。"
             }
         }
 
-        private func databaseURL() throws -> URL {
+        func databaseURL() throws -> URL {
             let support = try FileManager.default.url(
                 for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: false
             )
@@ -271,7 +242,7 @@
                 .appendingPathComponent("worktime.sqlite")
         }
 
-        private static func sample() throws -> ClockSample {
+        static func sample() throws -> ClockSample {
             guard let wall = Int64(exactly: Date().timeIntervalSince1970.rounded(.down)) else {
                 throw ApplicationClockError.invalidSample
             }
@@ -330,7 +301,7 @@
         }
 
         func disableReminders() {
-            guard sessionLock != nil, !requestingReminderPermission else { return }
+            guard !rollbackInProgress, sessionLock != nil, !requestingReminderPermission else { return }
             remindersEnabled = false
             UserDefaults.standard.set(false, forKey: "departureReminderEnabled")
             reminderStatus = "通知予約の取消を確認中"
@@ -338,7 +309,7 @@
         }
 
         private func latestReminderState() throws -> ReminderSyncState? {
-            guard remindersEnabled, !reminderClockUntrusted else { return nil }
+            guard remindersEnabled, !reminderStateUntrusted else { return nil }
             guard ready, let controller else { throw ReminderDeliveryError.invalidRequest }
             do {
                 return try controller.reminderState(
@@ -352,11 +323,12 @@
         }
 
         private func queueReminders(force: Bool = false) {
+            guard !rollbackInProgress else { return }
             if force {
                 nextReminderCheck = 0
             }
             guard let reminderCoordinator, sessionLock != nil, !reminderRunning,
-                  ready || reminderClockUntrusted || !remindersEnabled else { return }
+                  ready || reminderStateUntrusted || !remindersEnabled else { return }
             let uptime = ProcessInfo.processInfo.systemUptime
             guard uptime >= nextReminderCheck else { return }
             nextReminderCheck = uptime + 15
@@ -378,7 +350,7 @@
             switch result {
             case .settled:
                 if remindersEnabled {
-                    reminderStatus = reminderClockUntrusted ? "時計異常のため通知停止" : "通知予約の更新完了（配信はOS依存）"
+                    reminderStatus = reminderStateUntrusted ? "記録または時計を確認できないため通知停止" : "通知予約の更新完了（配信はOS依存）"
                 } else {
                     reminderStatus = "通知は無効です。"
                 }
