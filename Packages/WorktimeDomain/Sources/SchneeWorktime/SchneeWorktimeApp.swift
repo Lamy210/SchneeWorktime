@@ -22,6 +22,14 @@
                             Button(panel.displayMode == .compact ? "詳細表示" : "コンパクト表示") {
                                 panel.toggleDisplayMode()
                             }
+                            Menu("不透明度") {
+                                ForEach(PanelOpacity.allCases, id: \.rawValue) { value in
+                                    Button(value.title + (panel.opacity == value ? " (選択中)" : "")) {
+                                        panel.setOpacity(value)
+                                    }
+                                }
+                            }
+                            Button("表示位置をリセット") { panel.resetPosition() }
                         }
                     }
                     .padding(8)
