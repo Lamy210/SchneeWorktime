@@ -21,8 +21,12 @@
         @Published private(set) var departureLeads = ReminderLeadSettings.decode(
             UserDefaults.standard.string(forKey: "departureReminderLeads")
         )
-        @Published private(set) var earliestReminderEnabled = UserDefaults.standard.bool(forKey: "earliestReminderEnabled")
-        @Published private(set) var referenceReminderEnabled = UserDefaults.standard.bool(forKey: "referenceReminderEnabled")
+        @Published private(set) var earliestReminderEnabled = UserDefaults.standard.bool(
+            forKey: "earliestReminderEnabled"
+        )
+        @Published private(set) var referenceReminderEnabled = UserDefaults.standard.bool(
+            forKey: "referenceReminderEnabled"
+        )
         @Published private(set) var reminderStatus = ""
         @Published private(set) var requestingReminderPermission = false
 
