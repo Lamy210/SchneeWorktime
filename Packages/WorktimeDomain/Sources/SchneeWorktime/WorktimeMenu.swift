@@ -166,6 +166,7 @@
             Text(stateLabel(glance.day.state)).font(.headline)
             forecastLabel(glance.forecast.goal)
             DesiredDepartureStatusView(glance: glance)
+            BreakRecordAdvisoryView(glance: glance)
             DepartureCountdownView(
                 countdown: DepartureCountdown(goal: glance.forecast.goal, observedAt: glance.observedAt)
             )
