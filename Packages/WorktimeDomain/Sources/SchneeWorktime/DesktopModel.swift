@@ -21,6 +21,8 @@
         @Published private(set) var departureLeads = ReminderLeadSettings.decode(
             UserDefaults.standard.string(forKey: "departureReminderLeads")
         )
+        @Published private(set) var earliestReminderEnabled = UserDefaults.standard.bool(forKey: "earliestReminderEnabled")
+        @Published private(set) var referenceReminderEnabled = UserDefaults.standard.bool(forKey: "referenceReminderEnabled")
         @Published private(set) var reminderStatus = ""
         @Published private(set) var requestingReminderPermission = false
 
@@ -299,6 +301,20 @@
             queueReminders(force: true)
         }
 
+        func setEarliestReminder(_ enabled: Bool) {
+            guard ready, sessionLock != nil, !requestingReminderPermission else { return }
+            earliestReminderEnabled = enabled
+            UserDefaults.standard.set(enabled, forKey: "earliestReminderEnabled")
+            queueReminders(force: true)
+        }
+
+        func setReferenceReminder(_ enabled: Bool) {
+            guard ready, sessionLock != nil, !requestingReminderPermission else { return }
+            referenceReminderEnabled = enabled
+            UserDefaults.standard.set(enabled, forKey: "referenceReminderEnabled")
+            queueReminders(force: true)
+        }
+
         func disableReminders() {
             guard sessionLock != nil, !requestingReminderPermission else { return }
             remindersEnabled = false
@@ -311,7 +327,11 @@
             guard remindersEnabled, !reminderClockUntrusted else { return nil }
             guard ready, let controller else { throw ReminderDeliveryError.invalidRequest }
             do {
-                return try controller.reminderState(sample: Self.sample(), departureLeads: departureLeads)
+                return try controller.reminderState(
+                    sample: Self.sample(), departureLeads: departureLeads,
+                    earliestLeads: earliestReminderEnabled ? [.fifteen] : [],
+                    referenceEnabled: referenceReminderEnabled
+                )
             } catch is ApplicationClockError {
                 return nil
             }
