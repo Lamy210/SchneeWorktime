@@ -5,7 +5,7 @@ struct ReminderLeadSettingsTests {
     @Test func `missing preference preserves legacy fifteen minutes and empty suppresses notifications`() {
         #expect(ReminderLeadSettings.decode(nil) == [.fifteen])
         #expect(ReminderLeadSettings.decode("") == [])
-        #expect(ReminderLeadSettings.encode([]) == "")
+        #expect(ReminderLeadSettings.encode([]).isEmpty)
     }
 
     @Test func `all combinations survive persistence encoding`() {
