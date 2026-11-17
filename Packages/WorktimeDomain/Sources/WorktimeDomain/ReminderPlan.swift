@@ -39,10 +39,10 @@ public enum ReminderPlan {
             if departureLeads.contains(lead), let target, let trigger = future(target, lead: lead, now: now) {
                 result.append(PlannedReminder(kind: .departurePreparation(lead), trigger: trigger))
             }
-            if earliestLeads.contains(lead), let earliest = automatic?.0,
-               let trigger = future(earliest, lead: lead, now: now)
-            {
-                result.append(PlannedReminder(kind: .earliestGoal(lead), trigger: trigger))
+            if earliestLeads.contains(lead), let earliest = automatic?.0 {
+                if let trigger = future(earliest, lead: lead, now: now) {
+                    result.append(PlannedReminder(kind: .earliestGoal(lead), trigger: trigger))
+                }
             }
         }
         if let referenceAt, referenceAt > now {
