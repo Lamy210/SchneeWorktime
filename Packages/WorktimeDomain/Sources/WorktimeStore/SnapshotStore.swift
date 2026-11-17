@@ -97,6 +97,23 @@ public struct SnapshotStore: Sendable {
         }
     }
 
+    /// Internal only: the repository has validated both journals and preserved the current one.
+    func replaceForRecovery(_ source: StoredSnapshot, expected: StoreVersion) throws -> StoreVersion {
+        guard source.version.epoch == expected.epoch,
+              source.version.revision > 0, source.version.revision < expected.revision,
+              let payload = source.payload, !payload.isEmpty, payload.count <= Self.maxPayload
+        else { throw SnapshotStoreError.invalidSnapshot }
+        return try connection { db in
+            try Self.transaction(db) {
+                let current = try Self.read(db)
+                guard current.version == expected else { throw SnapshotStoreError.staleVersion }
+                let next = StoreVersion(epoch: UUID(), revision: source.version.revision)
+                try Self.write(db, version: next, payload: payload)
+                return next
+            }
+        }
+    }
+
     /// Logical reset only. Old backups and filesystem remnants are not erased by this operation.
     @discardableResult
     public func reset(expected: StoreVersion) throws -> StoreVersion {

@@ -128,3 +128,54 @@ public struct CatalogRepository: Sendable {
         return CatalogSession(version: version, catalog: catalog)
     }
 }
+
+public extension CatalogRepository {
+    /// No writes or files are created during preview.
+    func previewRollback(from data: Data, now: Int64, expected: StoreVersion) throws -> CatalogRollbackProposal {
+        let current = try store.load()
+        guard current.version == expected else { throw SnapshotStoreError.staleVersion }
+        let decoded = try CatalogBackup.decodeValidated(data, now: now)
+        return try Self.rollbackProposal(source: decoded.snapshot, current: current, now: now)
+    }
+
+    /// Caller must explicitly confirm the preview, select a fresh private preservation path,
+    /// and stop all application writers/notifications before calling. Reopen the controller afterwards.
+    func commitRollback(
+        _ proposal: CatalogRollbackProposal, preserveCurrentAt destination: URL, now: Int64
+    ) throws -> CatalogSession {
+        let current = try store.load()
+        guard current.version == proposal.currentVersion else { throw SnapshotStoreError.staleVersion }
+        _ = try Self.rollbackProposal(source: proposal.source, current: current, now: now)
+        let original = try CatalogBackup.encode(current, now: now)
+        try BackupFile.publish(original, to: destination)
+        guard try BackupFile.load(destination) == original else { throw CatalogRollbackError.preservationFailed }
+        let version = try store.replaceForRecovery(proposal.source, expected: current.version)
+        return try CatalogBackup.validateSnapshot(
+            StoredSnapshot(version: version, payload: proposal.source.payload), now: now
+        )
+    }
+
+    private static func rollbackProposal(
+        source: StoredSnapshot, current: StoredSnapshot, now: Int64
+    ) throws -> CatalogRollbackProposal {
+        guard source.version.epoch == current.version.epoch else { throw CatalogRollbackError.differentGeneration }
+        guard source.version.revision > 0, source.version.revision < current.version.revision,
+              let sourcePayload = source.payload, let currentPayload = current.payload
+        else { throw CatalogRollbackError.notEarlier }
+        let original = try CatalogBackup.validateSnapshot(current, now: now)
+        let restored = try CatalogBackup.validateSnapshot(source, now: now)
+        guard original.catalog.activeID == nil, restored.catalog.activeID == nil else {
+            throw CatalogRollbackError.activeWorkday
+        }
+        let decoder = JSONDecoder()
+        let previous = try decoder.decode(CatalogJournal.self, from: sourcePayload)
+        let latest = try decoder.decode(CatalogJournal.self, from: currentPayload)
+        guard latest.events.prefix(previous.events.count).elementsEqual(previous.events) else {
+            throw CatalogRollbackError.divergentHistory
+        }
+        return CatalogRollbackProposal(
+            source: source, currentVersion: current.version,
+            currentDays: original.catalog.days.count, restoredDays: restored.catalog.days.count
+        )
+    }
+}
