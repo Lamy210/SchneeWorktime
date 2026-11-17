@@ -114,6 +114,11 @@ public struct WorktimeController {
         return try glance(now: sample.wall)
     }
 
+    /// Export only the committed journal, never an unsaved review proposal.
+    public func writeBackup(to url: URL, now: Int64) throws {
+        try repository.writeBackup(to: url, now: now, expected: session.version)
+    }
+
     /// Read only committed state; an unobserved gap or unreliable clock must not produce a precise reminder.
     public func reminderState(sample: ClockSample) throws -> ReminderSyncState? {
         var observation = clock
