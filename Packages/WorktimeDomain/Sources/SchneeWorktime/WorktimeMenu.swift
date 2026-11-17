@@ -77,8 +77,12 @@
                     .font(.caption)
                 Text("所有者専用のローカルフォルダを指定してください。同期フォルダは避けてください。")
                     .font(.caption)
-                Button("保存先フォルダを選択") { model.chooseBackupDestination() }
+                Button("JSONバックアップの保存先を選択") { model.chooseBackupDestination() }
                     .disabled(model.choosingBackupDestination)
+                Button("全履歴CSVの保存先を選択") { model.chooseBackupDestination(format: .csv) }
+                    .disabled(model.choosingBackupDestination)
+                Text("CSVはUTCのUnix秒で全勤務区間・要確認区間・訂正情報を出力します。復元にはJSONを使用します。")
+                    .font(.caption)
                 if let notice = model.backupNotice {
                     Text(notice)
                         .font(.caption)

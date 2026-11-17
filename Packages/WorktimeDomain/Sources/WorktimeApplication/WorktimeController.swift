@@ -126,6 +126,10 @@ public struct WorktimeController {
         try repository.writeBackup(to: url, now: now, expected: session.version)
     }
 
+    public func writeCSV(to url: URL, now: Int64) throws {
+        try repository.writeCSV(to: url, now: now, expected: session.version)
+    }
+
     /// Read only committed state; an unobserved gap or unreliable clock must not produce a precise reminder.
     public func reminderState(sample: ClockSample) throws -> ReminderSyncState? {
         var observation = clock
