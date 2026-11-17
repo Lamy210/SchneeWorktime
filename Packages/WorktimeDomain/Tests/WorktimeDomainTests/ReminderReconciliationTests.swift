@@ -36,8 +36,9 @@ struct ReminderReconciliationTests {
 
     @Test func `same identifier with changed trigger or revision is replaced`() throws {
         let original = try #require(changes(plan()).upsert.first)
-        for next in [try changes(plan(4200), [pending(original)]),
-                     try changes(plan(), [pending(original)], revision: 2)] {
+        let changedTrigger = try changes(plan(4200), [pending(original)])
+        let changedRevision = try changes(plan(), [pending(original)], revision: 2)
+        for next in [changedTrigger, changedRevision] {
             #expect(next.cancel == [original.id])
             #expect(next.upsert.map(\.id) == [original.id])
         }
