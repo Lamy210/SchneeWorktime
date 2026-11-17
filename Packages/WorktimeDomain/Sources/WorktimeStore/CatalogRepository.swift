@@ -55,6 +55,13 @@ public struct CatalogRepository: Sendable {
         return try mutate(event, expected: expected)
     }
 
+    public func setFutureRest(
+        dayID: UUID, remainingSeconds: Int64?, now: Int64, expected: StoreVersion
+    ) throws -> CatalogSession {
+        let action = JournalAction.futureRest(dayID: dayID, remainingSeconds: remainingSeconds)
+        return try mutate(JournalEvent(action: action, now: now), expected: expected)
+    }
+
     public func recordObservation(
         dayID: UUID, gap: ObservationGap, now: Int64, expected: StoreVersion
     ) throws -> CatalogSession {
