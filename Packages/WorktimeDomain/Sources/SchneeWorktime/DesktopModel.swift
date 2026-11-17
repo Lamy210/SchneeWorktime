@@ -7,7 +7,10 @@
 
     @MainActor
     final class DesktopModel: ObservableObject {
-        @Published private(set) var glance: WorktimeGlance?
+        @Published private(set) var glance: WorktimeGlance? {
+            didSet { updateObservationTimer() }
+        }
+
         @Published private(set) var ready = false
         @Published private(set) var message: String?
         @Published private(set) var reviewProposal: WorktimeReviewProposal?
@@ -39,16 +42,20 @@
         private(set) var reminderRunning = false
         private var nextReminderCheck: Double = 0
         private var reminderStateUntrusted = false
+        private let observationTimer = DesktopObservationTimer()
 
         init() {
             if DesktopReminderCoordinator.supported {
                 reminderCoordinator = DesktopReminderCoordinator()
             }
             open(create: false)
-            let timer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
-                Task { @MainActor in self?.tick() }
+            updateObservationTimer()
+        }
+
+        private func updateObservationTimer() {
+            observationTimer.update(to: ObservationCadence(dayState: glance?.day.state)) { [weak self] in
+                self?.tick()
             }
-            RunLoop.main.add(timer, forMode: .common)
         }
 
         func open(create: Bool) {
