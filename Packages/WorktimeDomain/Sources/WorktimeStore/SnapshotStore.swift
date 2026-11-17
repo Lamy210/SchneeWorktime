@@ -71,6 +71,32 @@ public struct SnapshotStore: Sendable {
         }
     }
 
+    /// Internal recovery primitive: seed only a newly initialized empty store.
+    /// The caller must validate the full journal first and must not use the live database.
+    func seedRecovery(_ source: StoredSnapshot, expected: StoreVersion) throws -> StoreVersion {
+        guard expected.revision == 0, source.version.revision >= 0 else {
+            throw SnapshotStoreError.invalidSnapshot
+        }
+        if let payload = source.payload {
+            guard source.version.revision > 0, !payload.isEmpty, payload.count <= Self.maxPayload else {
+                throw SnapshotStoreError.invalidPayload
+            }
+        } else if source.version.revision != 0 {
+            throw SnapshotStoreError.invalidPayload
+        }
+        return try connection { db in
+            try Self.transaction(db) {
+                let current = try Self.read(db)
+                guard current.version == expected, current.payload == nil else {
+                    throw SnapshotStoreError.staleVersion
+                }
+                let next = StoreVersion(epoch: UUID(), revision: source.version.revision)
+                try Self.write(db, version: next, payload: source.payload)
+                return next
+            }
+        }
+    }
+
     /// Logical reset only. Old backups and filesystem remnants are not erased by this operation.
     @discardableResult
     public func reset(expected: StoreVersion) throws -> StoreVersion {
