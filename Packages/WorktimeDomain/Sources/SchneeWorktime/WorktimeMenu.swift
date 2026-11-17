@@ -59,6 +59,8 @@
                         if glance.day.state != .ended, model.reviewProposal == nil {
                             FutureRestSettingsView(model: model, day: glance.day)
                                 .id(glance.day.id)
+                            DesiredDepartureSettingsView(model: model, day: glance.day)
+                                .id(glance.day.id)
                             DepartureScenarioView(glance: glance)
                         }
                     }
@@ -164,6 +166,7 @@
         private func summary(_ glance: WorktimeGlance) -> some View {
             Text(stateLabel(glance.day.state)).font(.headline)
             forecastLabel(glance.forecast.goal)
+            DesiredDepartureStatusView(glance: glance)
             ReferenceStatusView(glance: glance)
             DepartureCountdownView(
                 countdown: DepartureCountdown(goal: glance.forecast.goal, observedAt: glance.observedAt)
@@ -258,7 +261,7 @@
     extension WorktimeMenu {
         private var reminderSettings: some View {
             DisclosureGroup("退勤準備の通知") {
-                Text("休憩込み退勤見込みの選択した時刻に通知します。過ぎた時刻には通知しません。実績の確定ではありません。")
+                Text("希望退勤（適格な場合）または希望がない場合の退勤見込みを基準に通知します。過ぎた時刻には通知しません。")
                     .font(.caption)
                 if model.remindersSupported {
                     ForEach([ReminderLead.thirty, .fifteen, .five], id: \.rawValue) { lead in

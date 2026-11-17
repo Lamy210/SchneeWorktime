@@ -357,6 +357,49 @@
     }
 
     extension DesktopModel {
+        func previewDesiredDeparture(at instant: Int64) throws -> DesiredDepartureProposal {
+            guard ready, !choosingBackupDestination, reviewProposal == nil, let controller else {
+                throw DesiredDepartureSaveError.staleProposal
+            }
+            return try controller.previewDesiredDeparture(at: instant, sample: Self.sample())
+        }
+
+        func confirmDesiredDeparture(_ proposal: DesiredDepartureProposal, warningAcknowledged: Bool) throws {
+            guard ready, !choosingBackupDestination, reviewProposal == nil, var current = controller else {
+                throw DesiredDepartureSaveError.staleProposal
+            }
+            do {
+                glance = try current.commitDesiredDeparture(
+                    proposal, warningAcknowledged: warningAcknowledged, sample: Self.sample()
+                )
+                controller = current
+                queueReminders(force: true)
+            } catch let error as DesiredDepartureSaveError {
+                throw error
+            } catch {
+                fail(error)
+                throw error
+            }
+        }
+
+        func clearDesiredDeparture(expectedDay: Workday) throws {
+            guard ready, !choosingBackupDestination, reviewProposal == nil, var current = controller else {
+                throw DesiredDepartureSaveError.staleProposal
+            }
+            do {
+                glance = try current.clearDesiredDeparture(expectedDay: expectedDay, sample: Self.sample())
+                controller = current
+                queueReminders(force: true)
+            } catch let error as DesiredDepartureSaveError {
+                throw error
+            } catch {
+                fail(error)
+                throw error
+            }
+        }
+    }
+
+    extension DesktopModel {
         private func captureReference(for command: WorkdayCommand, at instant: Int64) throws -> WorkdayCommand {
             guard case let .clockIn(id, profile) = command else { return command }
             return try .clockIn(id: id, profile: capturedProfile(profile, at: instant))
