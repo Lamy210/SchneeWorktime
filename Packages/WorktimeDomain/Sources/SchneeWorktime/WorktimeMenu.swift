@@ -10,33 +10,19 @@ struct WorktimeMenu: View {
     @ObservedObject var model: DesktopModel
     @State private var confirmCreate = false
     @State private var confirmBreakExit = false
+    @AppStorage("nextDayTargetMinutes") private var targetMinutes = 420
+    @AppStorage("nextDayRestMinutes") private var restMinutes = 60
+
+    private var settingsValid: Bool {
+        NextDaySettings.targetRange.contains(targetMinutes) && NextDaySettings.restRange.contains(restMinutes)
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("SchneeWorktime").font(.headline)
-            Text("開発版 · 正式な勤怠記録ではありません")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            if let glance = model.glance {
-                summary(glance)
-                if model.ready {
-                    actions(glance.day).disabled(model.reviewProposal != nil)
-                    reviewSection(glance)
-                }
-            } else if model.ready {
-                Text("勤務記録なし")
-                Button("勤務開始") { model.start() }
-            } else {
-                Text(model.message ?? "記録を読み込めません")
-                    .font(.caption)
-                Button("既存データを再読込") { model.open(create: false) }
-                Button("新規データベースを作成") { confirmCreate = true }
-            }
-            Divider()
-            Button("アプリを終了") { NSApplication.shared.terminate(nil) }
+        ScrollView {
+            contents
+                .padding(16)
         }
-        .padding(16)
-        .frame(width: 320)
+        .frame(width: 360, height: 540)
         .confirmationDialog("勤務記録を新規作成しますか？", isPresented: $confirmCreate) {
             Button("新規作成") { model.open(create: true) }
             Button("キャンセル", role: .cancel) {}
@@ -49,10 +35,65 @@ struct WorktimeMenu: View {
         }
     }
 
+    private var contents: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("SchneeWorktime").font(.headline)
+            Text("開発版 · 正式な勤怠記録ではありません")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            if let glance = model.glance {
+                summary(glance)
+                if model.ready {
+                    actions(glance.day).disabled(model.reviewProposal != nil)
+                    reviewSection(glance)
+                    if glance.day.state != .ended, model.reviewProposal == nil {
+                        DepartureScenarioView(glance: glance)
+                    }
+                }
+            } else if model.ready {
+                Text("勤務記録なし")
+                Button("勤務開始") { start() }.disabled(!settingsValid)
+            } else {
+                Text(model.message ?? "記録を読み込めません")
+                    .font(.caption)
+                Button("既存データを再読込") { model.open(create: false) }
+                Button("新規データベースを作成") { confirmCreate = true }
+            }
+            if model.ready {
+                nextDaySettings
+            }
+            Divider()
+            Button("アプリを終了") { NSApplication.shared.terminate(nil) }
+        }
+    }
+
+    private var nextDaySettings: some View {
+        DisclosureGroup("次の勤務日の設定") {
+            Text("現在と過去の勤務記録は変更しません。").font(.caption)
+            if settingsValid {
+                Stepper("実働目標：\(targetMinutes)分", value: $targetMinutes,
+                        in: NextDaySettings.targetRange, step: 5)
+                Stepper("標準休憩：\(restMinutes)分", value: $restMinutes,
+                        in: NextDaySettings.restRange, step: 5)
+            } else {
+                Text("設定値が無効です。既定値に戻してください。").font(.caption)
+            }
+            Button("既定値（実働420分・休憩60分）に戻す") {
+                targetMinutes = 420
+                restMinutes = 60
+            }
+        }
+    }
+
+    private func start() {
+        model.start(targetMinutes: targetMinutes, restMinutes: restMinutes)
+    }
+
     @ViewBuilder
     private func summary(_ glance: WorktimeGlance) -> some View {
         Text(stateLabel(glance.day.state)).font(.headline)
         forecastLabel(glance.forecast.goal)
+        Text("実働目標：\(glance.day.profile.target / 60)分")
         Text("実働：\(duration(glance.snapshot.bounds.lower ... glance.snapshot.bounds.upper))")
         Text("目標まで：\(duration(glance.forecast.remaining, roundUp: true))")
         Text("日次目標超過：\(duration(glance.forecast.surplus))")
@@ -151,7 +192,7 @@ struct WorktimeMenu: View {
             Button("休憩終了") { model.perform(.endBreak) }
             Button("退勤") { confirmBreakExit = true }
         case .ended:
-            Button("新しい勤務日を開始") { model.start() }
+            Button("新しい勤務日を開始") { start() }.disabled(!settingsValid)
             Button("直前の勤務日を再開") { model.perform(.resume(id: day.id)) }
         }
     }

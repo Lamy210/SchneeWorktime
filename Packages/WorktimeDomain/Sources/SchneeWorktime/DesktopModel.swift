@@ -50,11 +50,12 @@ final class DesktopModel: ObservableObject {
         }
     }
 
-    func start() {
+    func start(targetMinutes: Int, restMinutes: Int) {
         do {
-            perform(.clockIn(id: UUID(), profile: try WorkdayProfile()))
+            let defaults = try NextDaySettings(targetMinutes: targetMinutes, restMinutes: restMinutes)
+            perform(.clockIn(id: UUID(), profile: defaults.profile))
         } catch {
-            fail(error)
+            message = "勤務設定を確認してください。"
         }
     }
 
