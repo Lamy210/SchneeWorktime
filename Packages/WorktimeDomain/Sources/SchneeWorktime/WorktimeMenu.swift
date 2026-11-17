@@ -149,6 +149,7 @@
                 } else {
                     Text("設定値が無効です。既定値に戻してください。").font(.caption)
                 }
+                ReferenceSettingsView()
                 Button("既定値（実働420分・休憩60分）に戻す") {
                     targetMinutes = 420
                     restMinutes = 60
@@ -166,6 +167,7 @@
             Text(stateLabel(glance.day.state)).font(.headline)
             forecastLabel(glance.forecast.goal)
             DesiredDepartureStatusView(glance: glance)
+            ReferenceStatusView(glance: glance)
             BreakRecordAdvisoryView(glance: glance)
             DepartureCountdownView(
                 countdown: DepartureCountdown(goal: glance.forecast.goal, observedAt: glance.observedAt)
@@ -259,7 +261,7 @@
 
     extension WorktimeMenu {
         private var reminderSettings: some View {
-            DisclosureGroup("退勤準備の通知") {
+            DisclosureGroup("勤務の通知") {
                 Text("希望退勤（適格な場合）または希望がない場合の退勤見込みを基準に通知します。過ぎた時刻には通知しません。")
                     .font(.caption)
                 if model.remindersSupported {
@@ -270,8 +272,18 @@
                         ))
                     }
                     if model.departureLeads.isEmpty {
-                        Text("通知時刻が未選択です。予約は作成されません。").font(.caption)
+                        Text("退勤準備通知は未選択です。").font(.caption)
                     }
+                    Toggle("最短目標達成の15分前", isOn: Binding(
+                        get: { model.earliestReminderEnabled },
+                        set: { model.setEarliestReminder($0) }
+                    ))
+                    Toggle("参考終業時刻", isOn: Binding(
+                        get: { model.referenceReminderEnabled },
+                        set: { model.setReferenceReminder($0) }
+                    ))
+                    Text("最短達成と参考終業は独立した通知です。勤務実績の確定ではありません。")
+                        .font(.caption)
                     if model.remindersEnabled {
                         Button("通知を無効にする") { model.disableReminders() }
                         Button("通知許可を確認する") { model.enableReminders() }

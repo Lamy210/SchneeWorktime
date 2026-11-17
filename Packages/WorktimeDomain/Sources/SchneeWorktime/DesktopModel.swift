@@ -21,6 +21,12 @@
         @Published private(set) var departureLeads = ReminderLeadSettings.decode(
             UserDefaults.standard.string(forKey: "departureReminderLeads")
         )
+        @Published private(set) var earliestReminderEnabled = UserDefaults.standard.bool(
+            forKey: "earliestReminderEnabled"
+        )
+        @Published private(set) var referenceReminderEnabled = UserDefaults.standard.bool(
+            forKey: "referenceReminderEnabled"
+        )
         @Published private(set) var reminderStatus = ""
         @Published private(set) var requestingReminderPermission = false
 
@@ -146,7 +152,9 @@
             cancelReview()
             guard var current = controller else { return }
             do {
-                glance = try current.perform(command, sample: Self.sample())
+                let sample = try Self.sample()
+                let prepared = try captureReference(for: command, at: sample.wall)
+                glance = try current.perform(prepared, sample: sample)
                 controller = current
                 queueReminders(force: true)
             } catch {
@@ -307,6 +315,20 @@
             queueReminders(force: true)
         }
 
+        func setEarliestReminder(_ enabled: Bool) {
+            guard ready, sessionLock != nil, !requestingReminderPermission else { return }
+            earliestReminderEnabled = enabled
+            UserDefaults.standard.set(enabled, forKey: "earliestReminderEnabled")
+            queueReminders(force: true)
+        }
+
+        func setReferenceReminder(_ enabled: Bool) {
+            guard ready, sessionLock != nil, !requestingReminderPermission else { return }
+            referenceReminderEnabled = enabled
+            UserDefaults.standard.set(enabled, forKey: "referenceReminderEnabled")
+            queueReminders(force: true)
+        }
+
         func disableReminders() {
             guard sessionLock != nil, !requestingReminderPermission else { return }
             remindersEnabled = false
@@ -319,7 +341,11 @@
             guard remindersEnabled, !reminderClockUntrusted else { return nil }
             guard ready, let controller else { throw ReminderDeliveryError.invalidRequest }
             do {
-                return try controller.reminderState(sample: Self.sample(), departureLeads: departureLeads)
+                return try controller.reminderState(
+                    sample: Self.sample(), departureLeads: departureLeads,
+                    earliestLeads: earliestReminderEnabled ? [.fifteen] : [],
+                    referenceEnabled: referenceReminderEnabled
+                )
             } catch is ApplicationClockError {
                 return nil
             }
@@ -408,6 +434,20 @@
     }
 
     extension DesktopModel {
+        private func captureReference(for command: WorkdayCommand, at instant: Int64) throws -> WorkdayCommand {
+            guard case let .clockIn(id, profile) = command else { return command }
+            return try .clockIn(id: id, profile: capturedProfile(profile, at: instant))
+        }
+
+        private func capturedProfile(_ profile: WorkdayProfile, at instant: Int64) throws -> WorkdayProfile {
+            let wallTime = try ReferencePreferences.wallTime()
+            return try profile.capturingReference(
+                at: instant, timeZoneID: TimeZone.current.identifier, wallTime: wallTime
+            )
+        }
+    }
+
+    extension DesktopModel {
         func setFutureRest(minutes: Int?, expectedDay: Workday) throws {
             guard ready, !choosingBackupDestination, reviewProposal == nil,
                   glance?.day == expectedDay, var current = controller
@@ -434,7 +474,7 @@
             }
             let settings = try NextDaySettings(targetMinutes: targetMinutes, restMinutes: restMinutes)
             return try controller.previewRetrospectiveStart(
-                at: instant, profile: settings.profile, sample: Self.sample()
+                at: instant, profile: capturedProfile(settings.profile, at: instant), sample: Self.sample()
             )
         }
 

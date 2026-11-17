@@ -60,6 +60,7 @@
         @ViewBuilder
         private func detailedForecast(_ glance: WorktimeGlance) -> some View {
             DesiredDepartureStatusView(glance: glance)
+            ReferenceStatusView(glance: glance)
             BreakRecordAdvisoryView(glance: glance)
             Text("実働目標：\(DepartureCountdown.duration(glance.day.profile.target))").font(.caption)
             Text("残り予定休憩：\(DepartureCountdown.duration(glance.snapshot.remainingRest))").font(.caption)

@@ -3,6 +3,7 @@ import WorktimeDomain
 
 enum JournalCommand: Codable, Equatable {
     case clockIn(id: UUID, target: Int64, expectedRest: Int64)
+    case clockInWithReference(id: UUID, target: Int64, expectedRest: Int64, reference: CapturedReference)
     case startBreak, endBreak
     case clockOut(confirmBreak: Bool)
     case resume(id: UUID)
@@ -10,7 +11,13 @@ enum JournalCommand: Codable, Equatable {
     init(_ command: WorkdayCommand) {
         switch command {
         case let .clockIn(id, profile):
-            self = .clockIn(id: id, target: profile.target, expectedRest: profile.expectedRest)
+            if let reference = profile.reference {
+                self = .clockInWithReference(
+                    id: id, target: profile.target, expectedRest: profile.expectedRest, reference: reference
+                )
+            } else {
+                self = .clockIn(id: id, target: profile.target, expectedRest: profile.expectedRest)
+            }
         case .startBreak:
             self = .startBreak
         case .endBreak:
@@ -26,6 +33,10 @@ enum JournalCommand: Codable, Equatable {
         switch self {
         case let .clockIn(id, target, expectedRest):
             try .clockIn(id: id, profile: WorkdayProfile(target: target, expectedRest: expectedRest))
+        case let .clockInWithReference(id, target, expectedRest, reference):
+            try .clockIn(
+                id: id, profile: WorkdayProfile(target: target, expectedRest: expectedRest, reference: reference)
+            )
         case .startBreak:
             .startBreak
         case .endBreak:
