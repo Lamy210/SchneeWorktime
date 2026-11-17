@@ -168,6 +168,7 @@
             forecastLabel(glance.forecast.goal)
             DesiredDepartureStatusView(glance: glance)
             ReferenceStatusView(glance: glance)
+            BreakRecordAdvisoryView(glance: glance)
             DepartureCountdownView(
                 countdown: DepartureCountdown(goal: glance.forecast.goal, observedAt: glance.observedAt)
             )
