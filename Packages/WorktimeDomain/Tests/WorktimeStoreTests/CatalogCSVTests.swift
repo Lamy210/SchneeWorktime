@@ -14,7 +14,7 @@ struct CatalogCSVTests {
     }
 
     private func rows(_ data: Data) -> [[String]] {
-        String(decoding: data, as: UTF8.self).components(separatedBy: "\r\n")
+        (String(bytes: data, encoding: .utf8) ?? "").components(separatedBy: "\r\n")
             .filter { !$0.isEmpty }.map { $0.components(separatedBy: ",") }
     }
 
