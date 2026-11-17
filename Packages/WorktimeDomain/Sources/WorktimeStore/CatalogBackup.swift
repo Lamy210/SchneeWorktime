@@ -72,6 +72,6 @@ public enum CatalogBackup {
             throw CatalogPersistenceError.invalidJournal
         }
         let catalog = try journal.replay(now: now)
-        return CatalogSession(version: snapshot.version, catalog: catalog)
+        return CatalogSession(snapshot: snapshot, catalog: catalog, now: now)
     }
 }

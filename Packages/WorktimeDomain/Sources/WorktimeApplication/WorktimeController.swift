@@ -204,8 +204,7 @@ public struct WorktimeController {
     ) throws -> ReminderSyncState? {
         var observation = clock
         guard try observation.advance(to: sample) == nil else { return nil }
-        let stored = try repository.load(now: sample.wall)
-        guard stored.version == session.version else { throw SnapshotStoreError.staleVersion }
+        let stored = try repository.revalidate(session, now: sample.wall)
         guard !stored.catalog.days.isEmpty else { return nil }
         let glance = try WorktimeGlance(catalog: stored.catalog, now: sample.wall)
         let basis = try glance.departureReminderBasis()
