@@ -35,7 +35,9 @@ public enum CatalogBackup {
         try decodeValidated(data, now: now).session
     }
 
-    static func decodeValidated(_ data: Data, now: Int64) throws -> (snapshot: StoredSnapshot, session: CatalogSession) {
+    static func decodeValidated(
+        _ data: Data, now: Int64
+    ) throws -> (snapshot: StoredSnapshot, session: CatalogSession) {
         guard data.count <= maxArchive else { throw CatalogBackupError.tooLarge }
         let archive: Archive
         do {
