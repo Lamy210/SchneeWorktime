@@ -9,6 +9,8 @@ final class DesktopModel: ObservableObject {
     @Published private(set) var glance: WorktimeGlance?
     @Published private(set) var ready = false
     @Published private(set) var message: String?
+    @Published private(set) var reviewProposal: WorktimeReviewProposal?
+    @Published private(set) var reviewNotice: String?
 
     private var controller: WorktimeController?
 
@@ -21,6 +23,7 @@ final class DesktopModel: ObservableObject {
     }
 
     func open(create: Bool) {
+        cancelReview()
         controller = nil
         ready = false
         glance = nil
@@ -56,6 +59,7 @@ final class DesktopModel: ObservableObject {
     }
 
     func perform(_ command: WorkdayCommand) {
+        cancelReview()
         guard var current = controller else { return }
         do {
             glance = try current.perform(command, sample: Self.sample())
@@ -65,17 +69,66 @@ final class DesktopModel: ObservableObject {
         }
     }
 
+    func prepareReview(selection: ObservationGap, classification: ReviewClassification) {
+        guard var current = controller else { return }
+        do {
+            let sample = try Self.sample()
+            let proposal = try current.previewReview(selection: selection, classification: classification, sample: sample)
+            glance = proposal.before
+            controller = current
+            reviewProposal = proposal
+            reviewNotice = nil
+        } catch {
+            fail(error)
+        }
+    }
+
+    func cancelReview() {
+        reviewProposal = nil
+        reviewNotice = nil
+    }
+
+    func acceptReview() {
+        guard var current = controller, let proposal = reviewProposal else { return }
+        do {
+            glance = try current.commitReview(proposal, sample: Self.sample())
+            controller = current
+            cancelReview()
+        } catch {
+            if current.isCurrent(proposal) {
+                fail(error)
+            } else {
+                do {
+                    glance = try current.refresh(sample: Self.sample())
+                    controller = current
+                    invalidateReview()
+                } catch {
+                    fail(error)
+                }
+            }
+        }
+    }
+
+    private func invalidateReview() {
+        reviewProposal = nil
+        reviewNotice = "記録が更新されたため、訂正案をもう一度確認してください。"
+    }
+
     private func tick() {
         guard var current = controller else { return }
         do {
             glance = try current.refresh(sample: Self.sample())
             controller = current
+            if let proposal = reviewProposal, !current.isCurrent(proposal) {
+                invalidateReview()
+            }
         } catch {
             fail(error)
         }
     }
 
     private func fail(_ error: Error) {
+        cancelReview()
         controller = nil
         glance = nil
         ready = false

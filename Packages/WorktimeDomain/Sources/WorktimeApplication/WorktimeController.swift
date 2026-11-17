@@ -6,6 +6,7 @@ public struct WorktimeGlance: Sendable {
     public let day: Workday
     public let snapshot: TimelineSnapshot
     public let forecast: DailyForecast
+    public let reviewableGaps: [ObservationGap]
 
     public init(catalog: WorkdayCatalog, now: Int64) throws {
         guard let day = catalog.days.last else { throw WorkdayError.noActiveDay }
@@ -17,11 +18,32 @@ public struct WorktimeGlance: Sendable {
         }
         self.day = day
         self.snapshot = snapshot
+        reviewableGaps = Self.reviewable(day: day, gaps: catalog.observations[day.id] ?? [], now: now)
         forecast = try DailyForecast.calculate(
             worked: snapshot.bounds.lower ... snapshot.bounds.upper,
             target: day.profile.target, remainingRest: snapshot.remainingRest, now: now, state: state
         )
     }
+
+    private static func reviewable(day: Workday, gaps: [ObservationGap], now: Int64) -> [ObservationGap] {
+        day.intervals.filter { $0.kind == .work }.flatMap { interval in
+            gaps.compactMap { gap in
+                let start = max(interval.start, gap.start)
+                let end = min(interval.end ?? now, gap.end)
+                return start < end ? ObservationGap(start: start, end: end) : nil
+            }
+        }
+    }
+}
+
+public struct WorktimeReviewProposal: Sendable {
+    fileprivate let stored: StoredReviewPreview
+    public let before: WorktimeGlance
+    public let after: WorktimeGlance
+
+    public var selection: ObservationGap { stored.preview.review.selection }
+    public var classification: ReviewClassification { stored.preview.review.classification }
+    public var observedAt: Int64 { stored.preview.review.reviewedAt }
 }
 
 /// A single-owner application session. Callers must discard the controller after clock or storage errors.
@@ -50,6 +72,33 @@ public struct WorktimeController {
     public mutating func perform(_ command: WorkdayCommand, sample: ClockSample) throws -> WorktimeGlance? {
         try observe(sample)
         session = try repository.apply(command, at: sample.wall, now: sample.wall, expected: session.version)
+        return try glance(now: sample.wall)
+    }
+
+    public mutating func previewReview(
+        selection: ObservationGap, classification: ReviewClassification, sample: ClockSample
+    ) throws -> WorktimeReviewProposal {
+        try observe(sample)
+        guard let before = try glance(now: sample.wall) else { throw WorkdayError.noActiveDay }
+        let stored = try session.previewReview(
+            dayID: before.day.id, selection: selection, classification: classification, now: sample.wall
+        )
+        var proposed = session.catalog
+        try proposed.commitReview(stored.preview, now: sample.wall)
+        let after = try WorktimeGlance(catalog: proposed, now: sample.wall)
+        return WorktimeReviewProposal(stored: stored, before: before, after: after)
+    }
+
+    public func isCurrent(_ proposal: WorktimeReviewProposal) -> Bool {
+        session.version == proposal.stored.version && session.catalog.days.last?.id == proposal.before.day.id
+    }
+
+    public mutating func commitReview(
+        _ proposal: WorktimeReviewProposal, sample: ClockSample
+    ) throws -> WorktimeGlance? {
+        try observe(sample)
+        guard isCurrent(proposal) else { throw SnapshotStoreError.staleVersion }
+        session = try repository.commitReview(proposal.stored, now: sample.wall)
         return try glance(now: sample.wall)
     }
 

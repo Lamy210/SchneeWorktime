@@ -20,7 +20,8 @@ struct WorktimeMenu: View {
             if let glance = model.glance {
                 summary(glance)
                 if model.ready {
-                    actions(glance.day)
+                    actions(glance.day).disabled(model.reviewProposal != nil)
+                    reviewSection(glance)
                 }
             } else if model.ready {
                 Text("勤務記録なし")
@@ -58,12 +59,67 @@ struct WorktimeMenu: View {
         Text("残り予定休憩：\(duration(glance.snapshot.remainingRest ... glance.snapshot.remainingRest, roundUp: true))")
             .font(.caption)
         if glance.snapshot.bounds.lower != glance.snapshot.bounds.upper {
-            Text("要確認区間あり。上下限を表示しています。訂正画面は未実装です。")
+            Text("要確認区間あり。実働は上下限を表示しています。")
                 .foregroundStyle(.orange)
                 .font(.caption)
         }
         if glance.day.state == .ended, let end = glance.day.intervals.last?.end {
             Text("退勤実績：\(timeLabel(end))")
+        }
+    }
+
+    @ViewBuilder
+    private func reviewSection(_ glance: WorktimeGlance) -> some View {
+        if let notice = model.reviewNotice {
+            Text(notice).font(.caption)
+        }
+        if let proposal = model.reviewProposal {
+            Divider()
+            Text("訂正案（未保存）").font(.headline)
+            Text("\(reviewTimeLabel(proposal.selection.start))〜\(reviewTimeLabel(proposal.selection.end))")
+                .font(.caption)
+            Text("分類：\(classificationLabel(proposal.classification))")
+            Text("試算時刻：\(reviewTimeLabel(proposal.observedAt))").font(.caption)
+            Text("訂正前の実働：\(workedLabel(proposal.before))")
+            Text("訂正後の実働：\(workedLabel(proposal.after))")
+            Text("退勤見込み：\(goalLabel(proposal.before.forecast.goal)) → \(goalLabel(proposal.after.forecast.goal))")
+                .font(.caption)
+            HStack {
+                Button("キャンセル") { model.cancelReview() }
+                Button("訂正を保存") { model.acceptReview() }
+            }
+        } else if let gap = glance.reviewableGaps.first {
+            Divider()
+            Text("要確認区間（残り\(glance.reviewableGaps.count)件）").font(.headline)
+            Text("\(reviewTimeLabel(gap.start))〜\(reviewTimeLabel(gap.end))").font(.caption)
+            Text("区間全体を分類します。実態が混在する場合は保存しないでください（部分訂正UIは未実装）。")
+                .font(.caption)
+            Button("勤務継続として確認") { model.prepareReview(selection: gap, classification: .work) }
+            Button("休憩として訂正") { model.prepareReview(selection: gap, classification: .rest) }
+            Button("非勤務として訂正") { model.prepareReview(selection: gap, classification: .gap) }
+        }
+    }
+
+    private func classificationLabel(_ classification: ReviewClassification) -> String {
+        switch classification {
+        case .work: "勤務"
+        case .rest: "休憩"
+        case .gap: "非勤務"
+        }
+    }
+
+    private func workedLabel(_ glance: WorktimeGlance) -> String {
+        let bounds = glance.snapshot.bounds
+        return bounds.lower == bounds.upper ? "\(bounds.lower)秒" : "\(bounds.lower)〜\(bounds.upper)秒"
+    }
+
+    private func goalLabel(_ goal: GoalForecast) -> String {
+        switch goal {
+        case let .projected(_, departure): timeLabel(departure)
+        case .reached: "目標達成"
+        case .uncertain: "要確認"
+        case .onBreak: "休憩中"
+        case .ended: "退勤済み"
         }
     }
 
@@ -106,6 +162,10 @@ struct WorktimeMenu: View {
         case .onBreak: "休憩中"
         case .ended: "退勤済み"
         }
+    }
+
+    private func reviewTimeLabel(_ instant: Int64) -> String {
+        Date(timeIntervalSince1970: Double(instant)).formatted(.dateTime.month().day().hour().minute().second())
     }
 
     private func timeLabel(_ instant: Int64) -> String {
