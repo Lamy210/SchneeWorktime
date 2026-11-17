@@ -20,8 +20,9 @@ public struct ReferenceWallTime: Sendable, Equatable {
     public let dayOffset: Int
     public let repeatedTime: RepeatedWallTime?
 
-    public init(hour: Int = 18, minute: Int = 0, dayOffset: Int = 0,
-                repeatedTime: RepeatedWallTime? = nil) throws {
+    public init(
+        hour: Int = 18, minute: Int = 0, dayOffset: Int = 0, repeatedTime: RepeatedWallTime? = nil
+    ) throws {
         guard (0 ... 23).contains(hour), (0 ... 59).contains(minute), (0 ... 1).contains(dayOffset) else {
             throw ReferenceTimeError.invalidWallTime
         }
@@ -59,12 +60,16 @@ public struct ReferenceContext: Sendable, Equatable {
         else { return .nonexistent }
         let components = DateComponents(hour: wallTime.hour, minute: wallTime.minute, second: 0)
         let before = day.addingTimeInterval(-1)
-        guard let first = calendar.nextDate(after: before, matching: components, matchingPolicy: .strict,
-                                            repeatedTimePolicy: .first, direction: .forward),
-              calendar.isDate(first, inSameDayAs: day),
-              let last = calendar.nextDate(after: before, matching: components, matchingPolicy: .strict,
-                                           repeatedTimePolicy: .last, direction: .forward),
-              calendar.isDate(last, inSameDayAs: day)
+        let firstMatch = calendar.nextDate(
+            after: before, matching: components, matchingPolicy: .strict,
+            repeatedTimePolicy: .first, direction: .forward
+        )
+        let lastMatch = calendar.nextDate(
+            after: before, matching: components, matchingPolicy: .strict,
+            repeatedTimePolicy: .last, direction: .forward
+        )
+        guard let first = firstMatch, let last = lastMatch,
+              calendar.isDate(first, inSameDayAs: day), calendar.isDate(last, inSameDayAs: day)
         else { return .nonexistent }
         let earlier = try Self.instant(first)
         let later = try Self.instant(last)

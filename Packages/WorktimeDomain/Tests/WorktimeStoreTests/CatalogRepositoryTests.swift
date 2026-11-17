@@ -103,6 +103,7 @@ struct CatalogRepositoryTests {
             #expect(try repo.load(now: 100).version == start.version)
         }
     }
+
     @Test func `review proposal cannot cross a reset epoch`() throws {
         try withRepository { url, repo in
             let id = UUID()
