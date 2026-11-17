@@ -110,6 +110,22 @@ public struct WorktimeController {
         return try glance(now: sample.wall)
     }
 
+    /// Read only committed state; an unobserved gap or unreliable clock must not produce a precise reminder.
+    public func reminderState(sample: ClockSample) throws -> ReminderSyncState? {
+        var observation = clock
+        guard try observation.advance(to: sample) == nil else { return nil }
+        let stored = try repository.load(now: sample.wall)
+        guard stored.version == session.version else { throw SnapshotStoreError.staleVersion }
+        guard !stored.catalog.days.isEmpty else { return nil }
+        let glance = try WorktimeGlance(catalog: stored.catalog, now: sample.wall)
+        let desired = ReminderPlan.desired(
+            forecast: glance.forecast.goal, now: sample.wall, clockTrusted: true
+        )
+        return ReminderSyncState(
+            epoch: stored.version.epoch, dayID: glance.day.id, revision: stored.version.revision, desired: desired
+        )
+    }
+
     private var activeWorkingDay: Workday? {
         guard let day = session.catalog.days.last, day.state == .working else { return nil }
         return day

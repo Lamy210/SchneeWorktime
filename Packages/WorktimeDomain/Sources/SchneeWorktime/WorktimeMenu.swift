@@ -61,10 +61,30 @@
                 }
                 if model.ready {
                     nextDaySettings
+                    reminderSettings
                 }
                 Divider()
                 Button("アプリを終了") { NSApplication.shared.terminate(nil) }
             }
+        }
+
+        private var reminderSettings: some View {
+            DisclosureGroup("退勤準備の通知") {
+                Text("休憩込み退勤見込みの15分前に通知します。実績の確定ではありません。")
+                    .font(.caption)
+                if model.remindersSupported {
+                    if model.remindersEnabled {
+                        Button("通知を無効にする") { model.disableReminders() }
+                        Button("通知許可を確認する") { model.enableReminders() }
+                    } else {
+                        Button("通知を有効にする") { model.enableReminders() }
+                    }
+                    Text(model.reminderStatus).font(.caption)
+                } else {
+                    Text("通知は.appからの起動時に利用できます。").font(.caption)
+                }
+            }
+            .disabled(model.requestingReminderPermission)
         }
 
         private var nextDaySettings: some View {

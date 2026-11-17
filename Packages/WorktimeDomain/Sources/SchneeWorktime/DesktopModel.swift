@@ -12,10 +12,21 @@
         @Published private(set) var reviewProposal: WorktimeReviewProposal?
         @Published private(set) var reviewNotice: String?
 
+        @Published private(set) var remindersEnabled = UserDefaults.standard.bool(forKey: "departureReminderEnabled")
+        @Published private(set) var reminderStatus = ""
+        @Published private(set) var requestingReminderPermission = false
+
         private var controller: WorktimeController?
         private var sessionLock: LocalSessionLock?
+        private var reminderCoordinator: DesktopReminderCoordinator?
+        private var reminderRunning = false
+        private var nextReminderCheck: Double = 0
+        private var reminderClockUntrusted = false
 
         init() {
+            if DesktopReminderCoordinator.supported {
+                reminderCoordinator = DesktopReminderCoordinator()
+            }
             open(create: false)
             let timer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
                 Task { @MainActor in self?.tick() }
@@ -50,6 +61,8 @@
                 controller = opened
                 ready = true
                 message = nil
+                reminderClockUntrusted = false
+                queueReminders(force: true)
             } catch {
                 fail(error)
             }
@@ -70,6 +83,7 @@
             do {
                 glance = try current.perform(command, sample: Self.sample())
                 controller = current
+                queueReminders(force: true)
             } catch {
                 fail(error)
             }
@@ -86,6 +100,7 @@
                 controller = current
                 reviewProposal = proposal
                 reviewNotice = nil
+                queueReminders(force: true)
             } catch {
                 fail(error)
             }
@@ -102,6 +117,7 @@
                 glance = try current.commitReview(proposal, sample: Self.sample())
                 controller = current
                 cancelReview()
+                queueReminders(force: true)
             } catch {
                 if current.isCurrent(proposal) {
                     fail(error)
@@ -110,6 +126,7 @@
                         glance = try current.refresh(sample: Self.sample())
                         controller = current
                         invalidateReview()
+                        queueReminders(force: true)
                     } catch {
                         fail(error)
                     }
@@ -123,10 +140,15 @@
         }
 
         private func tick() {
-            guard var current = controller else { return }
+            guard var current = controller else {
+                queueReminders()
+                return
+            }
             do {
+                let previousGoal = glance?.forecast.goal
                 glance = try current.refresh(sample: Self.sample())
                 controller = current
+                queueReminders(force: previousGoal != glance?.forecast.goal)
                 if let proposal = reviewProposal, !current.isCurrent(proposal) {
                     invalidateReview()
                 }
@@ -140,6 +162,10 @@
             controller = nil
             glance = nil
             ready = false
+            if error is ApplicationClockError {
+                reminderClockUntrusted = true
+                queueReminders(force: true)
+            }
             if let lockError = error as? LocalSessionLockError {
                 switch lockError {
                 case .alreadyLocked:
@@ -151,6 +177,83 @@
                 }
             } else {
                 message = "記録を停止：\(error)。時刻・データを確認して再読込してください。"
+            }
+        }
+
+        var remindersSupported: Bool {
+            reminderCoordinator != nil
+        }
+
+        func enableReminders() {
+            guard ready, sessionLock != nil, let reminderCoordinator, !requestingReminderPermission else { return }
+            requestingReminderPermission = true
+            Task {
+                defer { requestingReminderPermission = false }
+                do {
+                    let granted = try await reminderCoordinator.enable()
+                    remindersEnabled = granted
+                    UserDefaults.standard.set(granted, forKey: "departureReminderEnabled")
+                    reminderStatus = granted ? "通知を設定中" : "macOSの通知設定を確認してください。"
+                    queueReminders(force: true)
+                } catch {
+                    reminderStatus = "通知許可を確認できません。勤務記録は継続します。"
+                }
+            }
+        }
+
+        func disableReminders() {
+            guard sessionLock != nil, !requestingReminderPermission else { return }
+            remindersEnabled = false
+            UserDefaults.standard.set(false, forKey: "departureReminderEnabled")
+            reminderStatus = "通知予約の取消を確認中"
+            queueReminders(force: true)
+        }
+
+        private func latestReminderState() throws -> ReminderSyncState? {
+            guard remindersEnabled, !reminderClockUntrusted else { return nil }
+            guard ready, let controller else { throw ReminderDeliveryError.invalidRequest }
+            do {
+                return try controller.reminderState(sample: Self.sample())
+            } catch is ApplicationClockError {
+                return nil
+            }
+        }
+
+        private func queueReminders(force: Bool = false) {
+            if force {
+                nextReminderCheck = 0
+            }
+            guard let reminderCoordinator, sessionLock != nil, !reminderRunning,
+                  ready || reminderClockUntrusted || !remindersEnabled else { return }
+            let uptime = ProcessInfo.processInfo.systemUptime
+            guard uptime >= nextReminderCheck else { return }
+            nextReminderCheck = uptime + 15
+            reminderRunning = true
+            Task {
+                defer { reminderRunning = false }
+                do {
+                    let result = try await reminderCoordinator.reconcile(
+                        latest: { try self.latestReminderState() }, now: { try Self.sample().wall }
+                    )
+                    updateReminderStatus(result)
+                } catch {
+                    reminderStatus = "通知を更新できませんでした。勤務記録は変更しません。"
+                }
+            }
+        }
+
+        private func updateReminderStatus(_ result: ReminderSyncResult) {
+            switch result {
+            case .settled:
+                if remindersEnabled {
+                    reminderStatus = reminderClockUntrusted ? "時計異常のため通知停止" : "通知予約の更新完了（配信はOS依存）"
+                } else {
+                    reminderStatus = "通知は無効です。"
+                }
+            case .permissionUnavailable:
+                reminderStatus = "macOSの通知設定を確認してください。"
+            case .busy, .superseded, .cancellationPending:
+                reminderStatus = "通知予約を再確認します。"
             }
         }
 
