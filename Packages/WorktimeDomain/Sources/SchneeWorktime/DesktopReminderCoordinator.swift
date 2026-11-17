@@ -16,9 +16,9 @@
             try await delivery.requestAuthorization()
         }
 
-        func reconcile(latest: () throws -> ReminderSyncState?, now: () throws -> Int64) async throws
-            -> ReminderSyncResult
-        {
+        func reconcile(
+            latest: () throws -> ReminderSyncState?, now: () throws -> Int64
+        ) async throws -> ReminderSyncResult {
             try await sync.reconcile(latest: latest, now: now)
         }
     }
