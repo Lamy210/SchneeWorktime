@@ -179,3 +179,100 @@ public struct SnapshotStore: Sendable {
         }
     }
 }
+
+/// A durable observation marker, never independent evidence of attendance.
+public struct ObservationCheckpoint: Sendable, Equatable {
+    public let version: StoreVersion
+    public let dayID: UUID
+    public let observedAt: Int64
+}
+
+public enum ObservationCheckpointError: Error, Equatable {
+    case invalid, regressed, conflictingDay
+}
+
+extension SnapshotStore {
+    /// Additive metadata: old schema-1 databases have no marker until the first explicit save.
+    public func loadObservationCheckpoint(expected: StoreVersion) throws -> ObservationCheckpoint? {
+        try connection { db in
+            try Self.transaction(db) {
+                guard try Self.read(db).version == expected else { throw SnapshotStoreError.staleVersion }
+                guard let marker = try Self.readCheckpoint(db), marker.version == expected else { return nil }
+                return marker
+            }
+        }
+    }
+
+    /// The caller must establish trust in the clock and day before saving. No journal revision is advanced.
+    public func saveObservationCheckpoint(dayID: UUID, observedAt: Int64, expected: StoreVersion) throws {
+        guard expected.revision > 0, Self.validCheckpointTime(observedAt) else {
+            throw ObservationCheckpointError.invalid
+        }
+        try connection { db in
+            try Self.transaction(db) {
+                guard try Self.read(db).version == expected else { throw SnapshotStoreError.staleVersion }
+                try Self.execute(db, """
+                CREATE TABLE IF NOT EXISTS observation_checkpoint (
+                    id INTEGER PRIMARY KEY CHECK (id = 1),
+                    epoch TEXT NOT NULL,
+                    revision INTEGER NOT NULL CHECK (revision > 0),
+                    day_id TEXT NOT NULL,
+                    observed_at INTEGER NOT NULL
+                ) STRICT
+                """)
+                if let previous = try Self.readCheckpoint(db), previous.version == expected {
+                    guard previous.dayID == dayID else { throw ObservationCheckpointError.conflictingDay }
+                    guard observedAt >= previous.observedAt else { throw ObservationCheckpointError.regressed }
+                    guard observedAt != previous.observedAt else { return }
+                }
+                let marker = ObservationCheckpoint(version: expected, dayID: dayID, observedAt: observedAt)
+                try Self.writeCheckpoint(db, marker: marker)
+            }
+        }
+    }
+
+    private static func validCheckpointTime(_ instant: Int64) -> Bool {
+        (-2_208_988_800 ... 253_402_300_799).contains(instant)
+    }
+
+    private static func readCheckpoint(_ db: OpaquePointer) throws -> ObservationCheckpoint? {
+        let tableSQL = "SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name = 'observation_checkpoint'"
+        guard try scalar(db, tableSQL) == 1 else { return nil }
+        let sql = "SELECT epoch, revision, day_id, observed_at FROM observation_checkpoint WHERE id = 1"
+        return try statement(db, sql) { stmt in
+            let status = sqlite3_step(stmt)
+            guard status != SQLITE_DONE else { return nil }
+            try check(status, expected: SQLITE_ROW)
+            guard sqlite3_column_type(stmt, 0) == SQLITE_TEXT,
+                  sqlite3_column_type(stmt, 1) == SQLITE_INTEGER,
+                  sqlite3_column_type(stmt, 2) == SQLITE_TEXT,
+                  sqlite3_column_type(stmt, 3) == SQLITE_INTEGER,
+                  let rawEpoch = sqlite3_column_text(stmt, 0), let rawDay = sqlite3_column_text(stmt, 2),
+                  let epoch = UUID(uuidString: String(cString: rawEpoch)),
+                  let day = UUID(uuidString: String(cString: rawDay))
+            else { throw ObservationCheckpointError.invalid }
+            let revision = sqlite3_column_int64(stmt, 1)
+            let instant = sqlite3_column_int64(stmt, 3)
+            guard revision > 0, validCheckpointTime(instant) else { throw ObservationCheckpointError.invalid }
+            return ObservationCheckpoint(
+                version: .init(epoch: epoch, revision: revision), dayID: day, observedAt: instant
+            )
+        }
+    }
+
+    private static func writeCheckpoint(_ db: OpaquePointer, marker: ObservationCheckpoint) throws {
+        try statement(db, """
+        INSERT INTO observation_checkpoint VALUES (1, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET epoch = excluded.epoch, revision = excluded.revision,
+            day_id = excluded.day_id, observed_at = excluded.observed_at
+        """) { stmt in
+            let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
+            try check(sqlite3_bind_text(stmt, 1, marker.version.epoch.uuidString, -1, transient))
+            try check(sqlite3_bind_int64(stmt, 2, marker.version.revision))
+            try check(sqlite3_bind_text(stmt, 3, marker.dayID.uuidString, -1, transient))
+            try check(sqlite3_bind_int64(stmt, 4, marker.observedAt))
+            try check(sqlite3_step(stmt), expected: SQLITE_DONE)
+            guard sqlite3_changes(db) == 1 else { throw ObservationCheckpointError.invalid }
+        }
+    }
+}
