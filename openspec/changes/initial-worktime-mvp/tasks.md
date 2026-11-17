@@ -39,6 +39,8 @@
 
 - [ ] 6.4 自動算定の退勤準備・最短目標・参考時刻から純粋な未来通知候補を算出（AC-24/25/26/70/84/102/103/112/113/117の計算部分、ReminderPlanTests 6件を隔離Linux Swift 6.2.1で確認、統合CI待ち。保存済み希望・超過通知・OS権限・pending照合は別途）
 
+- [ ] 6.5 通知候補と既存pendingの差分計算（epoch・勤務日・種類によるID、trigger/revision/payload版の照合、過去・他世代の取消、非所有ID保護、重複/破損検出）を実装。AC-23/25/52/53の計算部分をReminderReconciliationTests 7件とReminderPlanTests 6件で隔離Linux Swift 6.2.1確認。実際の保存版接続、OS呼出し直列化・再検証、権限・取消競合・再試行・配送は未実装。
+
 ## 7. リリース判定
 - [ ] 7.1 `docs/SchneeWorktime/ACCEPTANCE_MATRIX.md` のP0全件にテストIDを割り当てる（検証: 全P0をテストIDへマッピング（未対応を明示））
 - [ ] 7.2 失敗を隠さずCIをグリーンにし、OS実機テストを実施する（検証: CI実行結果とmacOS QA）
