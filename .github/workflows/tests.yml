@@ -32,6 +32,7 @@ jobs:
           set -euo pipefail
           swift --version
           swift test --package-path Packages/WorktimeDomain
+          swift build --package-path Packages/WorktimeDomain --product SchneeWorktime
 
   classify:
     name: Classify tests
