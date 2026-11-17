@@ -62,6 +62,7 @@ enum JournalAction: Codable, Equatable {
     case command(JournalCommand, at: Int64)
     case observation(dayID: UUID, start: Int64, end: Int64)
     case review(dayID: UUID, start: Int64, end: Int64, classification: JournalClassification)
+    case desiredDeparture(dayID: UUID, candidate: Int64?, warningAcknowledged: Bool)
 }
 
 struct JournalEvent: Codable, Equatable {
@@ -75,6 +76,11 @@ struct JournalEvent: Codable, Equatable {
         case let .observation(dayID, start, end):
             try catalog.recordObservation(dayID: dayID, gap: .init(start: start, end: end),
                                           now: now, expected: catalog.reviewVersion)
+        case let .desiredDeparture(dayID, candidate, warningAcknowledged):
+            try catalog.setDesiredDeparture(
+                dayID: dayID, candidate: candidate, warningAcknowledged: warningAcknowledged,
+                now: now, expected: catalog.reviewVersion
+            )
         case let .review(dayID, start, end, classification):
             let preview = try catalog.previewReview(dayID: dayID, selection: .init(start: start, end: end),
                                                     classification: classification.domain, now: now)
