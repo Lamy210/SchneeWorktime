@@ -62,9 +62,26 @@
                 if model.ready {
                     nextDaySettings
                     reminderSettings
+                    backupSettings
                 }
                 Divider()
                 Button("アプリを終了") { NSApplication.shared.terminate(nil) }
+            }
+        }
+
+        private var backupSettings: some View {
+            DisclosureGroup("勤務履歴のバックアップ") {
+                Text("保存済みの勤務履歴と訂正履歴を平文JSONとして保存します。未保存の訂正案や設定は含みません。")
+                    .font(.caption)
+                Text("所有者専用のローカルフォルダを指定してください。同期フォルダは避けてください。")
+                    .font(.caption)
+                Button("保存先フォルダを選択") { model.chooseBackupDestination() }
+                    .disabled(model.choosingBackupDestination)
+                if let notice = model.backupNotice {
+                    Text(notice)
+                        .font(.caption)
+                        .textSelection(.enabled)
+                }
             }
         }
 
