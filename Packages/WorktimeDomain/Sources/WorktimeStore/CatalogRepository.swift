@@ -69,6 +69,15 @@ public struct CatalogRepository: Sendable {
         return try mutate(JournalEvent(action: action, now: now), expected: expected)
     }
 
+    public func setDesiredDeparture(
+        dayID: UUID, candidate: Int64?, warningAcknowledged: Bool, now: Int64, expected: StoreVersion
+    ) throws -> CatalogSession {
+        let action = JournalAction.desiredDeparture(
+            dayID: dayID, candidate: candidate, warningAcknowledged: warningAcknowledged
+        )
+        return try mutate(JournalEvent(action: action, now: now), expected: expected)
+    }
+
     public func commitReview(
         _ proposal: StoredReviewPreview, now: Int64
     ) throws -> CatalogSession {
