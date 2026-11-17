@@ -54,7 +54,6 @@ public struct WorktimeReviewProposal: Sendable {
     public var observedAt: Int64 {
         stored.preview.review.reviewedAt
     }
-
 }
 
 /// A single-owner application session. Callers must discard the controller after clock or storage errors.
