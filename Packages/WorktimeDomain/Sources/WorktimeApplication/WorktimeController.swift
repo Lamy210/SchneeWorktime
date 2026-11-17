@@ -56,6 +56,10 @@ public struct WorktimeReviewProposal: Sendable {
     }
 }
 
+public enum FutureRestChangeError: Error, Equatable {
+    case staleContext, invalidMinutes
+}
+
 /// A single-owner application session. Callers must discard the controller after clock or storage errors.
 public struct WorktimeController {
     private let repository: CatalogRepository
