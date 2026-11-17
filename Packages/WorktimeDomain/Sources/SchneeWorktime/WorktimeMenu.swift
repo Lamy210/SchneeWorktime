@@ -47,6 +47,8 @@
                         actions(glance.day).disabled(model.reviewProposal != nil)
                         reviewSection(glance)
                         if glance.day.state != .ended, model.reviewProposal == nil {
+                            FutureRestSettingsView(model: model, day: glance.day)
+                                .id(glance.day.id)
                             DepartureScenarioView(glance: glance)
                         }
                     }
