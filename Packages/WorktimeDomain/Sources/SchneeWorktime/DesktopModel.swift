@@ -325,6 +325,7 @@
             return try ClockSample(wall: wall, uptime: ProcessInfo.processInfo.systemUptime)
         }
     }
+
     extension DesktopModel {
         func previewRetrospectiveStart(
             at instant: Int64, targetMinutes: Int, restMinutes: Int
@@ -354,5 +355,4 @@
             }
         }
     }
-
 #endif
