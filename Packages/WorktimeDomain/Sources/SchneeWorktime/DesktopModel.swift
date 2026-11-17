@@ -10,6 +10,7 @@
         @Published private(set) var glance: WorktimeGlance? {
             didSet { updateObservationTimer() }
         }
+
         @Published private(set) var ready = false
         @Published private(set) var message: String?
         @Published private(set) var reviewProposal: WorktimeReviewProposal?
