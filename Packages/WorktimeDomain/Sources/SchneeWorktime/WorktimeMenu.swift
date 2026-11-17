@@ -10,6 +10,7 @@
         @ObservedObject var model: DesktopModel
         @State private var confirmCreate = false
         @State private var confirmBreakExit = false
+        @State private var pendingBreakExit: PanelActionContext?
         @AppStorage("nextDayTargetMinutes") private var targetMinutes = 420
         @AppStorage("nextDayRestMinutes") private var restMinutes = 60
 
@@ -29,9 +30,18 @@
             } message: {
                 Text("以前の記録が見つからない場合は、新規作成せずバックアップを確認してください。")
             }
-            .confirmationDialog("休憩を終了して退勤しますか？", isPresented: $confirmBreakExit) {
-                Button("退勤を確定") { model.perform(.clockOut(confirmBreak: true)) }
-                Button("キャンセル", role: .cancel) {}
+            .confirmationDialog(
+                "休憩を終了して退勤しますか？", isPresented: $confirmBreakExit, presenting: pendingBreakExit
+            ) { expected in
+                Button("退勤を確定") {
+                    pendingBreakExit = nil
+                    model.performAction(.clockOut, expected: expected, confirmed: true)
+                }
+                Button("キャンセル", role: .cancel) { pendingBreakExit = nil }
+            }
+            .onChange(of: model.actionContext) { _, _ in
+                pendingBreakExit = nil
+                confirmBreakExit = false
             }
         }
 
@@ -47,12 +57,16 @@
                         actions(glance.day).disabled(model.reviewProposal != nil)
                         reviewSection(glance)
                         if glance.day.state != .ended, model.reviewProposal == nil {
+                            FutureRestSettingsView(model: model, day: glance.day)
+                                .id(glance.day.id)
                             DepartureScenarioView(glance: glance)
                         }
                     }
                 } else if model.ready {
                     Text("勤務記録なし")
-                    Button("勤務開始") { start() }.disabled(!settingsValid)
+                    let context = model.actionContext
+                    Button("勤務開始") { start(expected: context) }
+                        .disabled(!settingsValid || !context.enabled)
                 } else {
                     Text(model.message ?? "記録を読み込めません")
                         .font(.caption)
@@ -122,6 +136,124 @@
             }
         }
 
+        private var nextDaySettings: some View {
+            DisclosureGroup("次の勤務日の設定") {
+                Text("現在と過去の勤務記録は変更しません。").font(.caption)
+                if settingsValid {
+                    Stepper("実働目標：\(targetMinutes)分", value: $targetMinutes,
+                            in: NextDaySettings.targetRange, step: 5)
+                    Stepper("標準休憩：\(restMinutes)分", value: $restMinutes,
+                            in: NextDaySettings.restRange, step: 5)
+                } else {
+                    Text("設定値が無効です。既定値に戻してください。").font(.caption)
+                }
+                Button("既定値（実働420分・休憩60分）に戻す") {
+                    targetMinutes = 420
+                    restMinutes = 60
+                }
+            }
+        }
+
+        private func start(expected: PanelActionContext) {
+            let profile = try? NextDaySettings(targetMinutes: targetMinutes, restMinutes: restMinutes).profile
+            model.performAction(.start, expected: expected, profile: profile)
+        }
+
+        @ViewBuilder
+        private func summary(_ glance: WorktimeGlance) -> some View {
+            Text(stateLabel(glance.day.state)).font(.headline)
+            forecastLabel(glance.forecast.goal)
+            DepartureCountdownView(
+                countdown: DepartureCountdown(goal: glance.forecast.goal, observedAt: glance.observedAt)
+            )
+            Text("実働目標：\(glance.day.profile.target / 60)分")
+            Text("実働：\(duration(glance.snapshot.bounds.lower ... glance.snapshot.bounds.upper))")
+            Text("目標まで：\(duration(glance.forecast.remaining, roundUp: true))")
+            Text("日次目標超過：\(duration(glance.forecast.surplus))")
+            Text("残り予定休憩：\(duration(glance.snapshot.remainingRest ... glance.snapshot.remainingRest, roundUp: true))")
+                .font(.caption)
+            if glance.snapshot.bounds.lower != glance.snapshot.bounds.upper {
+                Text("要確認区間あり。実働は上下限を表示しています。")
+                    .foregroundStyle(.orange)
+                    .font(.caption)
+            }
+            if glance.day.state == .ended, let end = glance.day.intervals.last?.end {
+                Text("退勤実績：\(timeLabel(end))")
+            }
+        }
+
+        @ViewBuilder
+        private func forecastLabel(_ goal: GoalForecast) -> some View {
+            switch goal {
+            case let .projected(earliest, departure):
+                Text("休憩込み退勤見込み（現在のタイムゾーン）").font(.caption)
+                Text(timeLabel(departure)).font(.title2).monospacedDigit()
+                Text("最短達成：\(timeLabel(earliest))").font(.subheadline)
+            case .reached:
+                Text("確認済み実働が目標に到達").font(.title3)
+            case .uncertain:
+                Text("退勤見込み未確定・要確認").font(.title3)
+            case .onBreak:
+                Text("休憩終了時刻が未確定").font(.title3)
+            case .ended:
+                Text("退勤済み・実績を表示").font(.title3)
+            }
+        }
+
+        @ViewBuilder
+        private func actions(_ day: Workday) -> some View {
+            let context = model.actionContext
+            let available = context.available(at: model.glance?.observedAt ?? 0)
+            switch day.state {
+            case .working:
+                Button("休憩開始") { model.performAction(.startBreak, expected: context) }
+                    .disabled(!available.contains(.startBreak))
+                Button("退勤") { model.performAction(.clockOut, expected: context, confirmed: true) }
+                    .disabled(!available.contains(.clockOut))
+            case .onBreak:
+                Button("休憩終了") { model.performAction(.endBreak, expected: context) }
+                    .disabled(!available.contains(.endBreak))
+                Button("退勤") {
+                    guard model.actionContext == context else { return }
+                    pendingBreakExit = context
+                    confirmBreakExit = true
+                }
+                .disabled(!available.contains(.clockOut))
+            case .ended:
+                Button("新しい勤務日を開始") { start(expected: context) }
+                    .disabled(!settingsValid || !available.contains(.start))
+                Button("直前の勤務日を再開") { model.performAction(.resume, expected: context) }
+                    .disabled(!available.contains(.resume))
+            }
+        }
+
+        private func stateLabel(_ state: WorkdayState) -> String {
+            switch state {
+            case .working: "勤務中"
+            case .onBreak: "休憩中"
+            case .ended: "退勤済み"
+            }
+        }
+
+        private func reviewTimeLabel(_ instant: Int64) -> String {
+            Date(timeIntervalSince1970: Double(instant)).formatted(.dateTime.month().day().hour().minute().second())
+        }
+
+        private func timeLabel(_ instant: Int64) -> String {
+            Date(timeIntervalSince1970: Double(instant)).formatted(.dateTime.month().day().hour().minute())
+        }
+
+        private func duration(_ seconds: ClosedRange<Int64>, roundUp: Bool = false) -> String {
+            func minutes(_ value: Int64) -> Int64 {
+                value / 60 + (roundUp && value % 60 > 0 ? 1 : 0)
+            }
+            let lower = minutes(seconds.lowerBound)
+            let upper = minutes(seconds.upperBound)
+            return lower == upper ? "\(lower)分" : "\(lower)〜\(upper)分"
+        }
+    }
+
+    extension WorktimeMenu {
         private var reminderSettings: some View {
             DisclosureGroup("退勤準備の通知") {
                 Text("休憩込み退勤見込みの選択した時刻に通知します。過ぎた時刻には通知しません。実績の確定ではありません。")
@@ -148,51 +280,6 @@
                 }
             }
             .disabled(model.requestingReminderPermission)
-        }
-
-        private var nextDaySettings: some View {
-            DisclosureGroup("次の勤務日の設定") {
-                Text("現在と過去の勤務記録は変更しません。").font(.caption)
-                if settingsValid {
-                    Stepper("実働目標：\(targetMinutes)分", value: $targetMinutes,
-                            in: NextDaySettings.targetRange, step: 5)
-                    Stepper("標準休憩：\(restMinutes)分", value: $restMinutes,
-                            in: NextDaySettings.restRange, step: 5)
-                } else {
-                    Text("設定値が無効です。既定値に戻してください。").font(.caption)
-                }
-                Button("既定値（実働420分・休憩60分）に戻す") {
-                    targetMinutes = 420
-                    restMinutes = 60
-                }
-            }
-        }
-
-        private func start() {
-            model.start(targetMinutes: targetMinutes, restMinutes: restMinutes)
-        }
-
-        @ViewBuilder
-        private func summary(_ glance: WorktimeGlance) -> some View {
-            Text(stateLabel(glance.day.state)).font(.headline)
-            forecastLabel(glance.forecast.goal)
-            DepartureCountdownView(
-                countdown: DepartureCountdown(goal: glance.forecast.goal, observedAt: glance.observedAt)
-            )
-            Text("実働目標：\(glance.day.profile.target / 60)分")
-            Text("実働：\(duration(glance.snapshot.bounds.lower ... glance.snapshot.bounds.upper))")
-            Text("目標まで：\(duration(glance.forecast.remaining, roundUp: true))")
-            Text("日次目標超過：\(duration(glance.forecast.surplus))")
-            Text("残り予定休憩：\(duration(glance.snapshot.remainingRest ... glance.snapshot.remainingRest, roundUp: true))")
-                .font(.caption)
-            if glance.snapshot.bounds.lower != glance.snapshot.bounds.upper {
-                Text("要確認区間あり。実働は上下限を表示しています。")
-                    .foregroundStyle(.orange)
-                    .font(.caption)
-            }
-            if glance.day.state == .ended, let end = glance.day.intervals.last?.end {
-                Text("退勤実績：\(timeLabel(end))")
-            }
         }
 
         @ViewBuilder
@@ -248,64 +335,6 @@
             case .onBreak: "休憩中"
             case .ended: "退勤済み"
             }
-        }
-
-        @ViewBuilder
-        private func forecastLabel(_ goal: GoalForecast) -> some View {
-            switch goal {
-            case let .projected(earliest, departure):
-                Text("休憩込み退勤見込み（現在のタイムゾーン）").font(.caption)
-                Text(timeLabel(departure)).font(.title2).monospacedDigit()
-                Text("最短達成：\(timeLabel(earliest))").font(.subheadline)
-            case .reached:
-                Text("確認済み実働が目標に到達").font(.title3)
-            case .uncertain:
-                Text("退勤見込み未確定・要確認").font(.title3)
-            case .onBreak:
-                Text("休憩終了時刻が未確定").font(.title3)
-            case .ended:
-                Text("退勤済み・実績を表示").font(.title3)
-            }
-        }
-
-        @ViewBuilder
-        private func actions(_ day: Workday) -> some View {
-            switch day.state {
-            case .working:
-                Button("休憩開始") { model.perform(.startBreak) }
-                Button("退勤") { model.perform(.clockOut(confirmBreak: false)) }
-            case .onBreak:
-                Button("休憩終了") { model.perform(.endBreak) }
-                Button("退勤") { confirmBreakExit = true }
-            case .ended:
-                Button("新しい勤務日を開始") { start() }.disabled(!settingsValid)
-                Button("直前の勤務日を再開") { model.perform(.resume(id: day.id)) }
-            }
-        }
-
-        private func stateLabel(_ state: WorkdayState) -> String {
-            switch state {
-            case .working: "勤務中"
-            case .onBreak: "休憩中"
-            case .ended: "退勤済み"
-            }
-        }
-
-        private func reviewTimeLabel(_ instant: Int64) -> String {
-            Date(timeIntervalSince1970: Double(instant)).formatted(.dateTime.month().day().hour().minute().second())
-        }
-
-        private func timeLabel(_ instant: Int64) -> String {
-            Date(timeIntervalSince1970: Double(instant)).formatted(.dateTime.month().day().hour().minute())
-        }
-
-        private func duration(_ seconds: ClosedRange<Int64>, roundUp: Bool = false) -> String {
-            func minutes(_ value: Int64) -> Int64 {
-                value / 60 + (roundUp && value % 60 > 0 ? 1 : 0)
-            }
-            let lower = minutes(seconds.lowerBound)
-            let upper = minutes(seconds.upperBound)
-            return lower == upper ? "\(lower)分" : "\(lower)〜\(upper)分"
         }
     }
 #endif

@@ -11,10 +11,7 @@
         @State private var pending: PanelActionContext?
 
         private var context: PanelActionContext {
-            PanelActionContext(
-                day: model.glance?.day,
-                enabled: model.ready && model.reviewProposal == nil && !model.choosingBackupDestination
-            )
+            model.actionContext
         }
 
         private var instant: Int64 {
@@ -61,11 +58,7 @@
         }
 
         private func execute(_ action: PanelWorkAction, expected: PanelActionContext, confirmed: Bool = false) {
-            guard context == expected,
-                  let command = context.command(
-                      for: action, at: instant, confirmed: confirmed, profile: profile
-                  ) else { return }
-            model.perform(command)
+            model.performAction(action, expected: expected, confirmed: confirmed, profile: profile)
         }
     }
 #endif
