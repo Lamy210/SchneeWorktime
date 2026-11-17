@@ -34,8 +34,10 @@ struct CatalogRevalidationTests {
 
     @Test func `same version with different valid journal bytes is rejected`() throws {
         try withDirectory { directory in
-            let live = try CatalogRepository(url: directory.appendingPathComponent("live.sqlite"), createIfMissing: true)
-            let other = try CatalogRepository(url: directory.appendingPathComponent("other.sqlite"), createIfMissing: true)
+            let liveURL = directory.appendingPathComponent("live.sqlite")
+            let live = try CatalogRepository(url: liveURL, createIfMissing: true)
+            let otherURL = directory.appendingPathComponent("other.sqlite")
+            let other = try CatalogRepository(url: otherURL, createIfMissing: true)
             let initial = try live.load(now: 100)
             let otherInitial = try other.load(now: 100)
             let command = try WorkdayCommand.clockIn(id: UUID(), profile: WorkdayProfile())
