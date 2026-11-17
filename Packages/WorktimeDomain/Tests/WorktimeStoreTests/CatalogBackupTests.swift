@@ -16,7 +16,7 @@ struct CatalogBackupTests {
         try withRepository { url, repo in
             let id = UUID()
             let initial = try repo.load(now: 100)
-            let command = WorkdayCommand.clockIn(id: id, profile: try WorkdayProfile())
+            let command = try WorkdayCommand.clockIn(id: id, profile: WorkdayProfile())
             let started = try repo.apply(command, at: 100, now: 100, expected: initial.version)
             let observed = try repo.recordObservation(
                 dayID: id, gap: .init(start: 120, end: 160), now: 200, expected: started.version
@@ -54,7 +54,7 @@ struct CatalogBackupTests {
     @Test func `stale snapshot version cannot be exported as current`() throws {
         try withRepository { _, repo in
             let initial = try repo.load(now: 100)
-            let command = WorkdayCommand.clockIn(id: UUID(), profile: try WorkdayProfile())
+            let command = try WorkdayCommand.clockIn(id: UUID(), profile: WorkdayProfile())
             _ = try repo.apply(command, at: 100, now: 100, expected: initial.version)
             #expect(throws: SnapshotStoreError.staleVersion) {
                 try repo.makeBackup(now: 101, expected: initial.version)
@@ -65,7 +65,7 @@ struct CatalogBackupTests {
     @Test func `future events and invalid journal revision are rejected`() throws {
         try withRepository { _, repo in
             let initial = try repo.load(now: 100)
-            let command = WorkdayCommand.clockIn(id: UUID(), profile: try WorkdayProfile())
+            let command = try WorkdayCommand.clockIn(id: UUID(), profile: WorkdayProfile())
             let started = try repo.apply(command, at: 100, now: 100, expected: initial.version)
             let bytes = try repo.makeBackup(now: 101, expected: started.version)
             #expect(throws: CatalogPersistenceError.futureEvent) {
