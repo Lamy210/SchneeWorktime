@@ -75,6 +75,10 @@ jobs:
             scripts.release.test_verify_validated_release_metadata \
             -v
 
+      - name: Bounded exact fixture artifact fetch tests
+        shell: bash
+        run: python3 scripts/ci/test_fetch_fixture_artifact.py -v
+
       - name: Shell repository identity guardrails
         shell: bash
         run: |
@@ -170,7 +174,9 @@ jobs:
             exit 1
           fi
 
-          gh api "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${ARTIFACT_ID}" >artifact-metadata.json
+          python3 scripts/ci/fetch_fixture_artifact.py \
+            --repository "${GITHUB_REPOSITORY}" --artifact-id "${ARTIFACT_ID}" \
+            --kind metadata --output artifact-metadata.json
           api_digest="$(python3 - <<'PY'
           import json
           import re
@@ -185,7 +191,9 @@ jobs:
           )"
           test "${api_digest}" = "${canonical_digest}"
 
-          gh api "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${ARTIFACT_ID}/zip" >artifact-api.zip
+          python3 scripts/ci/fetch_fixture_artifact.py \
+            --repository "${GITHUB_REPOSITORY}" --artifact-id "${ARTIFACT_ID}" \
+            --kind zip --output artifact-api.zip
           actual_digest="$(python3 - <<'PY'
           import hashlib
 
