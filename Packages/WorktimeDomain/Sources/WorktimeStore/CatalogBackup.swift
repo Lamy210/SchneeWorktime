@@ -32,6 +32,12 @@ public enum CatalogBackup {
 
     /// Inspect only. Never modifies a live database or credits time based on a copied heartbeat.
     public static func inspect(_ data: Data, now: Int64) throws -> CatalogSession {
+        try decodeValidated(data, now: now).session
+    }
+
+    static func decodeValidated(
+        _ data: Data, now: Int64
+    ) throws -> (snapshot: StoredSnapshot, session: CatalogSession) {
         guard data.count <= maxArchive else { throw CatalogBackupError.tooLarge }
         let archive: Archive
         do {
@@ -43,7 +49,7 @@ public enum CatalogBackup {
         let snapshot = StoredSnapshot(
             version: StoreVersion(epoch: archive.sourceEpoch, revision: archive.revision), payload: archive.payload
         )
-        return try validateSnapshot(snapshot, now: now)
+        return try (snapshot, validateSnapshot(snapshot, now: now))
     }
 
     private static func validateSnapshot(_ snapshot: StoredSnapshot, now: Int64) throws -> CatalogSession {
