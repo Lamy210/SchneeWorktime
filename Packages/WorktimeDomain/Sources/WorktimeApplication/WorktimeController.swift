@@ -61,25 +61,27 @@ public struct WorktimeController {
     private let repository: CatalogRepository
     private var session: CatalogSession
     private var clock: ClockObservation
+    private var checkpointVersion: StoreVersion?
+    private var checkpointAt: Int64?
 
     public init(url: URL, createIfMissing: Bool = false, sample: ClockSample) throws {
         repository = try CatalogRepository(url: url, createIfMissing: createIfMissing)
         session = try repository.load(now: sample.wall)
         clock = ClockObservation(initial: sample)
-        // No persisted observation heartbeat yet: conservatively review the open work interval on launch.
-        if let day = activeWorkingDay, let start = day.intervals.last?.start, start < sample.wall {
-            try record(dayID: day.id, gap: .init(start: start, end: sample.wall), now: sample.wall)
-        }
+        try recoverOpenInterval(sample: sample)
+        try saveCheckpoint(sample: sample)
     }
 
     public mutating func refresh(sample: ClockSample) throws -> WorktimeGlance? {
         try observe(sample)
+        try saveCheckpoint(sample: sample)
         return try glance(now: sample.wall)
     }
 
     public mutating func perform(_ command: WorkdayCommand, sample: ClockSample) throws -> WorktimeGlance? {
         try observe(sample)
         session = try repository.apply(command, at: sample.wall, now: sample.wall, expected: session.version)
+        try saveCheckpoint(sample: sample)
         return try glance(now: sample.wall)
     }
 
@@ -87,6 +89,7 @@ public struct WorktimeController {
         selection: ObservationGap, classification: ReviewClassification, sample: ClockSample
     ) throws -> WorktimeReviewProposal {
         try observe(sample)
+        try saveCheckpoint(sample: sample)
         guard let before = try glance(now: sample.wall) else { throw WorkdayError.noActiveDay }
         let stored = try session.previewReview(
             dayID: before.day.id, selection: selection, classification: classification, now: sample.wall
@@ -107,12 +110,40 @@ public struct WorktimeController {
         try observe(sample)
         guard isCurrent(proposal) else { throw SnapshotStoreError.staleVersion }
         session = try repository.commitReview(proposal.stored, now: sample.wall)
+        try saveCheckpoint(sample: sample)
         return try glance(now: sample.wall)
     }
 
     private var activeWorkingDay: Workday? {
         guard let day = session.catalog.days.last, day.state == .working else { return nil }
         return day
+    }
+
+    private mutating func recoverOpenInterval(sample: ClockSample) throws {
+        guard let day = activeWorkingDay, let start = day.intervals.last?.start else { return }
+        var unknownStart = start
+        if let marker = try repository.loadObservationCheckpoint(expected: session.version), marker.dayID == day.id {
+            guard marker.observedAt <= sample.wall else { throw ApplicationClockError.unreliableClock }
+            unknownStart = max(start, marker.observedAt)
+        }
+        if unknownStart < sample.wall {
+            try record(dayID: day.id, gap: .init(start: unknownStart, end: sample.wall), now: sample.wall)
+        }
+    }
+
+    /// Persist only after clock observation and any gap/command/review commits have succeeded.
+    private mutating func saveCheckpoint(sample: ClockSample) throws {
+        guard let day = activeWorkingDay else {
+            checkpointVersion = nil
+            checkpointAt = nil
+            return
+        }
+        if checkpointVersion == session.version, let checkpointAt, sample.wall - checkpointAt < 10 {
+            return
+        }
+        try repository.saveObservationCheckpoint(dayID: day.id, observedAt: sample.wall, expected: session.version)
+        checkpointVersion = session.version
+        checkpointAt = sample.wall
     }
 
     private mutating func observe(_ sample: ClockSample) throws {
