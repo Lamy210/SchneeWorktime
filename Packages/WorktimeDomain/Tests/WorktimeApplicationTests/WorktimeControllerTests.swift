@@ -21,7 +21,8 @@ struct WorktimeControllerTests {
             var controller = try WorktimeController(url: url, createIfMissing: true, sample: sample(100))
             let start = try controller.perform(.clockIn(id: UUID(), profile: WorkdayProfile()), sample: sample(100))
             #expect(start?.forecast.goal == .projected(earliestGoalAt: 25300, estimatedDepartureAt: 28900))
-            let current = try #require(controller.refresh(sample: sample(110)))
+            let currentResult = try controller.refresh(sample: sample(110))
+            let current = try #require(currentResult)
             #expect(current.snapshot.bounds.lower == 10)
             #expect(current.snapshot.bounds.upper == 10)
         }
@@ -32,11 +33,13 @@ struct WorktimeControllerTests {
             var controller = try WorktimeController(url: url, createIfMissing: true, sample: sample(100))
             _ = try controller.perform(.clockIn(id: UUID(), profile: WorkdayProfile()), sample: sample(100))
             _ = try controller.refresh(sample: sample(110))
-            let ended = try #require(controller.perform(.clockOut(confirmBreak: false), sample: sample(140)))
+            let endedResult = try controller.perform(.clockOut(confirmBreak: false), sample: sample(140))
+            let ended = try #require(endedResult)
             #expect(ended.snapshot.bounds.lower == 10)
             #expect(ended.snapshot.bounds.upper == 40)
             #expect(ended.forecast.goal == .ended)
-            let later = try #require(controller.refresh(sample: sample(150)))
+            let laterResult = try controller.refresh(sample: sample(150))
+            let later = try #require(laterResult)
             #expect(later.snapshot == ended.snapshot)
         }
     }
@@ -46,7 +49,8 @@ struct WorktimeControllerTests {
             var first = try WorktimeController(url: url, createIfMissing: true, sample: sample(100))
             _ = try first.perform(.clockIn(id: UUID(), profile: WorkdayProfile()), sample: sample(100))
             var reopened = try WorktimeController(url: url, sample: sample(200))
-            let current = try #require(reopened.refresh(sample: sample(210)))
+            let currentResult = try reopened.refresh(sample: sample(210))
+            let current = try #require(currentResult)
             #expect(current.snapshot.bounds.lower == 10)
             #expect(current.snapshot.bounds.upper == 110)
             #expect(current.forecast.goal == .uncertain)
@@ -62,7 +66,8 @@ struct WorktimeControllerTests {
         #expect(throws: ApplicationClockError.unreliableClock) {
             try monitor.advance(to: shifted)
         }
-        #expect(try monitor.advance(to: sample(101)) == nil)
+        let nextGap = try monitor.advance(to: sample(101))
+        #expect(nextGap == nil)
     }
 
     @Test func `break interval does not count as unverified work`() throws {
@@ -70,7 +75,8 @@ struct WorktimeControllerTests {
             var controller = try WorktimeController(url: url, createIfMissing: true, sample: sample(100))
             _ = try controller.perform(.clockIn(id: UUID(), profile: WorkdayProfile()), sample: sample(100))
             _ = try controller.perform(.startBreak, sample: sample(110))
-            let current = try #require(controller.refresh(sample: sample(200)))
+            let currentResult = try controller.refresh(sample: sample(200))
+            let current = try #require(currentResult)
             #expect(current.snapshot.bounds.lower == 10)
             #expect(current.snapshot.bounds.upper == 10)
             #expect(current.snapshot.recordedRest == 90)
@@ -84,7 +90,8 @@ struct WorktimeControllerTests {
             _ = try controller.perform(.clockIn(id: UUID(), profile: WorkdayProfile()), sample: sample(100))
             _ = try controller.refresh(sample: sample(110))
             let gap = ObservationGap(start: 110, end: 140)
-            let current = try #require(controller.refresh(sample: sample(140)))
+            let currentResult = try controller.refresh(sample: sample(140))
+            let current = try #require(currentResult)
             #expect(current.reviewableGaps == [gap])
             let repository = try CatalogRepository(url: url)
             let before = try repository.load(now: 141)
@@ -96,13 +103,16 @@ struct WorktimeControllerTests {
             #expect(proposal.after.snapshot.recordedRest == 30)
             #expect(try repository.load(now: 141).version == before.version)
             #expect(controller.isCurrent(proposal))
-            let accepted = try #require(controller.commitReview(proposal, sample: sample(142)))
+            let acceptedResult = try controller.commitReview(proposal, sample: sample(142))
+            let accepted = try #require(acceptedResult)
             #expect(accepted.snapshot.bounds.lower == 12)
             #expect(accepted.reviewableGaps.isEmpty)
             #expect(!controller.isCurrent(proposal))
-            let ended = try #require(controller.perform(.clockOut(confirmBreak: false), sample: sample(150)))
+            let endedResult = try controller.perform(.clockOut(confirmBreak: false), sample: sample(150))
+            let ended = try #require(endedResult)
             var reopened = try WorktimeController(url: url, sample: sample(160))
-            #expect(try reopened.refresh(sample: sample(160))?.snapshot == ended.snapshot)
+            let restoredSnapshot = try reopened.refresh(sample: sample(160))?.snapshot
+            #expect(restoredSnapshot == ended.snapshot)
             #expect(try repository.load(now: 160).catalog.reviewAudit.count == 1)
         }
     }
@@ -111,7 +121,8 @@ struct WorktimeControllerTests {
         try withDatabase { url in
             var controller = try WorktimeController(url: url, createIfMissing: true, sample: sample(100))
             _ = try controller.perform(.clockIn(id: UUID(), profile: WorkdayProfile()), sample: sample(100))
-            let current = try #require(controller.refresh(sample: sample(140)))
+            let currentResult = try controller.refresh(sample: sample(140))
+            let current = try #require(currentResult)
             let gap = try #require(current.reviewableGaps.first)
             let work = try controller.previewReview(selection: gap, classification: .work, sample: sample(141))
             let nonwork = try controller.previewReview(selection: gap, classification: .gap, sample: sample(141))
@@ -119,7 +130,8 @@ struct WorktimeControllerTests {
             #expect(nonwork.after.snapshot.bounds.upper == 1)
             #expect(nonwork.after.snapshot.recordedRest == 0)
             #expect(nonwork.after.snapshot.remainingRest == 3600)
-            let saved = try #require(controller.commitReview(nonwork, sample: sample(142)))
+            let savedResult = try controller.commitReview(nonwork, sample: sample(142))
+            let saved = try #require(savedResult)
             #expect(saved.snapshot.bounds.lower == 2)
             #expect(saved.snapshot.bounds.upper == 2)
             #expect(!controller.isCurrent(work))
@@ -130,7 +142,8 @@ struct WorktimeControllerTests {
         try withDatabase { url in
             var controller = try WorktimeController(url: url, createIfMissing: true, sample: sample(100))
             _ = try controller.perform(.clockIn(id: UUID(), profile: WorkdayProfile()), sample: sample(100))
-            let current = try #require(controller.refresh(sample: sample(140)))
+            let currentResult = try controller.refresh(sample: sample(140))
+            let current = try #require(currentResult)
             let gap = try #require(current.reviewableGaps.first)
             let proposal = try controller.previewReview(selection: gap, classification: .work, sample: sample(141))
             #expect(throws: SnapshotStoreError.staleVersion) {
@@ -139,7 +152,8 @@ struct WorktimeControllerTests {
             #expect(!controller.isCurrent(proposal))
             let repository = try CatalogRepository(url: url)
             #expect(try repository.load(now: 170).catalog.reviewAudit.isEmpty)
-            let next = try #require(controller.refresh(sample: sample(170)))
+            let nextResult = try controller.refresh(sample: sample(170))
+            let next = try #require(nextResult)
             #expect(next.snapshot.bounds.upper == 70)
             #expect(next.snapshot.bounds.lower == 1)
         }
@@ -149,14 +163,17 @@ struct WorktimeControllerTests {
         try withDatabase { url in
             var controller = try WorktimeController(url: url, createIfMissing: true, sample: sample(100))
             _ = try controller.perform(.clockIn(id: UUID(), profile: WorkdayProfile()), sample: sample(100))
-            let ended = try #require(controller.perform(.clockOut(confirmBreak: false), sample: sample(140)))
+            let endedResult = try controller.perform(.clockOut(confirmBreak: false), sample: sample(140))
+            let ended = try #require(endedResult)
             let gap = try #require(ended.reviewableGaps.first)
             let proposal = try controller.previewReview(selection: gap, classification: .work, sample: sample(200))
-            let accepted = try #require(controller.commitReview(proposal, sample: sample(201)))
+            let acceptedResult = try controller.commitReview(proposal, sample: sample(201))
+            let accepted = try #require(acceptedResult)
             #expect(accepted.snapshot.bounds.lower == 40)
             #expect(accepted.snapshot.bounds.upper == 40)
             #expect(accepted.forecast.goal == .ended)
-            #expect(try controller.refresh(sample: sample(300))?.snapshot == accepted.snapshot)
+            let laterSnapshot = try controller.refresh(sample: sample(300))?.snapshot
+            #expect(laterSnapshot == accepted.snapshot)
         }
     }
 }

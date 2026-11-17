@@ -43,9 +43,18 @@ public struct WorktimeReviewProposal: Sendable {
     public let before: WorktimeGlance
     public let after: WorktimeGlance
 
-    public var selection: ObservationGap { stored.preview.review.selection }
-    public var classification: ReviewClassification { stored.preview.review.classification }
-    public var observedAt: Int64 { stored.preview.review.reviewedAt }
+    public var selection: ObservationGap {
+        stored.preview.review.selection
+    }
+
+    public var classification: ReviewClassification {
+        stored.preview.review.classification
+    }
+
+    public var observedAt: Int64 {
+        stored.preview.review.reviewedAt
+    }
+
 }
 
 /// A single-owner application session. Callers must discard the controller after clock or storage errors.
