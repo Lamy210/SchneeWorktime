@@ -1,0 +1,52 @@
+name: Worktime Release Candidate
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Candidate version (canonical X.Y.Z)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  candidate:
+    name: Build ad-hoc macOS candidate
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: macos-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout reviewed source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Test and build
+        shell: bash
+        run: |
+          set -euo pipefail
+          swift test --package-path Packages/WorktimeDomain
+          swift build --package-path Packages/WorktimeDomain -c release --product SchneeWorktime
+
+      - name: Package and verify candidate
+        shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          bin_dir="$(swift build --package-path Packages/WorktimeDomain -c release --show-bin-path)"
+          python3 scripts/release/build_worktime_candidate.py \
+            --binary "$bin_dir/SchneeWorktime" \
+            --output "${RUNNER_TEMP}/worktime-candidate" \
+            --version "$VERSION" --source-sha "$(git rev-parse HEAD)"
+          (cd "${RUNNER_TEMP}/worktime-candidate" && shasum -a 256 -c SHA256SUMS)
+
+      - name: Upload verified candidate
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: worktime-candidate-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/worktime-candidate/
+          if-no-files-found: error
+          retention-days: 14

@@ -1,5 +1,7 @@
 # macOS App Development & Release Template
 
+> SchneeWorktime の初期配布はDeveloper ID署名・公証なし（ad-hoc署名あり）です。[アプリ固有の配布手順](docs/SchneeWorktime/UNSIGNED_RELEASE.md) を優先してください。以下は署名付き配布を行う場合の汎用テンプレートです。
+
 Reusable baseline for developing and distributing macOS applications with GitHub Actions, code-quality gates, Developer ID signing, Apple notarization, DMG packaging, and Homebrew Cask distribution.
 
 ## Goals
