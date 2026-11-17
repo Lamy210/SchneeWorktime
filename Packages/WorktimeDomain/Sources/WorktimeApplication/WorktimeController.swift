@@ -89,6 +89,27 @@ public struct WorktimeController {
         return try glance(now: sample.wall)
     }
 
+    /// Save a remaining-rest forecast only, fenced by the displayed day and current store version.
+    public mutating func setFutureRest(
+        minutes: Int?, expectedDay: Workday, sample: ClockSample
+    ) throws -> WorktimeGlance? {
+        guard session.catalog.days.last == expectedDay, session.catalog.activeID == expectedDay.id else {
+            throw FutureRestChangeError.staleContext
+        }
+        if let minutes, !NextDaySettings.restRange.contains(minutes) {
+            throw FutureRestChangeError.invalidMinutes
+        }
+        var updated = clock
+        guard try updated.advance(to: sample) == nil else { throw FutureRestChangeError.staleContext }
+        session = try repository.setFutureRest(
+            dayID: expectedDay.id, remainingSeconds: minutes.map { Int64($0) * 60 },
+            now: sample.wall, expected: session.version
+        )
+        clock = updated
+        try saveCheckpoint(sample: sample)
+        return try glance(now: sample.wall)
+    }
+
     public mutating func previewReview(
         selection: ObservationGap, classification: ReviewClassification, sample: ClockSample
     ) throws -> WorktimeReviewProposal {
