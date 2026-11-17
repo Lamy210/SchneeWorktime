@@ -49,7 +49,9 @@ public final class ReminderSync {
             let cancelled = Set(changes.cancel)
             guard !remaining.contains(where: { cancelled.contains($0.id) }) else { return .cancellationPending }
         }
-        if permission != .allowed, state != nil { return .permissionUnavailable }
+        if permission != .allowed, state != nil {
+            return .permissionUnavailable
+        }
         return try await install(changes.upsert, state: state, latest: latest, now: now)
     }
 

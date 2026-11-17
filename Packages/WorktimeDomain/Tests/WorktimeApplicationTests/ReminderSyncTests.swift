@@ -14,8 +14,13 @@ private final class FakeReminderDelivery: ReminderDelivery {
     var onSchedule: (() -> Void)?
     var error: ReminderDeliveryError?
 
-    func authorization() async -> ReminderAuthorization { permission }
-    func requestAuthorization() async throws -> Bool { permission == .allowed }
+    func authorization() async -> ReminderAuthorization {
+        permission
+    }
+
+    func requestAuthorization() async throws -> Bool {
+        permission == .allowed
+    }
 
     func pending() async -> [PendingReminder] {
         await onPending?()
@@ -30,7 +35,9 @@ private final class FakeReminderDelivery: ReminderDelivery {
     }
 
     func schedule(_ request: ReminderRequest) async throws {
-        if let error { throw error }
+        if let error {
+            throw error
+        }
         scheduled.append(request)
         requests.removeAll { $0.id == request.id }
         requests.append(PendingReminder(id: request.id, trigger: request.trigger, revision: request.revision,
