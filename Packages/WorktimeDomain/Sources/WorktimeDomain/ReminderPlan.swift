@@ -30,12 +30,7 @@ public enum ReminderPlan {
     ) -> [PlannedReminder] {
         guard clockTrusted, forecast != .ended else { return [] }
         var result: [PlannedReminder] = []
-        let automatic: (Int64, Int64)? = if case let .projected(earliest, departure) = forecast,
-                                           earliest > now, departure >= earliest {
-            (earliest, departure)
-        } else {
-            nil
-        }
+        let automatic = automaticTargets(forecast: forecast, now: now)
         let target: Int64? = switch departureBasis {
         case .automatic: automatic?.1
         case let .explicit(value): value
@@ -45,7 +40,8 @@ public enum ReminderPlan {
                 result.append(PlannedReminder(kind: .departurePreparation(lead), trigger: trigger))
             }
             if earliestLeads.contains(lead), let earliest = automatic?.0,
-               let trigger = future(earliest, lead: lead, now: now) {
+               let trigger = future(earliest, lead: lead, now: now)
+            {
                 result.append(PlannedReminder(kind: .earliestGoal(lead), trigger: trigger))
             }
         }
@@ -53,6 +49,13 @@ public enum ReminderPlan {
             result.append(PlannedReminder(kind: .referenceEnd, trigger: referenceAt))
         }
         return result
+    }
+
+    private static func automaticTargets(forecast: GoalForecast, now: Int64) -> (Int64, Int64)? {
+        guard case let .projected(earliest, departure) = forecast,
+              earliest > now, departure >= earliest
+        else { return nil }
+        return (earliest, departure)
     }
 
     private static func future(_ target: Int64, lead: ReminderLead, now: Int64) -> Int64? {

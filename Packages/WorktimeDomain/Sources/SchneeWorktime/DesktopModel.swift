@@ -18,6 +18,9 @@
         @Published private(set) var inspectionNotice: String?
 
         @Published private(set) var remindersEnabled = UserDefaults.standard.bool(forKey: "departureReminderEnabled")
+        @Published private(set) var departureLeads = ReminderLeadSettings.decode(
+            UserDefaults.standard.string(forKey: "departureReminderLeads")
+        )
         @Published private(set) var reminderStatus = ""
         @Published private(set) var requestingReminderPermission = false
 
@@ -242,6 +245,23 @@
             }
         }
 
+        private func databaseURL() throws -> URL {
+            let support = try FileManager.default.url(
+                for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: false
+            )
+            return support.appendingPathComponent("SchneeWorktime", isDirectory: true)
+                .appendingPathComponent("worktime.sqlite")
+        }
+
+        private static func sample() throws -> ClockSample {
+            guard let wall = Int64(exactly: Date().timeIntervalSince1970.rounded(.down)) else {
+                throw ApplicationClockError.invalidSample
+            }
+            return try ClockSample(wall: wall, uptime: ProcessInfo.processInfo.systemUptime)
+        }
+    }
+
+    extension DesktopModel {
         var remindersSupported: Bool {
             reminderCoordinator != nil
         }
@@ -263,6 +283,20 @@
             }
         }
 
+        func setDepartureLead(_ lead: ReminderLead, enabled: Bool) {
+            guard ready, sessionLock != nil, !requestingReminderPermission else { return }
+            var selected = departureLeads
+            if enabled {
+                selected.insert(lead)
+            } else {
+                selected.remove(lead)
+            }
+            guard selected != departureLeads else { return }
+            departureLeads = selected
+            UserDefaults.standard.set(ReminderLeadSettings.encode(selected), forKey: "departureReminderLeads")
+            queueReminders(force: true)
+        }
+
         func disableReminders() {
             guard sessionLock != nil, !requestingReminderPermission else { return }
             remindersEnabled = false
@@ -275,7 +309,7 @@
             guard remindersEnabled, !reminderClockUntrusted else { return nil }
             guard ready, let controller else { throw ReminderDeliveryError.invalidRequest }
             do {
-                return try controller.reminderState(sample: Self.sample())
+                return try controller.reminderState(sample: Self.sample(), departureLeads: departureLeads)
             } catch is ApplicationClockError {
                 return nil
             }
@@ -317,21 +351,6 @@
             case .busy, .superseded, .cancellationPending:
                 reminderStatus = "通知予約を再確認します。"
             }
-        }
-
-        private func databaseURL() throws -> URL {
-            let support = try FileManager.default.url(
-                for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: false
-            )
-            return support.appendingPathComponent("SchneeWorktime", isDirectory: true)
-                .appendingPathComponent("worktime.sqlite")
-        }
-
-        private static func sample() throws -> ClockSample {
-            guard let wall = Int64(exactly: Date().timeIntervalSince1970.rounded(.down)) else {
-                throw ApplicationClockError.invalidSample
-            }
-            return try ClockSample(wall: wall, uptime: ProcessInfo.processInfo.systemUptime)
         }
     }
 

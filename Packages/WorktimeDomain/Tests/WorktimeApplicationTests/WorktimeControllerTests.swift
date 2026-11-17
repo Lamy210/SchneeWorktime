@@ -198,6 +198,25 @@ struct WorktimeControllerTests {
         }
     }
 
+    @Test func `selected departure leads do not modify committed work history`() throws {
+        try withDatabase { url in
+            var controller = try WorktimeController(url: url, createIfMissing: true, sample: sample(100))
+            _ = try controller.perform(.clockIn(id: UUID(), profile: WorkdayProfile()), sample: sample(100))
+            let store = try SnapshotStore(url: url)
+            let before = try store.load()
+            let selectedResult = try controller.reminderState(
+                sample: sample(101), departureLeads: [.thirty, .fifteen, .five]
+            )
+            let selected = try #require(selectedResult)
+            #expect(Set(selected.desired.map(\.trigger)) == Set([Int64(27100), 28000, 28600]))
+            let emptyResult = try controller.reminderState(sample: sample(101), departureLeads: [])
+            let empty = try #require(emptyResult)
+            #expect(empty.desired.isEmpty)
+            #expect(empty.revision == selected.revision)
+            #expect(try store.load() == before)
+        }
+    }
+
     @Test func `unobserved gap suppresses and external revision rejects notification state`() throws {
         try withDatabase { url in
             var controller = try WorktimeController(url: url, createIfMissing: true, sample: sample(100))

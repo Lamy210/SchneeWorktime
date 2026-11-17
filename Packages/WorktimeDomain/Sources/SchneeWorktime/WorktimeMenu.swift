@@ -138,25 +138,6 @@
             }
         }
 
-        private var reminderSettings: some View {
-            DisclosureGroup("退勤準備の通知") {
-                Text("休憩込み退勤見込みの15分前に通知します。実績の確定ではありません。")
-                    .font(.caption)
-                if model.remindersSupported {
-                    if model.remindersEnabled {
-                        Button("通知を無効にする") { model.disableReminders() }
-                        Button("通知許可を確認する") { model.enableReminders() }
-                    } else {
-                        Button("通知を有効にする") { model.enableReminders() }
-                    }
-                    Text(model.reminderStatus).font(.caption)
-                } else {
-                    Text("通知は.appからの起動時に利用できます。").font(.caption)
-                }
-            }
-            .disabled(model.requestingReminderPermission)
-        }
-
         private var nextDaySettings: some View {
             DisclosureGroup("次の勤務日の設定") {
                 Text("現在と過去の勤務記録は変更しません。").font(.caption)
@@ -276,6 +257,34 @@
     }
 
     extension WorktimeMenu {
+        private var reminderSettings: some View {
+            DisclosureGroup("退勤準備の通知") {
+                Text("希望退勤（適格な場合）または希望がない場合の退勤見込みを基準に通知します。過ぎた時刻には通知しません。")
+                    .font(.caption)
+                if model.remindersSupported {
+                    ForEach([ReminderLead.thirty, .fifteen, .five], id: \.rawValue) { lead in
+                        Toggle("\(lead.rawValue / 60)分前", isOn: Binding(
+                            get: { model.departureLeads.contains(lead) },
+                            set: { model.setDepartureLead(lead, enabled: $0) }
+                        ))
+                    }
+                    if model.departureLeads.isEmpty {
+                        Text("通知時刻が未選択です。予約は作成されません。").font(.caption)
+                    }
+                    if model.remindersEnabled {
+                        Button("通知を無効にする") { model.disableReminders() }
+                        Button("通知許可を確認する") { model.enableReminders() }
+                    } else {
+                        Button("通知を有効にする") { model.enableReminders() }
+                    }
+                    Text(model.reminderStatus).font(.caption)
+                } else {
+                    Text("通知は.appからの起動時に利用できます。").font(.caption)
+                }
+            }
+            .disabled(model.requestingReminderPermission)
+        }
+
         @ViewBuilder
         private func reviewSection(_ glance: WorktimeGlance) -> some View {
             if let notice = model.reviewNotice {

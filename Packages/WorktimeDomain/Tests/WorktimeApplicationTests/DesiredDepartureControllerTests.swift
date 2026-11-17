@@ -71,6 +71,12 @@ struct DesiredDepartureControllerTests {
             #expect(current.desiredDepartureAt == 2800)
             let requalified = try controller.reminderState(sample: sample(105))
             #expect(requalified?.desired.map(\.trigger) == [1900])
+            let multiple = try controller.reminderState(
+                sample: sample(105), departureLeads: [.five, .fifteen, .thirty]
+            )
+            #expect(multiple?.desired.map(\.trigger) == [2500, 1900, 1000])
+            let disabled = try controller.reminderState(sample: sample(105), departureLeads: [])
+            #expect(disabled?.desired.isEmpty == true)
             let cleared = try controller.clearDesiredDeparture(expectedDay: current.day, sample: sample(106))
             #expect(cleared?.desiredDepartureAt == nil)
             let automatic = try controller.reminderState(sample: sample(107))
