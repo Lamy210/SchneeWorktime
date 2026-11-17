@@ -51,6 +51,11 @@ jobs:
           APP_PATH="$stage/SchneeWorktime.app" OUTPUT_ARCHIVE="$stage/unsigned-macos-app.tar.gz" \
             bash scripts/release/package-app-artifact.sh
           test -s "$stage/unsigned-macos-app.tar.gz"
+          python3 -m unittest discover -s scripts/release -p test_build_worktime_candidate.py -v
+          python3 scripts/release/build_worktime_candidate.py \
+            --binary "$bin_dir/SchneeWorktime" --output "$stage/candidate" \
+            --version 0.1.0 --source-sha "$(git rev-parse HEAD)"
+          (cd "$stage/candidate" && shasum -a 256 -c SHA256SUMS)
 
   classify:
     name: Classify tests
