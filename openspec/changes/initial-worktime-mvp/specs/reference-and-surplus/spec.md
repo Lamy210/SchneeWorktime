@@ -70,3 +70,14 @@ The system SHALL allow the reference wall time to carry an explicit dayOffset of
 #### Scenario: Same-day reference before start
 - **WHEN** 21:00開始で参考18:00、dayOffset=0
 - **THEN** 不適用とし翌日18:00へ自動移動しない
+
+### Requirement: Reject shifted or skipped civil dates
+The system SHALL resolve reference wall time strictly against the Gregorian civil date derived from the captured start date plus explicit dayOffset. It SHALL return an unavailable resolution when that date or wall time does not exist, rather than moving to a later valid day. For repeated local times it SHALL expose both candidate Instants until the user explicitly chooses an occurrence.
+
+#### Scenario: Skipped civil date
+- **WHEN** 保存されたタイムゾーンにおける翌暦日の全体が時刻制度の変更で存在しない
+- **THEN** 基準時刻を翌々日に移さず、設定の確認を求める
+
+#### Scenario: Repeated or missing wall time
+- **WHEN** 夏時間切替により指定された参考時刻が二重に存在又は消失する
+- **THEN** 重複時刻は早い候補と遅い候補を提示し明示選択を要求する。消失時刻は自動補正せず不適用とする

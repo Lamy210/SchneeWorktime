@@ -106,3 +106,6 @@ CatalogReviewTests 6件を追加。AC-152〜155を中心に、訂正確定と監
 
 ## SQLiteカタログ連携の試験
 CatalogRepositoryTests 7件を追加: 復元と監査の等価性、独立接続からの古い書込み、重複観測のno-op、不正コマンド時の保持、破損/不可能journal、未来イベント、旧epochの訂正案。新規試験は実行結果未確認（CI待ち）。実並行writer、上限/容量、クラッシュ、バックアップ・旧世代の復元防止、時計異常からの復旧、実機は未確認。
+
+## 基準終業時刻・日次予測
+ReferenceTimeTests 6件: Asia/Tokyo、明示翌日、DST消失/重複、Pacific/Apiaの消失暦日、不正入力。DailyForecastTests 5件: 最短と休憩込みの分離、上下限、確定達成後、休憩と終了、overflowと不正期間。Linux Swift 6.2.1の隔離SwiftPMで計11件成功。既存Worktime.swiftと今回の4ファイルはblob SHAを照合。統合macOS CI、保存済みprofileとの接続、通知の試験、時計異常検知、実機は未確認。

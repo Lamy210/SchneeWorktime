@@ -245,3 +245,14 @@ The system SHALL validate disjoint recorded work, rest and gap intervals and all
 #### Scenario: Immediate clock-in
 - **WHEN** an open work interval starts exactly at the observation Instant
 - **THEN** the initial recorded work duration is zero without creating a zero-length closed interval
+
+### Requirement: Typed daily goal forecast
+The system SHALL expose separate remaining-work and daily-surplus bounds from validated work bounds. It SHALL distinguish projected, reached, uncertain, on-break and ended forecast outcomes. Reached and ended outcomes SHALL NOT produce a new target-based countdown; uncertain work bounds SHALL NOT be represented as a single future target Instant.
+
+#### Scenario: Confirmed target with remaining planned break
+- **WHEN** 確認済み実働の下限が目標以上で残り予定休憩が存在する
+- **THEN** 日次目標は達成済みとし、休憩予定を加えた未来の目標達成時刻を生成しない
+
+#### Scenario: Arithmetic overflow
+- **WHEN** 入力秒数に対する予測時刻の加算が表現可能範囲を超える
+- **THEN** 計算エラーを返し巻き戻った時刻や不正な予測を表示しない
