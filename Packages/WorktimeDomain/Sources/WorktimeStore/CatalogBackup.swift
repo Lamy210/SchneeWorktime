@@ -24,7 +24,7 @@ public enum CatalogBackup {
             revision: snapshot.version.revision, payload: snapshot.payload
         )
         let encoder = JSONEncoder()
-        encoder.outputFormatting = [.sortedKeys]
+        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
         let data = try encoder.encode(archive)
         guard data.count <= maxArchive else { throw CatalogBackupError.tooLarge }
         return data

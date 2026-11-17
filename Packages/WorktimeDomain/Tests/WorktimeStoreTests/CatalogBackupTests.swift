@@ -35,7 +35,8 @@ struct CatalogBackupTests {
             #expect(candidate.catalog.reviewAudit.count == 1)
             #expect(try store.load() == before)
             #expect(try store.loadObservationCheckpoint(expected: saved.version)?.observedAt == 210)
-            let envelope = try #require(JSONSerialization.jsonObject(with: bytes) as? [String: Any])
+            let decoded = try JSONSerialization.jsonObject(with: bytes) as? [String: Any]
+            let envelope = try #require(decoded)
             #expect(Set(envelope.keys) == ["schemaVersion", "sourceEpoch", "revision", "payload"])
         }
     }
