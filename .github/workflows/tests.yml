@@ -34,6 +34,24 @@ jobs:
           swift test --package-path Packages/WorktimeDomain
           swift build --package-path Packages/WorktimeDomain --product SchneeWorktime
 
+      - name: Test and assemble local Worktime app bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s scripts/release -p test_build_worktime_bundle.py -v
+          swift build --package-path Packages/WorktimeDomain -c release --product SchneeWorktime
+          bin_dir="$(swift build --package-path Packages/WorktimeDomain -c release --show-bin-path)"
+          stage="$(mktemp -d "${RUNNER_TEMP}/worktime-bundle.XXXXXXXX")"
+          trap 'rm -rf "$stage"' EXIT
+          xcrun otool -hv "$bin_dir/SchneeWorktime"
+          python3 scripts/release/build_worktime_bundle.py --binary "$bin_dir/SchneeWorktime" \
+            --output "$stage/SchneeWorktime.app" --version 0.1.0
+          plutil -lint "$stage/SchneeWorktime.app/Contents/Info.plist"
+          test -x "$stage/SchneeWorktime.app/Contents/MacOS/SchneeWorktime"
+          APP_PATH="$stage/SchneeWorktime.app" OUTPUT_ARCHIVE="$stage/unsigned-macos-app.tar.gz" \
+            bash scripts/release/package-app-artifact.sh
+          test -s "$stage/unsigned-macos-app.tar.gz"
+
   classify:
     name: Classify tests
     runs-on: ubuntu-latest

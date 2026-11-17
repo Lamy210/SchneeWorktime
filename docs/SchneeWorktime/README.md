@@ -46,3 +46,19 @@ WorktimeStoreのCatalogRepositoryとschema v1 journalを追加。勤務日カタ
 ### 次の勤務日の設定と退勤時刻の試算
 メニューバーから次回の実働目標・標準休憩を設定できる。初期値420分/60分。試作の入力範囲は目標5〜1440分、休憩0〜1440分、5分刻み。UserDefaultsに保存し、新規勤務開始時だけ検証済みprofileをSQLiteに保存する。既存勤務日のprofileは変更しない。
 退勤候補（分単位）・仮の復帰時刻・今帰るを選び、最新の観測時刻に対する仮定の実働・休憩・目標不足/超過の範囲を表示する。過去・実現不能・復帰不明を区別し、実績・退勤希望の保存・通知設定を変更しない。macOS GUIと新規テストは未検証。希望退勤の明示保存や参考終業時刻、当日設定変更は未実装。
+
+### ローカル配布候補の作成（署名・公証・公開なし）
+macOS 15以降で以下を実行する。出力先は新規の専用ディレクトリとする。既存 .app は上書きしない。
+
+```sh
+swift test --package-path Packages/WorktimeDomain
+swift build --package-path Packages/WorktimeDomain -c release --product SchneeWorktime
+bin_dir="$(swift build --package-path Packages/WorktimeDomain -c release --show-bin-path)"
+stage="$(mktemp -d)"
+python3 scripts/release/build_worktime_bundle.py --binary "$bin_dir/SchneeWorktime" \
+  --output "$stage/SchneeWorktime.app" --version 0.1.0
+plutil -lint "$stage/SchneeWorktime.app/Contents/Info.plist"
+open "$stage/SchneeWorktime.app"
+```
+
+暫定bundle ID: `uk.lamysnow.schneeworktime`、暫定検証用バージョン: 0.1.0。安定公開前に固定すること。CIは実バイナリでバンドルとtarを検証するが配布しない。Python単体テストは疑似Mach-O fixtureで、実機起動の証明ではない。署名済みDMG・Gatekeeper・公証・公開・Homebrewの接続は未完了。ローカル検証では隔離アカウントを利用し、既存勤務データのバックアップを取る。
