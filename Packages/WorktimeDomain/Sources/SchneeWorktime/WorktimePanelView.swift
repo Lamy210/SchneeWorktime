@@ -16,6 +16,18 @@
         }
 
         var body: some View {
+            ScrollView {
+                panelContents
+            }
+            .background(.regularMaterial)
+            .onReceive(NotificationCenter.default.publisher(
+                for: NSApplication.didChangeScreenParametersNotification
+            )) { _ in
+                repairPlacement()
+            }
+        }
+
+        private var panelContents: some View {
             VStack(alignment: .leading, spacing: 8) {
                 if model.ready, let glance = model.glance {
                     let countdown = DepartureCountdown(goal: glance.forecast.goal, observedAt: glance.observedAt)
@@ -38,16 +50,11 @@
                 } else {
                     Text(model.ready ? "勤務記録なし" : "記録を確認してください").font(.headline)
                 }
+                PanelWorkActionsView(model: model)
                 Text("予測は勤務実績ではありません。").font(.caption).foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
             .padding(16)
-            .background(.regularMaterial)
-            .onReceive(NotificationCenter.default.publisher(
-                for: NSApplication.didChangeScreenParametersNotification
-            )) { _ in
-                repairPlacement()
-            }
         }
 
         @ViewBuilder
