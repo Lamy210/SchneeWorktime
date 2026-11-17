@@ -155,7 +155,8 @@
         }
 
         func prepareReview(
-            selection: ObservationGap, classification: ReviewClassification, expectedDay: Workday, source: ObservationGap
+            selection: ObservationGap, classification: ReviewClassification,
+            expectedDay: Workday, source: ObservationGap
         ) {
             guard ready, !choosingBackupDestination, reviewProposal == nil,
                   let displayed = glance, displayed.day == expectedDay, displayed.reviewableGaps.contains(source),
