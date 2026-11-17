@@ -114,6 +114,46 @@ public struct WorktimeController {
         return try glance(now: sample.wall)
     }
 
+    /// Preview on a copy. Neither observation nor persistence is changed by previewing.
+    public func previewRetrospectiveStart(
+        at instant: Int64, profile: WorkdayProfile, sample: ClockSample
+    ) throws -> RetrospectiveStartProposal {
+        var observation = clock
+        _ = try observation.advance(to: sample)
+        let stored = try repository.load(now: sample.wall)
+        guard stored.version == session.version else { throw SnapshotStoreError.staleVersion }
+        guard instant < sample.wall, stored.catalog.activeID == nil else {
+            throw RetrospectiveStartError.invalidStart
+        }
+        var proposed = stored.catalog
+        let command = WorkdayCommand.clockIn(id: UUID(), profile: profile)
+        do {
+            try proposed.apply(command, at: instant, now: sample.wall, expectedRevision: proposed.revision)
+        } catch {
+            throw RetrospectiveStartError.invalidStart
+        }
+        let preview = try WorktimeGlance(catalog: proposed, now: sample.wall)
+        return RetrospectiveStartProposal(
+            version: stored.version, command: command, startedAt: instant, preparedAt: sample.wall, preview: preview
+        )
+    }
+
+    /// One journal event with the asserted start and the actual confirmation time.
+    public mutating func commitRetrospectiveStart(
+        _ proposal: RetrospectiveStartProposal, sample: ClockSample
+    ) throws -> WorktimeGlance? {
+        guard session.version == proposal.version, session.catalog.activeID == nil,
+              sample.wall >= proposal.preparedAt else { throw RetrospectiveStartError.staleProposal }
+        var updated = clock
+        guard try updated.advance(to: sample) == nil else { throw RetrospectiveStartError.staleProposal }
+        session = try repository.apply(
+            proposal.command, at: proposal.startedAt, now: sample.wall, expected: proposal.version
+        )
+        clock = updated
+        try saveCheckpoint(sample: sample)
+        return try glance(now: sample.wall)
+    }
+
     /// One committed snapshot, with no observation or persistence side effects.
     public func recentHistory(now: Int64) throws -> WorktimeHistory {
         let stored = try repository.load(now: now)

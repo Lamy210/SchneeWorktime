@@ -60,6 +60,9 @@
                     Button("新規データベースを作成") { confirmCreate = true }
                 }
                 if model.ready {
+                    if settingsValid, model.glance == nil || model.glance?.day.state == .ended {
+                        RetrospectiveStartView(model: model, targetMinutes: targetMinutes, restMinutes: restMinutes)
+                    }
                     nextDaySettings
                     reminderSettings
                     backupSettings
