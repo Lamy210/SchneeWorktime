@@ -109,3 +109,6 @@ CatalogRepositoryTests 7件を追加: 復元と監査の等価性、独立接続
 
 ## 基準終業時刻・日次予測
 ReferenceTimeTests 6件: Asia/Tokyo、明示翌日、DST消失/重複、Pacific/Apiaの消失暦日、不正入力。DailyForecastTests 5件: 最短と休憩込みの分離、上下限、確定達成後、休憩と終了、overflowと不正期間。Linux Swift 6.2.1の隔離SwiftPMで計11件成功。既存Worktime.swiftと今回の4ファイルはblob SHAを照合。統合macOS CI、保存済みprofileとの接続、通知の試験、時計異常検知、実機は未確認。
+
+## アプリケーション接続（試作）
+WorktimeControllerTests 5件を追加: 正常観測と最短/休憩込み予測、時計観測ギャップを退勤前に反映して終了後の値を固定、起動時の開区間要確認、時計逆行/乖離の拒否、休憩の実働除外。統合CIは未実行。macOSで実行ターゲットを明示ビルドするチェックを追加し、メニューバー操作・再起動・スリープ・記録停止・権限・署名/公証・実機負荷は手動QAの対象とする。

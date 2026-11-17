@@ -30,3 +30,15 @@ PR #7のmacOS CIでDomain 32件成功。WorktimeStoreのSQLite snapshotストア
 
 ### SQLiteカタログ接続の開発中変更
 WorktimeStoreのCatalogRepositoryとschema v1 journalを追加。勤務日カタログを保存・再生できる実装を用意したが、新規テストのCI結果は未確認。復元性能、上限、過去schema、バックアップの消去境界、UIとの連携は未完。
+
+## メニューバー試作版（リリース前）
+この変更で、macOS 15以降を対象としたSwiftPM実行ターゲット `SchneeWorktime` を追加する。
+
+- 開発環境からの起動: `swift run --package-path Packages/WorktimeDomain SchneeWorktime`
+- テスト: `swift test --package-path Packages/WorktimeDomain`
+- アプリ製品のビルド: `swift build --package-path Packages/WorktimeDomain --product SchneeWorktime`
+- 保存先: ~/Library/Application Support/SchneeWorktime/worktime.sqlite。初回作成は明示操作。以前のDBが消失している場合は作成せず復旧を優先する。
+- メニューバーの時計アイコンで出社・休憩・退勤・再開、実働範囲・残り・休憩込み退勤見込みを確認できる設計。時刻異常・永続化エラー時は書込みを停止する。
+- 起動時の未終了勤務は最後の開いた勤務開始から現在までを保守的に要確認とする。訂正画面はまだない。監視の暫定15秒閾値と時計差2秒はリリース確定値ではない。
+
+この時点でmacOS GUIのビルド・操作は未検証。開発版であり正式な勤怠記録用途や配布MVPの完了を主張しない。Linux向け実行入口は未対応OSの案内のみでGUIを提供しない。
