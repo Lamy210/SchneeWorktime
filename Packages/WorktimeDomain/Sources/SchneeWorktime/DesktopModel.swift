@@ -18,6 +18,9 @@
         @Published private(set) var inspectionNotice: String?
 
         @Published private(set) var remindersEnabled = UserDefaults.standard.bool(forKey: "departureReminderEnabled")
+        @Published private(set) var departureLeads = ReminderLeadSettings.decode(
+            UserDefaults.standard.string(forKey: "departureReminderLeads")
+        )
         @Published private(set) var reminderStatus = ""
         @Published private(set) var requestingReminderPermission = false
 
@@ -254,6 +257,20 @@
             }
         }
 
+        func setDepartureLead(_ lead: ReminderLead, enabled: Bool) {
+            guard ready, sessionLock != nil, !requestingReminderPermission else { return }
+            var selected = departureLeads
+            if enabled {
+                selected.insert(lead)
+            } else {
+                selected.remove(lead)
+            }
+            guard selected != departureLeads else { return }
+            departureLeads = selected
+            UserDefaults.standard.set(ReminderLeadSettings.encode(selected), forKey: "departureReminderLeads")
+            queueReminders(force: true)
+        }
+
         func disableReminders() {
             guard sessionLock != nil, !requestingReminderPermission else { return }
             remindersEnabled = false
@@ -266,7 +283,7 @@
             guard remindersEnabled, !reminderClockUntrusted else { return nil }
             guard ready, let controller else { throw ReminderDeliveryError.invalidRequest }
             do {
-                return try controller.reminderState(sample: Self.sample())
+                return try controller.reminderState(sample: Self.sample(), departureLeads: departureLeads)
             } catch is ApplicationClockError {
                 return nil
             }
