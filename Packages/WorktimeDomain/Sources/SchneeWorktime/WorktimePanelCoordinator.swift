@@ -8,6 +8,9 @@
     final class WorktimePanelCoordinator: NSObject, ObservableObject, NSWindowDelegate {
         @Published private(set) var visible = false
         @Published private(set) var alwaysOnTop = false
+        @Published private(set) var displayMode = PanelDisplayMode(
+            storedValue: UserDefaults.standard.string(forKey: "worktimePanelDisplayMode")
+        )
         private var panel: NSPanel?
         private var previousFrame: CGRect?
 
@@ -24,13 +27,23 @@
             panel?.level = alwaysOnTop ? .floating : .normal
         }
 
+        func toggleDisplayMode() {
+            displayMode = displayMode.alternate
+            UserDefaults.standard.set(displayMode.rawValue, forKey: "worktimePanelDisplayMode")
+            guard let window = panel else { return }
+            guard let frame = displayMode.resizedFrame(
+                previous: window.frame, screens: NSScreen.screens.map(\.visibleFrame)
+            ) else { return }
+            window.setFrame(frame, display: true)
+        }
+
         private func show(model: DesktopModel) {
             guard panel == nil else { return }
             let screens = NSScreen.screens.map(\.visibleFrame)
             guard let screen = screens.first else { return }
-            let defaultFrame = CGRect(x: screen.maxX - 336, y: screen.maxY - 240, width: 320, height: 220)
+            let defaultFrame = CGRect(x: screen.maxX - 336, y: screen.maxY - 320, width: 320, height: 300)
             let preferred = previousFrame ?? defaultFrame
-            guard let frame = PanelPlacement.visibleFrame(preferred: preferred, screens: screens) else { return }
+            guard let frame = displayMode.resizedFrame(previous: preferred, screens: screens) else { return }
             let window = NSPanel(
                 contentRect: frame, styleMask: [.titled, .closable, .nonactivatingPanel],
                 backing: .buffered, defer: false
