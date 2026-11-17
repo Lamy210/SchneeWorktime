@@ -319,15 +319,9 @@
                     Button("キャンセル") { model.cancelReview() }
                     Button("訂正を保存") { model.acceptReview() }
                 }
-            } else if let gap = glance.reviewableGaps.first {
+            } else if !glance.reviewableGaps.isEmpty {
                 Divider()
-                Text("要確認区間（残り\(glance.reviewableGaps.count)件）").font(.headline)
-                Text("\(reviewTimeLabel(gap.start))〜\(reviewTimeLabel(gap.end))").font(.caption)
-                Text("区間全体を分類します。実態が混在する場合は保存しないでください（部分訂正UIは未実装）。")
-                    .font(.caption)
-                Button("勤務継続として確認") { model.prepareReview(selection: gap, classification: .work) }
-                Button("休憩として訂正") { model.prepareReview(selection: gap, classification: .rest) }
-                Button("非勤務として訂正") { model.prepareReview(selection: gap, classification: .gap) }
+                ReviewRangeSettingsView(model: model, glance: glance)
             }
         }
 

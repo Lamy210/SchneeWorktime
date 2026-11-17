@@ -123,8 +123,18 @@
             }
         }
 
-        func prepareReview(selection: ObservationGap, classification: ReviewClassification) {
-            guard var current = controller else { return }
+        func prepareReview(
+            selection: ObservationGap, classification: ReviewClassification,
+            expectedDay: Workday, source: ObservationGap
+        ) {
+            guard ready, !choosingBackupDestination, reviewProposal == nil,
+                  let displayed = glance, displayed.day == expectedDay, displayed.reviewableGaps.contains(source),
+                  selection.start >= source.start, selection.end <= source.end, selection.start < selection.end,
+                  var current = controller
+            else {
+                reviewNotice = "要確認区間が変わったため、選択内容を再確認してください。"
+                return
+            }
             do {
                 let sample = try Self.sample()
                 let proposal = try current.previewReview(
