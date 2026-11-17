@@ -15,23 +15,38 @@ public struct PlannedReminder: Equatable, Sendable {
     public let trigger: Int64
 }
 
+public enum DepartureReminderBasis: Sendable, Equatable {
+    case automatic
+    case explicit(Int64?)
+}
+
 /// Pure desired future requests, not a claim of actual attendance or OS delivery.
 public enum ReminderPlan {
     public static func desired(
         forecast: GoalForecast, now: Int64, clockTrusted: Bool,
         departureLeads: Set<ReminderLead> = [.fifteen],
-        earliestLeads: Set<ReminderLead> = [], referenceAt: Int64? = nil
+        earliestLeads: Set<ReminderLead> = [], referenceAt: Int64? = nil,
+        departureBasis: DepartureReminderBasis = .automatic
     ) -> [PlannedReminder] {
         guard clockTrusted, forecast != .ended else { return [] }
         var result: [PlannedReminder] = []
-        if case let .projected(earliest, departure) = forecast, earliest > now, departure >= earliest {
-            for lead in ReminderLead.allCases {
-                if departureLeads.contains(lead), let trigger = future(departure, lead: lead, now: now) {
-                    result.append(PlannedReminder(kind: .departurePreparation(lead), trigger: trigger))
-                }
-                if earliestLeads.contains(lead), let trigger = future(earliest, lead: lead, now: now) {
-                    result.append(PlannedReminder(kind: .earliestGoal(lead), trigger: trigger))
-                }
+        let automatic: (Int64, Int64)? = if case let .projected(earliest, departure) = forecast,
+                                           earliest > now, departure >= earliest {
+            (earliest, departure)
+        } else {
+            nil
+        }
+        let target: Int64? = switch departureBasis {
+        case .automatic: automatic?.1
+        case let .explicit(value): value
+        }
+        for lead in ReminderLead.allCases {
+            if departureLeads.contains(lead), let target, let trigger = future(target, lead: lead, now: now) {
+                result.append(PlannedReminder(kind: .departurePreparation(lead), trigger: trigger))
+            }
+            if earliestLeads.contains(lead), let earliest = automatic?.0,
+               let trigger = future(earliest, lead: lead, now: now) {
+                result.append(PlannedReminder(kind: .earliestGoal(lead), trigger: trigger))
             }
         }
         if let referenceAt, referenceAt > now {

@@ -59,6 +59,8 @@
                         if glance.day.state != .ended, model.reviewProposal == nil {
                             FutureRestSettingsView(model: model, day: glance.day)
                                 .id(glance.day.id)
+                            DesiredDepartureSettingsView(model: model, day: glance.day)
+                                .id(glance.day.id)
                             DepartureScenarioView(glance: glance)
                         }
                     }
@@ -182,6 +184,7 @@
         private func summary(_ glance: WorktimeGlance) -> some View {
             Text(stateLabel(glance.day.state)).font(.headline)
             forecastLabel(glance.forecast.goal)
+            DesiredDepartureStatusView(glance: glance)
             DepartureCountdownView(
                 countdown: DepartureCountdown(goal: glance.forecast.goal, observedAt: glance.observedAt)
             )

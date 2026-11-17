@@ -205,8 +205,9 @@ public struct WorktimeController {
         guard stored.version == session.version else { throw SnapshotStoreError.staleVersion }
         guard !stored.catalog.days.isEmpty else { return nil }
         let glance = try WorktimeGlance(catalog: stored.catalog, now: sample.wall)
+        let basis = try glance.departureReminderBasis()
         let desired = ReminderPlan.desired(
-            forecast: glance.forecast.goal, now: sample.wall, clockTrusted: true
+            forecast: glance.forecast.goal, now: sample.wall, clockTrusted: true, departureBasis: basis
         )
         return ReminderSyncState(
             epoch: stored.version.epoch, dayID: glance.day.id, revision: stored.version.revision, desired: desired
@@ -317,6 +318,21 @@ public extension WorktimeController {
         session = try repository.setDesiredDeparture(
             dayID: proposal.dayID, candidate: proposal.assessment.scenario.candidate,
             warningAcknowledged: warningAcknowledged, now: sample.wall, expected: proposal.version
+        )
+        clock = updated
+        try saveCheckpoint(sample: sample)
+        return try glance(now: sample.wall)
+    }
+
+    mutating func clearDesiredDeparture(expectedDay: Workday, sample: ClockSample) throws -> WorktimeGlance? {
+        guard session.catalog.days.last == expectedDay, session.catalog.activeID == expectedDay.id else {
+            throw DesiredDepartureSaveError.staleProposal
+        }
+        var updated = clock
+        guard try updated.advance(to: sample) == nil else { throw DesiredDepartureSaveError.staleProposal }
+        session = try repository.setDesiredDeparture(
+            dayID: expectedDay.id, candidate: nil, warningAcknowledged: false,
+            now: sample.wall, expected: session.version
         )
         clock = updated
         try saveCheckpoint(sample: sample)

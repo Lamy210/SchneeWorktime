@@ -31,6 +31,11 @@ public struct DesiredDepartureAssessment: Sendable, Equatable {
 }
 
 public extension WorktimeGlance {
+    func departureReminderBasis() throws -> DepartureReminderBasis {
+        guard let desiredDepartureAt else { return .automatic }
+        return try .explicit(assessDesiredDeparture(at: desiredDepartureAt).notificationTarget)
+    }
+
     /// Reassess against the latest committed snapshot. No hypothetical return time is persisted.
     func assessDesiredDeparture(at candidate: Int64) throws -> DesiredDepartureAssessment {
         let scenario = try departureScenario(candidate: candidate)
