@@ -69,7 +69,8 @@ struct PanelWorkActionTests {
         try catalog.apply(.startBreak, at: 130, now: 130, expectedRevision: catalog.revision)
         let current = PanelActionContext(day: catalog.days.last, enabled: true)
         #expect(current.command(for: .clockOut, matching: old, at: 131, confirmed: true) == nil)
-        #expect(current.command(for: .clockOut, matching: current, at: 131, confirmed: true) == .clockOut(confirmBreak: true))
+        let confirmed = current.command(for: .clockOut, matching: current, at: 131, confirmed: true)
+        #expect(confirmed == .clockOut(confirmBreak: true))
     }
 
     @Test func `shared action gate rejects blocked and same second operations`() throws {
