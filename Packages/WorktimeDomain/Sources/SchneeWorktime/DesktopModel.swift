@@ -325,4 +325,34 @@
             return try ClockSample(wall: wall, uptime: ProcessInfo.processInfo.systemUptime)
         }
     }
+
+    extension DesktopModel {
+        func previewRetrospectiveStart(
+            at instant: Int64, targetMinutes: Int, restMinutes: Int
+        ) throws -> RetrospectiveStartProposal {
+            guard ready, !choosingBackupDestination, reviewProposal == nil, let controller else {
+                throw RetrospectiveStartError.staleProposal
+            }
+            let settings = try NextDaySettings(targetMinutes: targetMinutes, restMinutes: restMinutes)
+            return try controller.previewRetrospectiveStart(
+                at: instant, profile: settings.profile, sample: Self.sample()
+            )
+        }
+
+        func confirmRetrospectiveStart(_ proposal: RetrospectiveStartProposal) throws {
+            guard ready, !choosingBackupDestination, reviewProposal == nil, var current = controller else {
+                throw RetrospectiveStartError.staleProposal
+            }
+            do {
+                glance = try current.commitRetrospectiveStart(proposal, sample: Self.sample())
+                controller = current
+                queueReminders(force: true)
+            } catch let error as RetrospectiveStartError {
+                throw error
+            } catch {
+                fail(error)
+                throw error
+            }
+        }
+    }
 #endif
