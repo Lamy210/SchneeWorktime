@@ -111,3 +111,5 @@
 - [ ] 17.7 次回勤務日用の既定値設定、入力範囲検証、勤務開始時profile固定、退勤候補/今帰る/仮の復帰時刻と実働・過不足の非破壊試算（追加5件、CI待ち。保存済み希望/当日変更/参考時刻は別途）
 
 - [ ] 17.8 ローカル検証用 .app の生成、Info.plist/LSUIElement/macOS 15/実行属性、既存バンドル保護、秘密情報不要のCIでMach-O/Plist/tar生成を確認。Python fixture単体試験5件はLinuxで成功、macOS実ビルド・起動・署名/公証・公開の検証は未完了。
+
+- [ ] 17.9 アプリのDBオープン前にprivate directoryと協調プロセス用flockを取得し、再読込時も保持する。危険な権限・リンク・重複起動を拒否。LocalSessionLockTests 5件を隔離Linux Swift 6.2.1で確認。macOS複数プロセス・DB本体/sidecar保護・ACL・強制終了復旧は別途検証。

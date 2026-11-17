@@ -13,6 +13,7 @@
         @Published private(set) var reviewNotice: String?
 
         private var controller: WorktimeController?
+        private var sessionLock: LocalSessionLock?
 
         init() {
             open(create: false)
@@ -29,15 +30,19 @@
             glance = nil
             do {
                 let url = try databaseURL()
-                if create {
-                    guard !FileManager.default.fileExists(atPath: url.path) else {
-                        message = "既存のデータベースがあります。初期化せず再読込してください。"
-                        return
-                    }
+                let directory = url.deletingLastPathComponent()
+                if create, !FileManager.default.fileExists(atPath: directory.path) {
                     try FileManager.default.createDirectory(
-                        at: url.deletingLastPathComponent(), withIntermediateDirectories: true,
+                        at: directory, withIntermediateDirectories: true,
                         attributes: [.posixPermissions: 0o700]
                     )
+                }
+                if sessionLock == nil {
+                    sessionLock = try LocalSessionLock(directory: directory)
+                }
+                if create, FileManager.default.fileExists(atPath: url.path) {
+                    message = "既存のデータベースがあります。初期化せず再読込してください。"
+                    return
                 }
                 let sample = try Self.sample()
                 var opened = try WorktimeController(url: url, createIfMissing: create, sample: sample)
@@ -133,7 +138,18 @@
             controller = nil
             glance = nil
             ready = false
-            message = "記録を停止：\(error)。時刻・データを確認して再読込してください。"
+            if let lockError = error as? LocalSessionLockError {
+                switch lockError {
+                case .alreadyLocked:
+                    message = "別の起動中のSchneeWorktimeを終了してから再読込してください。"
+                case .unsafeDirectory, .unsafeLockFile:
+                    message = "保存先の所有者・権限・リンクを確認してください。記録は変更しません。"
+                case .system:
+                    message = "保存先の排他ロックを取得できません。記録を停止しました。"
+                }
+            } else {
+                message = "記録を停止：\(error)。時刻・データを確認して再読込してください。"
+            }
         }
 
         private func databaseURL() throws -> URL {
