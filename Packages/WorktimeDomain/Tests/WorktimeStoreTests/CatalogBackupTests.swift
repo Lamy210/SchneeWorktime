@@ -107,6 +107,7 @@ struct CatalogBackupTests {
             #expect(try store.load() == before)
         }
     }
+
     @Test func `validated backup file round trip preserves live data`() throws {
         try withRepository { url, repo in
             let initial = try repo.load(now: 100)
@@ -123,5 +124,4 @@ struct CatalogBackupTests {
             #expect(try repo.load(now: 101).version == saved.version)
         }
     }
-
 }

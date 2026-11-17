@@ -14,7 +14,7 @@ struct BackupFileTests {
     @Test func `complete archive is published privately and round trips`() throws {
         try withDirectory { root in
             let url = root.appendingPathComponent("backup.json")
-            let data = Data(repeating: 42, count: 150000)
+            let data = Data(repeating: 42, count: 150_000)
             try BackupFile.publish(data, to: url)
             #expect(try BackupFile.load(url) == data)
             let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
