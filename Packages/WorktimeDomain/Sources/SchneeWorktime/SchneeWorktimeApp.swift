@@ -1,5 +1,6 @@
 #if os(macOS)
     import SwiftUI
+    import WorktimeApplication
 
     @main
     @MainActor
@@ -7,10 +8,18 @@
         @StateObject private var model = DesktopModel()
 
         var body: some Scene {
-            MenuBarExtra("SchneeWorktime", systemImage: "clock") {
+            MenuBarExtra {
                 WorktimeMenu(model: model)
+            } label: {
+                Label(menuTitle, systemImage: "clock")
+                    .monospacedDigit()
             }
             .menuBarExtraStyle(.window)
+        }
+
+        private var menuTitle: String {
+            guard model.ready, let glance = model.glance else { return "SchneeWorktime" }
+            return DepartureCountdown(goal: glance.forecast.goal, observedAt: glance.observedAt).menuTitle
         }
     }
 #else

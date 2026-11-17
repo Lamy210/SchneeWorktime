@@ -130,6 +130,9 @@
         private func summary(_ glance: WorktimeGlance) -> some View {
             Text(stateLabel(glance.day.state)).font(.headline)
             forecastLabel(glance.forecast.goal)
+            DepartureCountdownView(
+                countdown: DepartureCountdown(goal: glance.forecast.goal, observedAt: glance.observedAt)
+            )
             Text("実働目標：\(glance.day.profile.target / 60)分")
             Text("実働：\(duration(glance.snapshot.bounds.lower ... glance.snapshot.bounds.upper))")
             Text("目標まで：\(duration(glance.forecast.remaining, roundUp: true))")
