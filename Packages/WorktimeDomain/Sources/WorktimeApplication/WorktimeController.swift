@@ -8,6 +8,7 @@ public struct WorktimeGlance: Sendable {
     public let forecast: DailyForecast
     public let reviewableGaps: [ObservationGap]
     public let observedAt: Int64
+    public let desiredDepartureAt: Int64?
 
     public init(catalog: WorkdayCatalog, now: Int64) throws {
         guard let day = catalog.days.last else { throw WorkdayError.noActiveDay }
@@ -18,6 +19,7 @@ public struct WorktimeGlance: Sendable {
         case .ended: .ended
         }
         self.day = day
+        desiredDepartureAt = catalog.desiredDepartures[day.id]
         observedAt = now
         self.snapshot = snapshot
         reviewableGaps = Self.reviewable(day: day, gaps: catalog.observations[day.id] ?? [], now: now)
