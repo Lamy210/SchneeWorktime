@@ -32,7 +32,7 @@ public struct Workday: Sendable, Equatable {
     public let state: WorkdayState
     public let intervals: [RecordedInterval]
     public let revision: UInt64
-    public internal(set) var futureRestPlan: FutureRestPlan? = nil
+    public internal(set) var futureRestPlan: FutureRestPlan?
 
     public func snapshot(now: Int64, uncertainty: [ObservationGap] = []) throws -> TimelineSnapshot {
         guard let last = intervals.last, now >= last.start else { throw WorkdayError.invalidEventTime }
@@ -111,12 +111,18 @@ public struct WorkdayCatalog: Sendable, Equatable {
         guard let day = days.last, activeID == dayID else { throw WorkdayError.noActiveDay }
         guard let last = day.intervals.last, now >= last.start,
               now >= (day.futureRestPlan?.plan.anchor ?? last.start)
-        else { throw WorkdayError.invalidEventTime }
+        else {
+            throw WorkdayError.invalidEventTime
+        }
         if let remainingSeconds, !(0 ... 86400).contains(remainingSeconds) {
             throw WorkdayError.invalidProfile
         }
-        if remainingSeconds == nil, day.futureRestPlan == nil { return }
-        guard revision < UInt64.max else { throw WorkdayError.revisionOverflow }
+        if remainingSeconds == nil, day.futureRestPlan == nil {
+            return
+        }
+        guard revision < UInt64.max else {
+            throw WorkdayError.revisionOverflow
+        }
         let next = revision + 1
         let plan = remainingSeconds.map {
             FutureRestPlan(plan: RestPlan(anchor: now, remainingAtAnchor: $0), revision: next)
