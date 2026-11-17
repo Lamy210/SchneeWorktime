@@ -124,9 +124,18 @@
 
         private var reminderSettings: some View {
             DisclosureGroup("退勤準備の通知") {
-                Text("休憩込み退勤見込みの15分前に通知します。実績の確定ではありません。")
+                Text("休憩込み退勤見込みの選択した時刻に通知します。過ぎた時刻には通知しません。実績の確定ではありません。")
                     .font(.caption)
                 if model.remindersSupported {
+                    ForEach([ReminderLead.thirty, .fifteen, .five], id: \.rawValue) { lead in
+                        Toggle("\(lead.rawValue / 60)分前", isOn: Binding(
+                            get: { model.departureLeads.contains(lead) },
+                            set: { model.setDepartureLead(lead, enabled: $0) }
+                        ))
+                    }
+                    if model.departureLeads.isEmpty {
+                        Text("通知時刻が未選択です。予約は作成されません。").font(.caption)
+                    }
                     if model.remindersEnabled {
                         Button("通知を無効にする") { model.disableReminders() }
                         Button("通知許可を確認する") { model.enableReminders() }
