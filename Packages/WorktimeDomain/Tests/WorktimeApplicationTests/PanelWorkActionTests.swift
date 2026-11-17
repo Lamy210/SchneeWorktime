@@ -58,4 +58,30 @@ struct PanelWorkActionTests {
         #expect(ended.command(for: .resume, at: 120) == .resume(id: id))
         #expect(ended.command(for: .clockOut, at: 120, confirmed: true) == nil)
     }
+
+    @Test func `shared action gate rejects stale confirmation after break cycle`() throws {
+        var catalog = WorkdayCatalog()
+        let profile = try WorkdayProfile()
+        try catalog.apply(.clockIn(id: UUID(), profile: profile), at: 100, now: 100, expectedRevision: 0)
+        try catalog.apply(.startBreak, at: 110, now: 110, expectedRevision: catalog.revision)
+        let old = PanelActionContext(day: catalog.days.last, enabled: true)
+        try catalog.apply(.endBreak, at: 120, now: 120, expectedRevision: catalog.revision)
+        try catalog.apply(.startBreak, at: 130, now: 130, expectedRevision: catalog.revision)
+        let current = PanelActionContext(day: catalog.days.last, enabled: true)
+        #expect(current.command(for: .clockOut, matching: old, at: 131, confirmed: true) == nil)
+        #expect(current.command(for: .clockOut, matching: current, at: 131, confirmed: true) == .clockOut(confirmBreak: true))
+    }
+
+    @Test func `shared action gate rejects blocked and same second operations`() throws {
+        var catalog = WorkdayCatalog()
+        let profile = try WorkdayProfile()
+        let empty = PanelActionContext(day: nil, enabled: true)
+        try catalog.apply(.clockIn(id: UUID(), profile: profile), at: 100, now: 100, expectedRevision: 0)
+        let current = PanelActionContext(day: catalog.days.last, enabled: true)
+        let blocked = PanelActionContext(day: catalog.days.last, enabled: false)
+        #expect(current.command(for: .start, matching: empty, at: 101, profile: profile) == nil)
+        #expect(blocked.command(for: .startBreak, matching: current, at: 101) == nil)
+        #expect(current.command(for: .startBreak, matching: current, at: 100) == nil)
+        #expect(current.command(for: .startBreak, matching: current, at: 101) == .startBreak)
+    }
 }
