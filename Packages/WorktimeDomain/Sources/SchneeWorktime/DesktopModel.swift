@@ -111,16 +111,8 @@
             backupInspection = nil
             inspectionNotice = nil
 
-            let panel = NSOpenPanel()
-            panel.title = "バックアップの内容を確認"
-            panel.prompt = "確認"
-            panel.message = "検証のみ行います。現在の勤務記録を置き換えることはありません。"
-            panel.canChooseFiles = true
-            panel.canChooseDirectories = false
-            panel.allowsMultipleSelection = false
-            panel.resolvesAliases = false
-            panel.directoryURL = try? databaseURL().deletingLastPathComponent()
-            guard panel.runModal() == .OK, let url = panel.url else { return }
+            let directory = try? databaseURL().deletingLastPathComponent()
+            guard let url = BackupInspectionPanel.choose(initialDirectory: directory) else { return }
             do {
                 backupInspection = try BackupInspection(file: url, now: Self.sample().wall)
                 inspectionNotice = "構造と勤務履歴の整合性を確認しました。真正性は保証されません。"
