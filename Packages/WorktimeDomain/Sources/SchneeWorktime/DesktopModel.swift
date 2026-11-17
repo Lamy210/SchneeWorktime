@@ -16,6 +16,9 @@
         @Published private(set) var choosingBackupDestination = false
         @Published private(set) var backupInspection: BackupInspection?
         @Published private(set) var inspectionNotice: String?
+        @Published private(set) var rollbackProposal: WorktimeRollbackProposal?
+        @Published private(set) var rollbackNotice: String?
+        @Published private(set) var rollbackInProgress = false
 
         @Published private(set) var remindersEnabled = UserDefaults.standard.bool(forKey: "departureReminderEnabled")
         @Published private(set) var departureLeads = ReminderLeadSettings.decode(
@@ -49,6 +52,8 @@
         }
 
         func open(create: Bool) {
+            guard !rollbackInProgress, !choosingBackupDestination else { return }
+            rollbackProposal = nil
             cancelReview()
             controller = nil
             ready = false
@@ -105,7 +110,7 @@
         }
 
         func chooseBackupForInspection() {
-            guard !choosingBackupDestination else { return }
+            guard !rollbackInProgress, !choosingBackupDestination else { return }
             choosingBackupDestination = true
             defer { choosingBackupDestination = false }
             backupInspection = nil
@@ -213,6 +218,7 @@
         }
 
         private func tick() {
+            guard !rollbackInProgress else { return }
             guard var current = controller else {
                 queueReminders()
                 return
@@ -221,6 +227,10 @@
                 let previousGoal = glance?.forecast.goal
                 glance = try current.refresh(sample: Self.sample())
                 controller = current
+                if let proposal = rollbackProposal, !current.isCurrent(proposal) {
+                    rollbackProposal = nil
+                    rollbackNotice = "記録が更新されました。復元候補を再選択してください。"
+                }
                 queueReminders(force: previousGoal != glance?.forecast.goal)
                 if let proposal = reviewProposal, !current.isCurrent(proposal) {
                     invalidateReview()
@@ -231,6 +241,7 @@
         }
 
         private func fail(_ error: Error) {
+            rollbackProposal = nil
             cancelReview()
             controller = nil
             glance = nil
@@ -320,7 +331,7 @@
         }
 
         func disableReminders() {
-            guard sessionLock != nil, !requestingReminderPermission else { return }
+            guard !rollbackInProgress, sessionLock != nil, !requestingReminderPermission else { return }
             remindersEnabled = false
             UserDefaults.standard.set(false, forKey: "departureReminderEnabled")
             reminderStatus = "通知予約の取消を確認中"
@@ -342,6 +353,7 @@
         }
 
         private func queueReminders(force: Bool = false) {
+            guard !rollbackInProgress else { return }
             if force {
                 nextReminderCheck = 0
             }
@@ -376,6 +388,96 @@
                 reminderStatus = "macOSの通知設定を確認してください。"
             case .busy, .superseded, .cancellationPending:
                 reminderStatus = "通知予約を再確認します。"
+            }
+        }
+    }
+
+    extension DesktopModel {
+        var canPreviewRollback: Bool {
+            ready && sessionLock != nil && glance?.day.state == .ended &&
+                reviewProposal == nil && !choosingBackupDestination && !rollbackInProgress
+        }
+
+        var canConfirmRollback: Bool {
+            canPreviewRollback && rollbackProposal != nil && reminderCoordinator != nil &&
+                !reminderRunning && !requestingReminderPermission
+        }
+
+        func chooseRollbackSource() {
+            guard canPreviewRollback else { return }
+            rollbackProposal = nil
+            rollbackNotice = nil
+            choosingBackupDestination = true
+            defer { choosingBackupDestination = false }
+            let directory = try? databaseURL().deletingLastPathComponent()
+            guard let source = BackupInspectionPanel.choose(initialDirectory: directory, forRollback: true) else {
+                return
+            }
+            guard ready, sessionLock != nil, glance?.day.state == .ended, reviewProposal == nil,
+                  let controller
+            else {
+                rollbackNotice = "勤務記録が変わりました。復元候補を再選択してください。"
+                return
+            }
+            do {
+                rollbackProposal = try controller.previewRollback(file: source, sample: Self.sample())
+            } catch {
+                rollbackNotice = "復元候補を使用できません。同一世代の以前の終了済み履歴とファイル権限を確認してください。"
+            }
+        }
+
+        func cancelRollback() {
+            guard !rollbackInProgress, !choosingBackupDestination else { return }
+            rollbackProposal = nil
+            rollbackNotice = nil
+        }
+
+        func confirmRollback() {
+            guard canConfirmRollback, let proposal = rollbackProposal else { return }
+            choosingBackupDestination = true
+            let directory = WorktimeExportFormat.backup.chooseDirectory(
+                initialDirectory: try? databaseURL().deletingLastPathComponent()
+            )
+            choosingBackupDestination = false
+            guard let directory else { return }
+            guard canConfirmRollback, let current = controller, current.isCurrent(proposal),
+                  let coordinator = reminderCoordinator
+            else {
+                rollbackProposal = nil
+                rollbackNotice = "記録または通知状態が変わりました。復元候補を再確認してください。"
+                return
+            }
+            let name = "SchneeWorktime-before-rollback-\(UUID().uuidString).json"
+            let destination = directory.appendingPathComponent(name)
+            rollbackInProgress = true
+            ready = false
+            rollbackProposal = nil
+            rollbackNotice = "通知停止と現履歴の保全を確認中"
+            Task {
+                await completeRollback(proposal, destination: destination, coordinator: coordinator)
+            }
+        }
+
+        private func completeRollback(
+            _ proposal: WorktimeRollbackProposal, destination: URL, coordinator: DesktopReminderCoordinator
+        ) async {
+            var committed = false
+            do {
+                let result = try await coordinator.reconcile(latest: { nil }, now: { try Self.sample().wall })
+                if result == .settled, let current = controller, current.isCurrent(proposal), sessionLock != nil {
+                    try current.commitRollback(proposal, preserveCurrentAt: destination, sample: Self.sample())
+                    committed = true
+                    rollbackNotice = "復元しました。保全ファイル：\(destination.path)"
+                } else {
+                    rollbackNotice = "通知停止を確認できないため復元を中止しました。"
+                }
+            } catch {
+                rollbackNotice = "復元を確認できませんでした。再読込結果と保全先を確認してください：\(destination.path)"
+            }
+            rollbackInProgress = false
+            open(create: false)
+            if committed, !ready {
+                rollbackNotice = "復元後の再読込に失敗しました。保全ファイル：\(destination.path)"
             }
         }
     }

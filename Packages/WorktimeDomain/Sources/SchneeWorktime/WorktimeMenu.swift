@@ -85,6 +85,7 @@
                     WorktimeHistoryView(model: model)
                 }
                 backupInspectionSettings
+                BackupRollbackView(model: model)
                 Divider()
                 Button("アプリを終了") { NSApplication.shared.terminate(nil) }
             }
