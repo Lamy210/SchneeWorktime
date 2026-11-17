@@ -41,6 +41,8 @@
 
 - [ ] 6.5 通知候補と既存pendingの差分計算（epoch・勤務日・種類によるID、trigger/revision/payload版の照合、過去・他世代の取消、非所有ID保護、重複/破損検出）を実装。AC-23/25/52/53の計算部分をReminderReconciliationTests 7件とReminderPlanTests 6件で隔離Linux Swift 6.2.1確認。実際の保存版接続、OS呼出し直列化・再検証、権限・取消競合・再試行・配送は未実装。
 
+- [ ] 6.6 UserNotificationsアダプターの権限・pending取得・対象ID限定取消・UTC単発登録・メタデータ照合・プライバシー配慮本文を実装。隔離Linux Swift 6.2.1で共通契約5件成功（GoalForecast型定義を抽出、OS部分は対象外）。macOSコンパイル/実機配送、DesktopModelとの連携、保存revisionの再照合、処理直列化・取消完了確認・再試行は未完了。
+
 ## 7. リリース判定
 - [ ] 7.1 `docs/SchneeWorktime/ACCEPTANCE_MATRIX.md` のP0全件にテストIDを割り当てる（検証: 全P0をテストIDへマッピング（未対応を明示））
 - [ ] 7.2 失敗を隠さずCIをグリーンにし、OS実機テストを実施する（検証: CI実行結果とmacOS QA）
