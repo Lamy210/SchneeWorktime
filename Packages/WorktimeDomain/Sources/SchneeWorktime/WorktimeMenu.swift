@@ -136,25 +136,6 @@
             }
         }
 
-        private var reminderSettings: some View {
-            DisclosureGroup("退勤準備の通知") {
-                Text("休憩込み退勤見込みの15分前に通知します。実績の確定ではありません。")
-                    .font(.caption)
-                if model.remindersSupported {
-                    if model.remindersEnabled {
-                        Button("通知を無効にする") { model.disableReminders() }
-                        Button("通知許可を確認する") { model.enableReminders() }
-                    } else {
-                        Button("通知を有効にする") { model.enableReminders() }
-                    }
-                    Text(model.reminderStatus).font(.caption)
-                } else {
-                    Text("通知は.appからの起動時に利用できます。").font(.caption)
-                }
-            }
-            .disabled(model.requestingReminderPermission)
-        }
-
         private var nextDaySettings: some View {
             DisclosureGroup("次の勤務日の設定") {
                 Text("現在と過去の勤務記録は変更しません。").font(.caption)
@@ -198,61 +179,6 @@
             }
             if glance.day.state == .ended, let end = glance.day.intervals.last?.end {
                 Text("退勤実績：\(timeLabel(end))")
-            }
-        }
-
-        @ViewBuilder
-        private func reviewSection(_ glance: WorktimeGlance) -> some View {
-            if let notice = model.reviewNotice {
-                Text(notice).font(.caption)
-            }
-            if let proposal = model.reviewProposal {
-                Divider()
-                Text("訂正案（未保存）").font(.headline)
-                Text("\(reviewTimeLabel(proposal.selection.start))〜\(reviewTimeLabel(proposal.selection.end))")
-                    .font(.caption)
-                Text("分類：\(classificationLabel(proposal.classification))")
-                Text("試算時刻：\(reviewTimeLabel(proposal.observedAt))").font(.caption)
-                Text("訂正前の実働：\(workedLabel(proposal.before))")
-                Text("訂正後の実働：\(workedLabel(proposal.after))")
-                Text("退勤見込み：\(goalLabel(proposal.before.forecast.goal)) → \(goalLabel(proposal.after.forecast.goal))")
-                    .font(.caption)
-                HStack {
-                    Button("キャンセル") { model.cancelReview() }
-                    Button("訂正を保存") { model.acceptReview() }
-                }
-            } else if let gap = glance.reviewableGaps.first {
-                Divider()
-                Text("要確認区間（残り\(glance.reviewableGaps.count)件）").font(.headline)
-                Text("\(reviewTimeLabel(gap.start))〜\(reviewTimeLabel(gap.end))").font(.caption)
-                Text("区間全体を分類します。実態が混在する場合は保存しないでください（部分訂正UIは未実装）。")
-                    .font(.caption)
-                Button("勤務継続として確認") { model.prepareReview(selection: gap, classification: .work) }
-                Button("休憩として訂正") { model.prepareReview(selection: gap, classification: .rest) }
-                Button("非勤務として訂正") { model.prepareReview(selection: gap, classification: .gap) }
-            }
-        }
-
-        private func classificationLabel(_ classification: ReviewClassification) -> String {
-            switch classification {
-            case .work: "勤務"
-            case .rest: "休憩"
-            case .gap: "非勤務"
-            }
-        }
-
-        private func workedLabel(_ glance: WorktimeGlance) -> String {
-            let bounds = glance.snapshot.bounds
-            return bounds.lower == bounds.upper ? "\(bounds.lower)秒" : "\(bounds.lower)〜\(bounds.upper)秒"
-        }
-
-        private func goalLabel(_ goal: GoalForecast) -> String {
-            switch goal {
-            case let .projected(_, departure): timeLabel(departure)
-            case .reached: "目標達成"
-            case .uncertain: "要確認"
-            case .onBreak: "休憩中"
-            case .ended: "退勤済み"
             }
         }
 
@@ -324,6 +250,91 @@
             let lower = minutes(seconds.lowerBound)
             let upper = minutes(seconds.upperBound)
             return lower == upper ? "\(lower)分" : "\(lower)〜\(upper)分"
+        }
+    }
+
+    extension WorktimeMenu {
+        private var reminderSettings: some View {
+            DisclosureGroup("退勤準備の通知") {
+                Text("休憩込み退勤見込みの選択した時刻に通知します。過ぎた時刻には通知しません。実績の確定ではありません。")
+                    .font(.caption)
+                if model.remindersSupported {
+                    ForEach([ReminderLead.thirty, .fifteen, .five], id: \.rawValue) { lead in
+                        Toggle("\(lead.rawValue / 60)分前", isOn: Binding(
+                            get: { model.departureLeads.contains(lead) },
+                            set: { model.setDepartureLead(lead, enabled: $0) }
+                        ))
+                    }
+                    if model.departureLeads.isEmpty {
+                        Text("通知時刻が未選択です。予約は作成されません。").font(.caption)
+                    }
+                    if model.remindersEnabled {
+                        Button("通知を無効にする") { model.disableReminders() }
+                        Button("通知許可を確認する") { model.enableReminders() }
+                    } else {
+                        Button("通知を有効にする") { model.enableReminders() }
+                    }
+                    Text(model.reminderStatus).font(.caption)
+                } else {
+                    Text("通知は.appからの起動時に利用できます。").font(.caption)
+                }
+            }
+            .disabled(model.requestingReminderPermission)
+        }
+
+        @ViewBuilder
+        private func reviewSection(_ glance: WorktimeGlance) -> some View {
+            if let notice = model.reviewNotice {
+                Text(notice).font(.caption)
+            }
+            if let proposal = model.reviewProposal {
+                Divider()
+                Text("訂正案（未保存）").font(.headline)
+                Text("\(reviewTimeLabel(proposal.selection.start))〜\(reviewTimeLabel(proposal.selection.end))")
+                    .font(.caption)
+                Text("分類：\(classificationLabel(proposal.classification))")
+                Text("試算時刻：\(reviewTimeLabel(proposal.observedAt))").font(.caption)
+                Text("訂正前の実働：\(workedLabel(proposal.before))")
+                Text("訂正後の実働：\(workedLabel(proposal.after))")
+                Text("退勤見込み：\(goalLabel(proposal.before.forecast.goal)) → \(goalLabel(proposal.after.forecast.goal))")
+                    .font(.caption)
+                HStack {
+                    Button("キャンセル") { model.cancelReview() }
+                    Button("訂正を保存") { model.acceptReview() }
+                }
+            } else if let gap = glance.reviewableGaps.first {
+                Divider()
+                Text("要確認区間（残り\(glance.reviewableGaps.count)件）").font(.headline)
+                Text("\(reviewTimeLabel(gap.start))〜\(reviewTimeLabel(gap.end))").font(.caption)
+                Text("区間全体を分類します。実態が混在する場合は保存しないでください（部分訂正UIは未実装）。")
+                    .font(.caption)
+                Button("勤務継続として確認") { model.prepareReview(selection: gap, classification: .work) }
+                Button("休憩として訂正") { model.prepareReview(selection: gap, classification: .rest) }
+                Button("非勤務として訂正") { model.prepareReview(selection: gap, classification: .gap) }
+            }
+        }
+
+        private func classificationLabel(_ classification: ReviewClassification) -> String {
+            switch classification {
+            case .work: "勤務"
+            case .rest: "休憩"
+            case .gap: "非勤務"
+            }
+        }
+
+        private func workedLabel(_ glance: WorktimeGlance) -> String {
+            let bounds = glance.snapshot.bounds
+            return bounds.lower == bounds.upper ? "\(bounds.lower)秒" : "\(bounds.lower)〜\(bounds.upper)秒"
+        }
+
+        private func goalLabel(_ goal: GoalForecast) -> String {
+            switch goal {
+            case let .projected(_, departure): timeLabel(departure)
+            case .reached: "目標達成"
+            case .uncertain: "要確認"
+            case .onBreak: "休憩中"
+            case .ended: "退勤済み"
+            }
         }
     }
 #endif
