@@ -107,4 +107,21 @@ struct CatalogBackupTests {
             #expect(try store.load() == before)
         }
     }
+    @Test func `validated backup file round trip preserves live data`() throws {
+        try withRepository { url, repo in
+            let initial = try repo.load(now: 100)
+            let command = try WorkdayCommand.clockIn(id: UUID(), profile: WorkdayProfile())
+            let saved = try repo.apply(command, at: 100, now: 100, expected: initial.version)
+            let directory = url.deletingLastPathComponent().appendingPathComponent("backups")
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false,
+                                                    attributes: [.posixPermissions: 0o700])
+            let backup = directory.appendingPathComponent("backup.json")
+            try repo.writeBackup(to: backup, now: 101, expected: saved.version)
+            let candidate = try CatalogBackup.inspectFile(at: backup, now: 101)
+            #expect(candidate.version == saved.version)
+            #expect(candidate.catalog == saved.catalog)
+            #expect(try repo.load(now: 101).version == saved.version)
+        }
+    }
+
 }

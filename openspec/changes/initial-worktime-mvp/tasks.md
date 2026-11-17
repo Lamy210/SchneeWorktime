@@ -100,6 +100,7 @@
 - [ ] 14.2 WorkdayCatalogのversioned codec・全不変条件の復元検証・アプリ側保存coordinatorを接続（検証: AC-131〜135/153/154、実際のカタログ往復、破損拒否）
 - [ ] 14.3 複数プロセス・ディスク満杯・強制終了時の障害注入、バックアップ復元・独立削除境界・権限とファイル保護を検証（AC-131〜135/158/159、復旧計画）
   - バックアップ候補のversioned JSONと保存epoch/revisionの照合、サイズ上限、journal replayによる検証APIを追加。上書き・自動復元は行わず、Heartbeatは含めない。回帰試験6件追加（未実行）。実ファイル出力・復元時の新epoch/世代フェンス・破損原本退避・明示確認UI・暗号化/権限検証は別途。
+  - バックアップのファイルI/Oを接続。既存ファイルの上書き禁止、所有者専用の親ディレクトリと0600のファイル、openat/linkatによる完成ファイルの公開、読み込み24MiB上限、リンク/非通常ファイル拒否。Linux Swift 6.2.1でI/O単体試験6件成功。repositoryを含む往復試験1件は未実行。親階層全体・ACL・同一UID・電源断・partial回収・macOS・復元UIは別途。
 
 ## 15. v0.8 — 永続カタログの接続
 - [ ] 15.1 versioned journal・Domain replay・保存coordinator・store version付き訂正案（検証: CatalogRepositoryTests 7件、AC-161〜166、新規CI確認後に完了）
