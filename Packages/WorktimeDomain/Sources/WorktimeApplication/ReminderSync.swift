@@ -72,20 +72,31 @@ public final class ReminderSync {
         _ requests: [ReminderRequest], state: ReminderSyncState?,
         latest: () throws -> ReminderSyncState?, now: () throws -> Int64
     ) async throws -> ReminderSyncResult {
-        var added: [String] = []
-        for request in requests {
-            guard try latest() == state, try now() < request.trigger else {
-                delivery.cancel(ids: added)
-                return .superseded
+        var attempted: [String] = []
+        do {
+            for request in requests {
+                guard try latest() == state, try now() < request.trigger else {
+                    cancelAttempted(attempted)
+                    return .superseded
+                }
+                // A delivery error does not prove the OS rejected the request before accepting it.
+                attempted.append(request.id)
+                try await delivery.schedule(request)
+                guard try latest() == state else {
+                    cancelAttempted(attempted)
+                    return .superseded
+                }
             }
-            try await delivery.schedule(request)
-            added.append(request.id)
-            guard try latest() == state else {
-                delivery.cancel(ids: added)
-                return .superseded
-            }
+            return .settled
+        } catch {
+            cancelAttempted(attempted)
+            throw error
         }
-        return .settled
+    }
+
+    private func cancelAttempted(_ ids: [String]) {
+        guard !ids.isEmpty else { return }
+        delivery.cancel(ids: ids)
     }
 }
 
