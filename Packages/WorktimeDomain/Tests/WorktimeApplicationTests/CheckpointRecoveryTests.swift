@@ -51,7 +51,7 @@ struct CheckpointRecoveryTests {
         try withDatabase { url in
             let repo = try CatalogRepository(url: url, createIfMissing: true)
             let initial = try repo.load(now: 100)
-            let command = WorkdayCommand.clockIn(id: UUID(), profile: try WorkdayProfile())
+            let command = try WorkdayCommand.clockIn(id: UUID(), profile: WorkdayProfile())
             _ = try repo.apply(command, at: 100, now: 100, expected: initial.version)
             var restored = try WorktimeController(url: url, sample: sample(200))
             let result = try restored.refresh(sample: sample(210))
