@@ -48,6 +48,7 @@
 - [ ] 6.7 通知差分の単一セッション内直列化、保存状態の再照合、取消の観測確認、期限再確認、再入/権限拒否/失敗時の結果を実装。ReminderSyncTests 10件とReminderDeliveryTests 5件が隔離Linux Swift 6.2.1で成功（既存GoalForecast型抽出）。DesktopModelからの最新commit取得・権限設定UI・再試行周期・実OSの取消競合と配送は未完了。settledは予約操作正常終了のみを示し、配信保証ではない。
 
 - [ ] 6.8 退勤見込み15分前の通知を明示的permission UIから有効化し、保存revisionと時計観測を再照合、勤務状態変更・最大15秒周期の再調整、無効化時の取消へ接続。回帰試験2件追加（未実行）。他カテゴリ・設定値・希望退勤・OS起床/終了・配信実機・取消競合は未完了。
+  - 通知再照合で保存epoch/revisionとjournal bytesを同一SQLite読取で確認。一致かつ時刻が検証済み範囲以降の場合のみcatalog再利用。異なるbytes/世代/未来eventは拒否し、通知計画の鮮度照合は維持。Store回帰3件追加。SQLite接続・BLOB読取は維持、追加メモリと性能実測は未確認。
 
 ## 7. リリース判定
 - [ ] 7.1 `docs/SchneeWorktime/ACCEPTANCE_MATRIX.md` のP0全件にテストIDを割り当てる（検証: 全P0をテストIDへマッピング（未対応を明示））
