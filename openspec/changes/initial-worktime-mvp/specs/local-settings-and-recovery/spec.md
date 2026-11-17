@@ -120,3 +120,21 @@ The system SHALL serialize erasure with ordinary writes, invalidate all pre-eras
 #### Scenario: Stale edit after erase
 - **WHEN** 全削除以前の訂正画面が保存を試みる
 - **THEN** 旧世代の更新を拒否し削除した勤務日を復活させない
+
+### Requirement: Compare and swap the durable snapshot
+The storage adapter SHALL read the stored epoch and revision inside an exclusive writer transaction before replacing the complete snapshot payload. A mismatch SHALL reject the write. A logical reset SHALL replace the epoch and clear the payload atomically. Physical erasure and backup fencing remain separate requirements.
+
+#### Scenario: Stale independent writer
+- **WHEN** 二つの接続が同じ保存版を読み、先行接続が保存する
+- **THEN** 後続の古い版による保存を拒否し先行のpayloadを維持する
+
+#### Scenario: Logical reset boundary
+- **WHEN** 保存済みpayloadの論理リセット後、削除前のepochで保存する
+- **THEN** 拒否し、空の新世代を維持する
+
+### Requirement: Separate first creation from normal recovery
+The storage adapter SHALL allow database creation only on explicit trusted first initialization. Ordinary reopening SHALL NOT recreate a missing database. An existing uninitialized or unsupported schema SHALL fail rather than being silently replaced.
+
+#### Scenario: Missing or empty existing database
+- **WHEN** 通常起動時にDBが消失している、または既存DBが空である
+- **THEN** エラーを返し新規空DBへの置換を行わない

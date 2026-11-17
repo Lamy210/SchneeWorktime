@@ -24,3 +24,6 @@
 - 未確認: 会社の正式な清算期間・残業規則、macOS実機でのUI/通知/性能。
 
 Domain単体テスト: `swift test --package-path Packages/WorktimeDomain`。Linux Swift 6.2.1で20件成功（実働・退勤試算・区間正規化・残り休憩・普通打刻の状態遷移）。OpenSpec CLIおよびMac実機は未検証。
+
+### 現時点の保存基盤
+PR #7のmacOS CIでDomain 32件成功。WorktimeStoreのSQLite snapshotストアを追加し、隔離Linux SwiftPMで6件成功。まだアプリ本体とWorkdayCatalogのシリアライズは未接続。記録が実際に復元できるアプリが完成したわけではない。OpenSpec CLI strictおよびmacOS実機は未検証。

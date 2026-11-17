@@ -91,4 +91,15 @@ Linux Swift 6.2.1で追加9件・既存11件の計20件成功。実際の競合�
 HistoryReviewTests 6件を追加。部分的な観測解決、休憩と非勤務ギャップの差、現在時刻までの開区間、閉区間終端、未来/ゼロ長/未確認外、重複レビューを対象とする。PR #6のmacOS CIで既存20件と追加6件の計26件成功。HistoryReviewResultは純粋な提案と前後証跡であり、永続監査・履歴訂正のcommit・観測世代・古い観測の再混入防止は未実装。
 
 ## CatalogReviewの追加検証
-CatalogReviewTests 6件を追加。AC-152〜155を中心に、訂正確定と監査の値型整合性、観測世代とrevisionの競合、観測再送防止、過去日の訂正、失敗時の不変性を検証する。新規テストのCI結果は未確認。永続化された監査、多重writer、削除epoch、障害注入、実時計/OS通知は別のテストで扱う。
+CatalogReviewTests 6件を追加。AC-152〜155を中心に、訂正確定と監査の値型整合性、観測世代とrevisionの競合、観測再送防止、過去日の訂正、失敗時の不変性を検証する。PR #7のmacOS CIで計32件成功。永続化された監査、多重writer、削除epoch、障害注入、実時計/OS通知は別のテストで扱う。
+
+## SQLite snapshotストア単体試験
+| Test | 対象 |
+|---|---|
+| snapshot survives reopening | AC-156 |
+| independent connections reject stale writes | AC-157（順次独立接続） |
+| logical reset fences old versions | AC-158（live DBのみ） |
+| invalid payload cannot replace valid snapshot | AC-160（空payload） |
+| missing database is not recreated by existing handle | AC-159（消失） |
+| existing empty database is not initialized | AC-159（既存空DB） |
+新規ストアと同一blob SHAのソース・試験を隔離SwiftPMでLinux Swift 6.2.1 / SQLite 3.46.1にて6件実行成功。リポジトリ全体のmacOS CI・上限超過・真の並行writer・障害注入、カタログcodecと監査の復元・物理削除は未確認。
