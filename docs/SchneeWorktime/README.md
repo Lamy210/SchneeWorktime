@@ -27,3 +27,6 @@ Domain単体テスト: `swift test --package-path Packages/WorktimeDomain`。Lin
 
 ### 現時点の保存基盤
 PR #7のmacOS CIでDomain 32件成功。WorktimeStoreのSQLite snapshotストアを追加し、隔離Linux SwiftPMで6件成功。まだアプリ本体とWorkdayCatalogのシリアライズは未接続。記録が実際に復元できるアプリが完成したわけではない。OpenSpec CLI strictおよびmacOS実機は未検証。
+
+### SQLiteカタログ接続の開発中変更
+WorktimeStoreのCatalogRepositoryとschema v1 journalを追加。勤務日カタログを保存・再生できる実装を用意したが、新規テストのCI結果は未確認。復元性能、上限、過去schema、バックアップの消去境界、UIとの連携は未完。

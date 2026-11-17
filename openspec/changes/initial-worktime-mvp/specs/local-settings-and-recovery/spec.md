@@ -138,3 +138,25 @@ The storage adapter SHALL allow database creation only on explicit trusted first
 #### Scenario: Missing or empty existing database
 - **WHEN** 通常起動時にDBが消失している、または既存DBが空である
 - **THEN** エラーを返し新規空DBへの置換を行わない
+
+### Requirement: Reconstruct the catalog through validated journal replay
+The storage coordinator SHALL encode a versioned journal of accepted operations, replay each through the domain invariants on load, and reject malformed, unsupported, future or impossible histories without overwriting the saved bytes. The durable revision SHALL equal the number of accepted persisted events.
+
+#### Scenario: Reopen with recorded review
+- **WHEN** 出社、観測、部分休憩訂正、退勤を保存し再起動する
+- **THEN** UUID・区間・状態・観測・監査・各世代を同一内容として復元する
+
+#### Scenario: Invalid journal
+- **WHEN** 未開始勤務の休憩開始、破損JSONまたは現在より未来の記録を復元する
+- **THEN** エラーとし原本を上書きしない
+
+### Requirement: Commit before publishing canonical mutations
+The repository SHALL return changed canonical state only after the durable store accepts the expected epoch and revision. A review proposal SHALL carry its original store version as well as its domain version. Duplicate observations SHALL not append a journal event or advance the durable version.
+
+#### Scenario: Review from a prior epoch
+- **WHEN** 論理リセット後に同じ勤務ID・revision・観測世代が再現されても削除前の訂正案で保存する
+- **THEN** 保存epochの相違で拒否し現データを維持する
+
+#### Scenario: Duplicate durable observation
+- **WHEN** 既に受理した観測範囲を同じ保存版で再送する
+- **THEN** payloadの追加保存・store revisionの更新を行わない

@@ -103,3 +103,6 @@ CatalogReviewTests 6件を追加。AC-152〜155を中心に、訂正確定と監
 | missing database is not recreated by existing handle | AC-159（消失） |
 | existing empty database is not initialized | AC-159（既存空DB） |
 新規ストアと同一blob SHAのソース・試験を隔離SwiftPMでLinux Swift 6.2.1 / SQLite 3.46.1にて6件実行成功。リポジトリ全体のmacOS CI・上限超過・真の並行writer・障害注入、カタログcodecと監査の復元・物理削除は未確認。
+
+## SQLiteカタログ連携の試験
+CatalogRepositoryTests 7件を追加: 復元と監査の等価性、独立接続からの古い書込み、重複観測のno-op、不正コマンド時の保持、破損/不可能journal、未来イベント、旧epochの訂正案。新規試験は実行結果未確認（CI待ち）。実並行writer、上限/容量、クラッシュ、バックアップ・旧世代の復元防止、時計異常からの復旧、実機は未確認。
