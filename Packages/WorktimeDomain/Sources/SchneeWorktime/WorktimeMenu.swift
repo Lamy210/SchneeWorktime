@@ -63,6 +63,7 @@
                     nextDaySettings
                     reminderSettings
                     backupSettings
+                    WorktimeHistoryView(model: model)
                 }
                 backupInspectionSettings
                 Divider()

@@ -126,6 +126,10 @@
             inspectionNotice = nil
         }
 
+        func recentHistory() throws -> WorktimeHistory? {
+            try controller?.recentHistory(now: Self.sample().wall)
+        }
+
         func start(targetMinutes: Int, restMinutes: Int) {
             do {
                 let defaults = try NextDaySettings(targetMinutes: targetMinutes, restMinutes: restMinutes)
