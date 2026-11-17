@@ -70,12 +70,7 @@
                     Button("勤務開始") { start(expected: context) }
                         .disabled(!settingsValid || !context.enabled)
                 } else {
-                    Text(model.message ?? "記録を読み込めません")
-                        .font(.caption)
-                    Text("以前の記録がある場合は新規作成せず、アプリ終了後に保存フォルダ全体を保全してください。")
-                        .font(.caption)
-                    Button("既存データを再読込") { model.open(create: false) }
-                    Button("新規データベースを作成") { confirmCreate = true }
+                    unavailableContent
                 }
                 if model.ready {
                     if settingsValid, model.glance == nil || model.glance?.day.state == .ended {
@@ -90,6 +85,22 @@
                 BackupRollbackView(model: model)
                 Divider()
                 Button("アプリを終了") { NSApplication.shared.terminate(nil) }
+            }
+        }
+
+        @ViewBuilder
+        private var unavailableContent: some View {
+            if model.rollbackInProgress {
+                Text("復元中は操作できません。").font(.caption)
+            } else {
+                Text(model.message ?? "記録を読み込めません")
+                    .font(.caption)
+                Text("以前の記録がある場合は新規作成せず、アプリ終了後に保存フォルダ全体を保全してください。")
+                    .font(.caption)
+                Button("既存データを再読込") { model.open(create: false) }
+                    .disabled(model.choosingBackupDestination)
+                Button("新規データベースを作成") { confirmCreate = true }
+                    .disabled(model.choosingBackupDestination)
             }
         }
 
@@ -128,7 +139,7 @@
                         Text("最後の勤務開始：\(reviewTimeLabel(last))").font(.caption)
                     }
                     if inspection.hasActiveDay {
-                        Text("未終了勤務を含みます。復元時には要確認区間が発生します。")
+                        Text("未終了勤務を含むため、限定ロールバックの対象にはできません。")
                             .font(.caption)
                             .foregroundStyle(.orange)
                     }
