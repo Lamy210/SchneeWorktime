@@ -26,7 +26,7 @@ public struct Workday: Sendable, Equatable {
     public let profile: WorkdayProfile
     public let state: WorkdayState
     public let intervals: [RecordedInterval]
-    public let revision: UInt64
+    public internal(set) var revision: UInt64
 
     public func snapshot(now: Int64, uncertainty: [ObservationGap] = []) throws -> TimelineSnapshot {
         guard let last = intervals.last, now >= last.start else { throw WorkdayError.invalidEventTime }
@@ -62,6 +62,7 @@ public struct WorkdayCatalog: Sendable, Equatable {
     public private(set) var observationGeneration: UInt64 = 0
     public private(set) var observations: [UUID: [ObservationGap]] = [:]
     public private(set) var reviewAudit: [WorkdayReviewAudit] = []
+    public private(set) var desiredDepartures: [UUID: Int64] = [:]
 
     public init() {}
 
@@ -139,6 +140,37 @@ public struct WorkdayCatalog: Sendable, Equatable {
         guard instant >= last.start else { throw WorkdayError.invalidEventTime }
         guard instant > last.start else { throw WorkdayError.zeroLengthInterval }
         intervals[intervals.count - 1] = .init(start: last.start, end: instant, kind: last.kind)
+    }
+}
+
+public extension WorkdayCatalog {
+    /// Save an intention without adding or closing actual work intervals.
+    mutating func setDesiredDeparture(
+        dayID: UUID, candidate: Int64?, warningAcknowledged: Bool,
+        now: Int64, expected: ReviewVersion
+    ) throws {
+        try checkVersion(expected)
+        guard var day = days.last, activeID == dayID else { throw WorkdayError.noActiveDay }
+        let snapshot = try snapshot(dayID: dayID, now: now)
+        if let candidate {
+            guard candidate > now else { throw WorkdayError.invalidEventTime }
+            let state: PreviewState = day.state == .working ? .working : .onBreak(returnAt: nil)
+            let preview = try Worktime.preview(
+                bounds: snapshot.bounds, now: now, candidate: candidate,
+                remainingRest: snapshot.remainingRest, state: state
+            )
+            if case let .feasible(worked, _) = preview, worked.lowerBound == worked.upperBound {
+                // A certain forecast can be saved without additional acknowledgement.
+            } else if !warningAcknowledged {
+                throw WorkdayError.confirmationRequired
+            }
+        }
+        guard desiredDepartures[dayID] != candidate else { return }
+        guard revision < UInt64.max else { throw WorkdayError.revisionOverflow }
+        revision += 1
+        day.revision = revision
+        desiredDepartures[dayID] = candidate
+        days[days.count - 1] = day
     }
 }
 
