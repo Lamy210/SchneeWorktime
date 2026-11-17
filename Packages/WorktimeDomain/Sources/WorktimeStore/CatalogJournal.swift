@@ -1,7 +1,7 @@
 import Foundation
 import WorktimeDomain
 
-enum JournalCommand: Codable {
+enum JournalCommand: Codable, Equatable {
     case clockIn(id: UUID, target: Int64, expectedRest: Int64)
     case startBreak, endBreak
     case clockOut(confirmBreak: Bool)
@@ -38,7 +38,7 @@ enum JournalCommand: Codable {
     }
 }
 
-enum JournalClassification: String, Codable {
+enum JournalClassification: String, Codable, Equatable {
     case work, rest, gap
 
     init(_ classification: ReviewClassification) {
@@ -58,13 +58,13 @@ enum JournalClassification: String, Codable {
     }
 }
 
-enum JournalAction: Codable {
+enum JournalAction: Codable, Equatable {
     case command(JournalCommand, at: Int64)
     case observation(dayID: UUID, start: Int64, end: Int64)
     case review(dayID: UUID, start: Int64, end: Int64, classification: JournalClassification)
 }
 
-struct JournalEvent: Codable {
+struct JournalEvent: Codable, Equatable {
     let action: JournalAction
     let now: Int64
 
@@ -83,7 +83,7 @@ struct JournalEvent: Codable {
     }
 }
 
-struct CatalogJournal: Codable {
+struct CatalogJournal: Codable, Equatable {
     var schemaVersion = 1
     var events: [JournalEvent] = []
 

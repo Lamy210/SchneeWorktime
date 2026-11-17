@@ -52,7 +52,7 @@ public enum CatalogBackup {
         return try (snapshot, validateSnapshot(snapshot, now: now))
     }
 
-    private static func validateSnapshot(_ snapshot: StoredSnapshot, now: Int64) throws -> CatalogSession {
+    static func validateSnapshot(_ snapshot: StoredSnapshot, now: Int64) throws -> CatalogSession {
         let journal: CatalogJournal
         if let payload = snapshot.payload {
             guard !payload.isEmpty, snapshot.version.revision > 0 else {
