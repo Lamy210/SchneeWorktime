@@ -40,6 +40,15 @@ public struct PanelActionContext: Sendable, Equatable {
         }
     }
 
+    /// Reject commands captured from an older view or confirmation.
+    public func command(
+        for action: PanelWorkAction, matching expected: Self, at instant: Int64,
+        confirmed: Bool = false, profile: WorkdayProfile? = nil
+    ) -> WorkdayCommand? {
+        guard self == expected else { return nil }
+        return command(for: action, at: instant, confirmed: confirmed, profile: profile)
+    }
+
     public func command(
         for action: PanelWorkAction, at instant: Int64, confirmed: Bool = false,
         profile: WorkdayProfile? = nil, newID: UUID = UUID()
