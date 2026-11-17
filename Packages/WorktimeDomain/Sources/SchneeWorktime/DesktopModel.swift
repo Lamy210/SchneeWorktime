@@ -38,7 +38,7 @@
         private var reminderCoordinator: DesktopReminderCoordinator?
         private var reminderRunning = false
         private var nextReminderCheck: Double = 0
-        private var reminderClockUntrusted = false
+        private var reminderStateUntrusted = false
 
         init() {
             if DesktopReminderCoordinator.supported {
@@ -72,6 +72,8 @@
                 }
                 if create, FileManager.default.fileExists(atPath: url.path) {
                     message = "既存のデータベースがあります。初期化せず再読込してください。"
+                    reminderStateUntrusted = true
+                    queueReminders(force: true)
                     return
                 }
                 let sample = try Self.sample()
@@ -80,7 +82,7 @@
                 controller = opened
                 ready = true
                 message = nil
-                reminderClockUntrusted = false
+                reminderStateUntrusted = false
                 queueReminders(force: true)
             } catch {
                 fail(error)
@@ -212,10 +214,8 @@
             controller = nil
             glance = nil
             ready = false
-            if error is ApplicationClockError {
-                reminderClockUntrusted = true
-                queueReminders(force: true)
-            }
+            reminderStateUntrusted = true
+            queueReminders(force: true)
             if let lockError = error as? LocalSessionLockError {
                 switch lockError {
                 case .alreadyLocked:
@@ -226,7 +226,7 @@
                     message = "保存先の排他ロックを取得できません。記録を停止しました。"
                 }
             } else {
-                message = "記録を停止：\(error)。時刻・データを確認して再読込してください。"
+                message = "記録を停止：\(error)。既存DBを上書きせず、時刻・権限・バックアップを確認してください。"
             }
         }
 
@@ -351,7 +351,7 @@
         }
 
         private func latestReminderState() throws -> ReminderSyncState? {
-            guard remindersEnabled, !reminderClockUntrusted else { return nil }
+            guard remindersEnabled, !reminderStateUntrusted else { return nil }
             guard ready, let controller else { throw ReminderDeliveryError.invalidRequest }
             do {
                 return try controller.reminderState(
@@ -370,7 +370,7 @@
                 nextReminderCheck = 0
             }
             guard let reminderCoordinator, sessionLock != nil, !reminderRunning,
-                  ready || reminderClockUntrusted || !remindersEnabled else { return }
+                  ready || reminderStateUntrusted || !remindersEnabled else { return }
             let uptime = ProcessInfo.processInfo.systemUptime
             guard uptime >= nextReminderCheck else { return }
             nextReminderCheck = uptime + 15
@@ -392,7 +392,7 @@
             switch result {
             case .settled:
                 if remindersEnabled {
-                    reminderStatus = reminderClockUntrusted ? "時計異常のため通知停止" : "通知予約の更新完了（配信はOS依存）"
+                    reminderStatus = reminderStateUntrusted ? "記録または時計を確認できないため通知停止" : "通知予約の更新完了（配信はOS依存）"
                 } else {
                     reminderStatus = "通知は無効です。"
                 }
