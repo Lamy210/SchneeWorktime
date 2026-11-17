@@ -87,50 +87,6 @@
             }
         }
 
-        func chooseBackupDestination(format: WorktimeExportFormat = .backup) {
-            guard ready, sessionLock != nil, controller != nil, !choosingBackupDestination else { return }
-            choosingBackupDestination = true
-            defer { choosingBackupDestination = false }
-
-            let initialDirectory = try? databaseURL().deletingLastPathComponent()
-            guard let directory = format.chooseDirectory(initialDirectory: initialDirectory) else { return }
-            // The modal panel may have allowed observation ticks; consult the current controller after selection.
-            guard ready, sessionLock != nil, let current = controller else {
-                backupNotice = "勤務記録の再読込が必要です。バックアップは作成していません。"
-                return
-            }
-            let name = format.filename
-            let destination = directory.appendingPathComponent(name)
-            do {
-                try format.write(controller: current, to: destination, now: Self.sample().wall)
-                backupNotice = "保存しました：\(name)"
-            } catch {
-                backupNotice = "保存できませんでした。保存先の所有者・権限、空き容量、勤務記録を確認してください。"
-            }
-        }
-
-        func chooseBackupForInspection() {
-            guard !rollbackInProgress, !choosingBackupDestination else { return }
-            choosingBackupDestination = true
-            defer { choosingBackupDestination = false }
-            backupInspection = nil
-            inspectionNotice = nil
-
-            let directory = try? databaseURL().deletingLastPathComponent()
-            guard let url = BackupInspectionPanel.choose(initialDirectory: directory) else { return }
-            do {
-                backupInspection = try BackupInspection(file: url, now: Self.sample().wall)
-                inspectionNotice = "構造と勤務履歴の整合性を確認しました。真正性は保証されません。"
-            } catch {
-                inspectionNotice = "確認できませんでした。形式・所有者・権限・ファイルサイズ・時刻を確認してください。"
-            }
-        }
-
-        func clearBackupInspection() {
-            backupInspection = nil
-            inspectionNotice = nil
-        }
-
         func recentHistory() throws -> WorktimeHistory? {
             try controller?.recentHistory(now: Self.sample().wall)
         }
@@ -277,6 +233,52 @@
                 throw ApplicationClockError.invalidSample
             }
             return try ClockSample(wall: wall, uptime: ProcessInfo.processInfo.systemUptime)
+        }
+    }
+
+    extension DesktopModel {
+        func chooseBackupDestination(format: WorktimeExportFormat = .backup) {
+            guard ready, sessionLock != nil, controller != nil, !choosingBackupDestination else { return }
+            choosingBackupDestination = true
+            defer { choosingBackupDestination = false }
+
+            let initialDirectory = try? databaseURL().deletingLastPathComponent()
+            guard let directory = format.chooseDirectory(initialDirectory: initialDirectory) else { return }
+            // The modal panel may have allowed observation ticks; consult the current controller after selection.
+            guard ready, sessionLock != nil, let current = controller else {
+                backupNotice = "勤務記録の再読込が必要です。バックアップは作成していません。"
+                return
+            }
+            let name = format.filename
+            let destination = directory.appendingPathComponent(name)
+            do {
+                try format.write(controller: current, to: destination, now: Self.sample().wall)
+                backupNotice = "保存しました：\(name)"
+            } catch {
+                backupNotice = "保存できませんでした。保存先の所有者・権限、空き容量、勤務記録を確認してください。"
+            }
+        }
+
+        func chooseBackupForInspection() {
+            guard !rollbackInProgress, !choosingBackupDestination else { return }
+            choosingBackupDestination = true
+            defer { choosingBackupDestination = false }
+            backupInspection = nil
+            inspectionNotice = nil
+
+            let directory = try? databaseURL().deletingLastPathComponent()
+            guard let url = BackupInspectionPanel.choose(initialDirectory: directory) else { return }
+            do {
+                backupInspection = try BackupInspection(file: url, now: Self.sample().wall)
+                inspectionNotice = "構造と勤務履歴の整合性を確認しました。真正性は保証されません。"
+            } catch {
+                inspectionNotice = "確認できませんでした。形式・所有者・権限・ファイルサイズ・時刻を確認してください。"
+            }
+        }
+
+        func clearBackupInspection() {
+            backupInspection = nil
+            inspectionNotice = nil
         }
     }
 
