@@ -64,6 +64,7 @@
                     reminderSettings
                     backupSettings
                 }
+                backupInspectionSettings
                 Divider()
                 Button("アプリを終了") { NSApplication.shared.terminate(nil) }
             }
@@ -82,6 +83,34 @@
                         .font(.caption)
                         .textSelection(.enabled)
                 }
+            }
+        }
+
+        private var backupInspectionSettings: some View {
+            DisclosureGroup("バックアップの内容を確認") {
+                Text("既存の勤務記録を変更せずに、バックアップの構造と履歴を検証します。")
+                    .font(.caption)
+                Button("確認するファイルを選択") { model.chooseBackupForInspection() }
+                    .disabled(model.choosingBackupDestination)
+                if let inspection = model.backupInspection {
+                    Text("勤務日：\(inspection.days)件")
+                    Text("訂正履歴：\(inspection.corrections)件")
+                    Text("保存revision：\(inspection.revision)")
+                    if let first = inspection.firstStart, let last = inspection.lastStart {
+                        Text("最初の勤務開始：\(reviewTimeLabel(first))").font(.caption)
+                        Text("最後の勤務開始：\(reviewTimeLabel(last))").font(.caption)
+                    }
+                    if inspection.hasActiveDay {
+                        Text("未終了勤務を含みます。復元時には要確認区間が発生します。")
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                    }
+                }
+                if let notice = model.inspectionNotice {
+                    Text(notice).font(.caption)
+                    Button("確認結果を閉じる") { model.clearBackupInspection() }
+                }
+                Text("この操作では復元・上書きは行いません。").font(.caption)
             }
         }
 

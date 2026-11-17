@@ -28,8 +28,8 @@
             guard panel == nil else { return }
             let screens = NSScreen.screens.map(\.visibleFrame)
             guard let screen = screens.first else { return }
-            let preferred = previousFrame ?? CGRect(x: screen.maxX - 336, y: screen.maxY - 240,
-                                                   width: 320, height: 220)
+            let defaultFrame = CGRect(x: screen.maxX - 336, y: screen.maxY - 240, width: 320, height: 220)
+            let preferred = previousFrame ?? defaultFrame
             guard let frame = PanelPlacement.visibleFrame(preferred: preferred, screens: screens) else { return }
             let window = NSPanel(
                 contentRect: frame, styleMask: [.titled, .closable, .nonactivatingPanel],

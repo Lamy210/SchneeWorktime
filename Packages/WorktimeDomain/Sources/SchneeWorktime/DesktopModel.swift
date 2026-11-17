@@ -14,6 +14,8 @@
         @Published private(set) var reviewNotice: String?
         @Published private(set) var backupNotice: String?
         @Published private(set) var choosingBackupDestination = false
+        @Published private(set) var backupInspection: BackupInspection?
+        @Published private(set) var inspectionNotice: String?
 
         @Published private(set) var remindersEnabled = UserDefaults.standard.bool(forKey: "departureReminderEnabled")
         @Published private(set) var reminderStatus = ""
@@ -100,6 +102,28 @@
             } catch {
                 backupNotice = "保存できませんでした。保存先の所有者・権限、空き容量、勤務記録を確認してください。"
             }
+        }
+
+        func chooseBackupForInspection() {
+            guard !choosingBackupDestination else { return }
+            choosingBackupDestination = true
+            defer { choosingBackupDestination = false }
+            backupInspection = nil
+            inspectionNotice = nil
+
+            let directory = try? databaseURL().deletingLastPathComponent()
+            guard let url = BackupInspectionPanel.choose(initialDirectory: directory) else { return }
+            do {
+                backupInspection = try BackupInspection(file: url, now: Self.sample().wall)
+                inspectionNotice = "構造と勤務履歴の整合性を確認しました。真正性は保証されません。"
+            } catch {
+                inspectionNotice = "確認できませんでした。形式・所有者・権限・ファイルサイズ・時刻を確認してください。"
+            }
+        }
+
+        func clearBackupInspection() {
+            backupInspection = nil
+            inspectionNotice = nil
         }
 
         func start(targetMinutes: Int, restMinutes: Int) {

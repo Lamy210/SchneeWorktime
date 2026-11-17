@@ -1,5 +1,9 @@
 import Foundation
 
+#if canImport(CoreGraphics)
+    import CoreGraphics
+#endif
+
 /// Keep a panel inside the usable screen rectangle; use the primary screen if the old screen is gone.
 public enum PanelPlacement {
     public static func visibleFrame(preferred: CGRect, screens: [CGRect]) -> CGRect? {
