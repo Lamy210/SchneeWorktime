@@ -1,4 +1,5 @@
 #if os(macOS)
+    import AppKit
     import Combine
     import Foundation
     import WorktimeApplication
@@ -11,6 +12,8 @@
         @Published private(set) var message: String?
         @Published private(set) var reviewProposal: WorktimeReviewProposal?
         @Published private(set) var reviewNotice: String?
+        @Published private(set) var backupNotice: String?
+        @Published private(set) var choosingBackupDestination = false
 
         @Published private(set) var remindersEnabled = UserDefaults.standard.bool(forKey: "departureReminderEnabled")
         @Published private(set) var reminderStatus = ""
@@ -65,6 +68,37 @@
                 queueReminders(force: true)
             } catch {
                 fail(error)
+            }
+        }
+
+        func chooseBackupDestination() {
+            guard ready, sessionLock != nil, controller != nil, !choosingBackupDestination else { return }
+            choosingBackupDestination = true
+            defer { choosingBackupDestination = false }
+
+            let panel = NSOpenPanel()
+            panel.title = "勤務履歴バックアップの保存先"
+            panel.prompt = "このフォルダに保存"
+            panel.message = "勤務履歴は暗号化されません。所有者だけがアクセスできるローカルフォルダを選択してください。"
+            panel.canChooseFiles = false
+            panel.canChooseDirectories = true
+            panel.allowsMultipleSelection = false
+            panel.canCreateDirectories = false
+            panel.directoryURL = try? databaseURL().deletingLastPathComponent()
+
+            guard panel.runModal() == .OK, let directory = panel.url else { return }
+            // The modal panel may have allowed observation ticks; consult the current controller after selection.
+            guard ready, sessionLock != nil, let current = controller else {
+                backupNotice = "勤務記録の再読込が必要です。バックアップは作成していません。"
+                return
+            }
+            let name = "SchneeWorktime-backup-\(UUID().uuidString).json"
+            let destination = directory.appendingPathComponent(name)
+            do {
+                try current.writeBackup(to: destination, now: Self.sample().wall)
+                backupNotice = "保存しました：\(name)"
+            } catch {
+                backupNotice = "保存できませんでした。保存先の所有者・権限、空き容量、勤務記録を確認してください。"
             }
         }
 
