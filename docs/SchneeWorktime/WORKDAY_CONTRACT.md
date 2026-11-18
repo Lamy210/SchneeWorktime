@@ -114,3 +114,7 @@ Detailed rationale: `FORECAST_SEMANTICS.md`, `NOTIFICATION_POLICY.md`.
 - `previewReview` は対象日とversion、訂正前後の区間・観測を返す。 `commitReview` は現在時刻で計算をやり直し、両世代と前後証跡が一致した場合に限りその日・観測・監査を値型として一体更新する。未来・時計逆転・競合・範囲不正は拒否し状態を変えない。
 - 明示解決済み範囲は同じ日の新しい観測から除く。新規観測で実績訂正を上書きしない。過去のended日への訂正は現在activeな日に影響しない。アプリの計算はcatalogのsnapshotを使用して観測を見落とさない。
 - 永続化・削除epoch・監査の耐障害性・他プロセス排他、解決済み分類の再訂正は未実装。観測の理由や信頼された時計のadapterも残る。
+
+## 記録済み休憩終了の訂正（AC-10の保存基盤）
+
+隣接する閉じた休憩と勤務の共有境界だけを前後に変更する。ゼロ長・未来・非隣接・要確認区間との交差は拒否し、勤務日の開始・終了・状態・予定休憩・他勤務日は維持する。確認時は両Domain世代、store epoch/revision、保存済みsnapshotと訂正前後を照合する。監査の由来はrecordedRestEnd、CSVではrest_end_correction（列構成は維持）。新journal eventは旧版で読めないため更新後のダウングレードは禁止。UIの明示確認・通知再計算・AC-10全体の受入は後続。最新CI未確認。

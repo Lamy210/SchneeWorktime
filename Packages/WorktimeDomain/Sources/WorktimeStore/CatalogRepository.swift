@@ -27,6 +27,21 @@ public struct CatalogSession: Sendable {
     }
 }
 
+public struct StoredRestEndCorrection: Sendable {
+    public let version: StoreVersion
+    public let preview: RestEndCorrectionPreview
+    fileprivate let source: StoredSnapshot
+}
+
+public extension CatalogSession {
+    func previewRestEndCorrection(
+        dayID: UUID, oldEnd: Int64, newEnd: Int64, now: Int64
+    ) throws -> StoredRestEndCorrection {
+        let preview = try catalog.previewRestEndCorrection(dayID: dayID, oldEnd: oldEnd, newEnd: newEnd, now: now)
+        return StoredRestEndCorrection(version: version, preview: preview, source: validatedSnapshot)
+    }
+}
+
 public struct StoredReviewPreview: Sendable {
     public let version: StoreVersion
     public let preview: CatalogReviewPreview
@@ -112,6 +127,19 @@ public struct CatalogRepository: Sendable {
         var catalog = loaded.session.catalog
         try catalog.commitReview(preview, now: now)
         return try commit(event, catalog: catalog, loaded: &loaded)
+    }
+
+    public func commitRestEndCorrection(
+        _ proposal: StoredRestEndCorrection, now: Int64
+    ) throws -> CatalogSession {
+        var loaded = try read(now: now)
+        guard loaded.session.version == proposal.version else { throw SnapshotStoreError.staleVersion }
+        guard loaded.session.validatedSnapshot == proposal.source else { throw CatalogPersistenceError.invalidJournal }
+        var catalog = loaded.session.catalog
+        try catalog.commitRestEndCorrection(proposal.preview, now: now)
+        let preview = proposal.preview
+        let action = JournalAction.correctRestEnd(dayID: preview.dayID, oldEnd: preview.oldEnd, newEnd: preview.newEnd)
+        return try commit(JournalEvent(action: action, now: now), catalog: catalog, loaded: &loaded)
     }
 
     public func loadObservationCheckpoint(expected: StoreVersion) throws -> ObservationCheckpoint? {
