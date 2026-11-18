@@ -23,7 +23,7 @@ public struct SnapshotStore: Sendable {
 
     public init(url: URL, createIfMissing: Bool = false) throws {
         self.url = url
-        let create = createIfMissing && !FileManager.default.fileExists(atPath: url.path)
+        let create = try DatabaseFileGuard.prepare(url, createIfMissing: createIfMissing)
         try connection(create: create) { db in
             try Self.transaction(db) {
                 let schema = try Self.scalar(db, "PRAGMA user_version")
@@ -139,8 +139,9 @@ public struct SnapshotStore: Sendable {
     }
 
     private func connection<T>(create: Bool = false, _ body: (OpaquePointer) throws -> T) throws -> T {
+        try DatabaseFileGuard.validate(url)
         var handle: OpaquePointer?
-        let flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX | (create ? SQLITE_OPEN_CREATE : 0)
+        let flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX | SQLITE_OPEN_NOFOLLOW
         let status = sqlite3_open_v2(url.path, &handle, flags, nil)
         defer { sqlite3_close(handle) }
         guard status == SQLITE_OK, let db = handle else { throw SnapshotStoreError.sqlite(status) }
