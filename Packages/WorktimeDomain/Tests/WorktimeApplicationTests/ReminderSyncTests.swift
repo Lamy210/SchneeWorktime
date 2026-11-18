@@ -13,6 +13,7 @@ private final class FakeReminderDelivery: ReminderDelivery {
     var onPending: (() async -> Void)?
     var onSchedule: (() -> Void)?
     var error: ReminderDeliveryError?
+    var errorAfterSchedule: ReminderDeliveryError?
 
     func authorization() async -> ReminderAuthorization {
         permission
@@ -43,6 +44,9 @@ private final class FakeReminderDelivery: ReminderDelivery {
         requests.append(PendingReminder(id: request.id, trigger: request.trigger, revision: request.revision,
                                         payloadVersion: request.payloadVersion))
         onSchedule?()
+        if let errorAfterSchedule {
+            throw errorAfterSchedule
+        }
     }
 }
 
@@ -163,6 +167,52 @@ struct ReminderSyncTests {
         }
         #expect(delivery.scheduled.isEmpty)
         #expect(delivery.removed.isEmpty)
+    }
+
+    @Test func `failed freshness read after registration cancels newly attempted notification`() async throws {
+        let delivery = FakeReminderDelivery()
+        let sync = ReminderSync(delivery: delivery)
+        let value = state()
+        let foreign = PendingReminder(id: "foreign", trigger: 100, revision: nil, payloadVersion: nil)
+        delivery.requests = [foreign]
+        var readFailed = false
+        delivery.onSchedule = { readFailed = true }
+        await #expect(throws: ReminderDeliveryError.invalidRequest) {
+            try await sync.reconcile(latest: {
+                guard !readFailed else { throw ReminderDeliveryError.invalidRequest }
+                return value
+            }, now: { 0 })
+        }
+        #expect(delivery.removed == delivery.scheduled.map(\.id))
+        #expect(delivery.requests == [foreign])
+    }
+
+    @Test func `partial registration failure cancels all attempted ids and allows retry`() async throws {
+        let delivery = FakeReminderDelivery()
+        let sync = ReminderSync(delivery: delivery)
+        let plan = ReminderPlan.desired(
+            forecast: .projected(earliestGoalAt: 3600, estimatedDepartureAt: 3600),
+            now: 0, clockTrusted: true, departureLeads: [.fifteen, .five]
+        )
+        let value = ReminderSyncState(epoch: epoch, dayID: dayID, revision: 1, desired: plan)
+        let foreign = PendingReminder(id: "foreign", trigger: 100, revision: nil, payloadVersion: nil)
+        delivery.requests = [foreign]
+        delivery.onSchedule = {
+            if delivery.scheduled.count == 2 {
+                delivery.errorAfterSchedule = .permissionUnavailable
+            }
+        }
+        await #expect(throws: ReminderDeliveryError.permissionUnavailable) {
+            try await sync.reconcile(latest: { value }, now: { 0 })
+        }
+        #expect(Set(delivery.removed) == Set(delivery.scheduled.map(\.id)))
+        #expect(delivery.requests == [foreign])
+        delivery.onSchedule = nil
+        delivery.errorAfterSchedule = nil
+        let result = try await sync.reconcile(latest: { value }, now: { 0 })
+        #expect(result == .settled)
+        #expect(delivery.requests.count == 3)
+        #expect(delivery.requests.contains(foreign))
     }
 
     @Test func `scheduling error is retryable and never sticks busy flag`() async throws {
