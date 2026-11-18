@@ -22,8 +22,8 @@ public struct SnapshotStore: Sendable {
     private static let maxPayload = 16 * 1024 * 1024
 
     public init(url: URL, createIfMissing: Bool = false) throws {
-        self.url = url
-        let create = createIfMissing && !FileManager.default.fileExists(atPath: url.path)
+        self.url = try DatabaseFileGuard.canonicalURL(url)
+        let create = try DatabaseFileGuard.prepare(self.url, createIfMissing: createIfMissing)
         try connection(create: create) { db in
             try Self.transaction(db) {
                 let schema = try Self.scalar(db, "PRAGMA user_version")
@@ -139,11 +139,15 @@ public struct SnapshotStore: Sendable {
     }
 
     private func connection<T>(create: Bool = false, _ body: (OpaquePointer) throws -> T) throws -> T {
+        let identity = try DatabaseFileGuard.identity(url)
         var handle: OpaquePointer?
-        let flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX | (create ? SQLITE_OPEN_CREATE : 0)
+        // The app-private directory and session lock are the primary boundary.
+        // SQLite NOFOLLOW rejected ordinary macOS paths in CI; verify identity around open instead.
+        let flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX
         let status = sqlite3_open_v2(url.path, &handle, flags, nil)
         defer { sqlite3_close(handle) }
         guard status == SQLITE_OK, let db = handle else { throw SnapshotStoreError.sqlite(status) }
+        guard try DatabaseFileGuard.identity(url) == identity else { throw DatabaseFileError.unsafeFile }
         try Self.check(sqlite3_busy_timeout(db, 5000))
         try Self.execute(db, "PRAGMA synchronous = FULL")
         try Self.execute(db, "PRAGMA trusted_schema = OFF")

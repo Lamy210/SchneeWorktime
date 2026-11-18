@@ -67,8 +67,8 @@ struct SnapshotStoreTests {
     @Test func `missing database is not recreated by existing handle`() throws {
         try withStore { url, store in
             try FileManager.default.removeItem(at: url)
-            #expect(throws: SnapshotStoreError.self) { try store.load() }
-            #expect(throws: SnapshotStoreError.self) { try SnapshotStore(url: url) }
+            #expect(throws: DatabaseFileError.self) { try store.load() }
+            #expect(throws: DatabaseFileError.self) { try SnapshotStore(url: url) }
             #expect(!FileManager.default.fileExists(atPath: url.path))
         }
     }
@@ -77,6 +77,7 @@ struct SnapshotStoreTests {
         try withStore { url, _ in
             try FileManager.default.removeItem(at: url)
             try Data().write(to: url)
+            try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
             #expect(throws: SnapshotStoreError.unsupportedSchema) {
                 try SnapshotStore(url: url, createIfMissing: true)
             }
