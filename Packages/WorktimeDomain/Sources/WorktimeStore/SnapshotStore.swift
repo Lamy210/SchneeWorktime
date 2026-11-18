@@ -118,10 +118,18 @@ public struct SnapshotStore: Sendable {
     /// Old backups and filesystem remnants are not erased by this operation.
     @discardableResult
     public func reset(expected: StoreVersion) throws -> StoreVersion {
+        try reset(expected: expected, matching: nil)
+    }
+
+    /// When confirmed by a catalog preview, fence the exact bytes inside the write transaction.
+    func reset(expected: StoreVersion, matching snapshot: StoredSnapshot?) throws -> StoreVersion {
         try connection { db in
             try Self.transaction(db) {
                 let current = try Self.read(db)
                 guard current.version == expected else { throw SnapshotStoreError.staleVersion }
+                if let snapshot, current != snapshot {
+                    throw CatalogPersistenceError.invalidJournal
+                }
                 let next = StoreVersion(epoch: UUID(), revision: 0)
                 try Self.write(db, version: next, payload: nil)
                 try Self.execute(db, "DROP TABLE IF EXISTS observation_checkpoint")

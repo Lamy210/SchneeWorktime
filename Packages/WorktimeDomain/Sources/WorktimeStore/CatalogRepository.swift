@@ -248,7 +248,7 @@ public extension CatalogRepository {
         let current = try load(now: now)
         guard current.version == proposal.version else { throw SnapshotStoreError.staleVersion }
         guard current.validatedSnapshot == proposal.source else { throw CatalogPersistenceError.invalidJournal }
-        let version = try store.reset(expected: proposal.version)
+        let version = try store.reset(expected: proposal.version, matching: proposal.source)
         return try CatalogBackup.validateSnapshot(StoredSnapshot(version: version, payload: nil), now: now)
     }
 }
