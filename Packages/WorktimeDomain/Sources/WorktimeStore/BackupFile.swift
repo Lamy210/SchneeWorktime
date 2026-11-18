@@ -11,10 +11,10 @@ public enum BackupFileError: Error, Equatable {
 }
 
 /// Local plaintext archive I/O. A private directory is required; this is not protection against the same user.
-enum BackupFile {
+package enum BackupFile {
     static let maxBytes = 24 * 1024 * 1024
 
-    static func publish(_ data: Data, to url: URL) throws {
+    package static func publish(_ data: Data, to url: URL) throws {
         guard data.count <= maxBytes else { throw BackupFileError.tooLarge }
         try withDirectory(url) { directory, name in
             let temp = ".worktime-\(UUID().uuidString).partial"

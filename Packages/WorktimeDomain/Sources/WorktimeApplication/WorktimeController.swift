@@ -460,3 +460,16 @@ public extension WorktimeController {
         session.version == summary.version
     }
 }
+
+public extension WorktimeController {
+    /// Export exactly the displayed committed summary after revalidating its source.
+    func writeSummaryCSV(_ displayed: WorktimeSummary, to url: URL, sample: ClockSample) throws {
+        let current = try summary(period: displayed.period, sample: sample, previous: displayed)
+        guard current.daily == displayed.daily, current.worked == displayed.worked,
+              current.target == displayed.target, current.recordedRest == displayed.recordedRest,
+              current.endedDays == displayed.endedDays, current.uncertainDays == displayed.uncertainDays,
+              current.dailyShortfall == displayed.dailyShortfall, current.dailySurplus == displayed.dailySurplus
+        else { throw WorktimeSummaryError.staleSummary }
+        try BackupFile.publish(WorktimeSummaryCSV.encode(displayed), to: url)
+    }
+}
