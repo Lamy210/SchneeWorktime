@@ -138,10 +138,11 @@
 
         func prepareReview(
             selection: ObservationGap, classification: ReviewClassification,
-            expectedDay: Workday, source: ObservationGap
+            expectedDay: Workday, source: ObservationGap, historical: HistoricalReviewContext? = nil
         ) {
             guard ready, !choosingBackupDestination, reviewProposal == nil,
-                  let displayed = glance, displayed.day == expectedDay, displayed.reviewableGaps.contains(source),
+                  let displayed = historical?.glance ?? glance,
+                  displayed.day == expectedDay, displayed.reviewableGaps.contains(source),
                   selection.start >= source.start, selection.end <= source.end, selection.start < selection.end,
                   var current = controller
             else {
@@ -150,14 +151,23 @@
             }
             do {
                 let sample = try Self.sample()
-                let proposal = try current.previewReview(
-                    selection: selection, classification: classification, sample: sample
-                )
-                glance = proposal.before
+                let proposal: WorktimeReviewProposal
+                if let historical {
+                    proposal = try current.previewHistoricalReview(
+                        historical, selection: selection, source: source, classification: classification, sample: sample
+                    )
+                } else {
+                    proposal = try current.previewReview(
+                        selection: selection, classification: classification, sample: sample
+                    )
+                    glance = proposal.before
+                }
                 controller = current
                 reviewProposal = proposal
                 reviewNotice = nil
                 queueReminders(force: true)
+            } catch HistoricalReviewError.staleContext {
+                reviewNotice = "履歴が更新されました。過去勤務日を再選択してください。"
             } catch {
                 fail(error)
             }

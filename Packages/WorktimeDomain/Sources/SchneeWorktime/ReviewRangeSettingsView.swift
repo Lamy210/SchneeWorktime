@@ -8,6 +8,7 @@
     struct ReviewRangeSettingsView: View {
         @ObservedObject var model: DesktopModel
         let glance: WorktimeGlance
+        var historical: HistoricalReviewContext?
         @State private var selectedIndex = 0
 
         var body: some View {
@@ -21,7 +22,9 @@
                 if glance.reviewableGaps.indices.contains(selectedIndex) {
                     let gap = glance.reviewableGaps[selectedIndex]
                     if let duration = ReviewRangeSelection.duration(of: gap) {
-                        ReviewRangeEditor(model: model, day: glance.day, gap: gap, duration: duration)
+                        ReviewRangeEditor(
+                            model: model, day: glance.day, gap: gap, duration: duration, historical: historical
+                        )
                             .id("\(glance.day.id)-\(glance.day.revision)-\(gap.start)-\(gap.end)")
                     }
                 }
@@ -37,14 +40,19 @@
         let day: Workday
         let gap: ObservationGap
         let duration: Int64
+        let historical: HistoricalReviewContext?
         @State private var startOffset = "0"
         @State private var endOffset: String
 
-        init(model: DesktopModel, day: Workday, gap: ObservationGap, duration: Int64) {
+        init(
+            model: DesktopModel, day: Workday, gap: ObservationGap, duration: Int64,
+            historical: HistoricalReviewContext?
+        ) {
             self.model = model
             self.day = day
             self.gap = gap
             self.duration = duration
+            self.historical = historical
             _endOffset = State(initialValue: String(duration))
         }
 
@@ -80,7 +88,10 @@
         }
 
         private func prepare(_ selection: ObservationGap, as classification: ReviewClassification) {
-            model.prepareReview(selection: selection, classification: classification, expectedDay: day, source: gap)
+            model.prepareReview(
+                selection: selection, classification: classification, expectedDay: day, source: gap,
+                historical: historical
+            )
         }
     }
 

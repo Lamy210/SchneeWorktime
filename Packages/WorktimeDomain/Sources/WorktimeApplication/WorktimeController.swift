@@ -10,8 +10,13 @@ public struct WorktimeGlance: Sendable {
     public let observedAt: Int64
     public let desiredDepartureAt: Int64?
 
-    public init(catalog: WorkdayCatalog, now: Int64) throws {
-        guard let day = catalog.days.last else { throw WorkdayError.noActiveDay }
+    public init(catalog: WorkdayCatalog, now: Int64, dayID: UUID? = nil) throws {
+        let selected = if let dayID {
+            catalog.days.first(where: { $0.id == dayID })
+        } else {
+            catalog.days.last
+        }
+        guard let day = selected else { throw WorkdayError.noActiveDay }
         let snapshot = try catalog.snapshot(dayID: day.id, now: now)
         let state: PreviewState = switch day.state {
         case .working: .working
@@ -128,7 +133,7 @@ public struct WorktimeController {
     }
 
     public func isCurrent(_ proposal: WorktimeReviewProposal) -> Bool {
-        session.version == proposal.stored.version && session.catalog.days.last?.id == proposal.before.day.id
+        session.version == proposal.stored.version && session.catalog.days.contains(proposal.before.day)
     }
 
     public mutating func commitReview(
@@ -385,5 +390,48 @@ public extension WorktimeController {
         var checked = clock
         _ = try checked.advance(to: sample)
         _ = try repository.commitRollback(proposal.stored, preserveCurrentAt: destination, now: sample.wall)
+    }
+}
+
+public extension WorktimeController {
+    /// Select only a completed historical day from the exact displayed history snapshot.
+    func historicalReviewContext(
+        dayID: UUID, history: WorktimeHistory, sample: ClockSample
+    ) throws -> HistoricalReviewContext {
+        var checked = clock
+        _ = try checked.advance(to: sample)
+        let stored = try repository.revalidate(session, now: sample.wall)
+        guard stored.version == history.version, stored.catalog.activeID == nil,
+              history.rows.contains(where: { $0.id == dayID }), stored.catalog.days.last?.id != dayID
+        else { throw HistoricalReviewError.staleContext }
+        let selected = try WorktimeGlance(catalog: stored.catalog, now: sample.wall, dayID: dayID)
+        guard selected.day.state == .ended else { throw HistoricalReviewError.staleContext }
+        return HistoricalReviewContext(version: stored.version, glance: selected)
+    }
+
+    func isCurrent(_ context: HistoricalReviewContext) -> Bool {
+        session.version == context.version && session.catalog.activeID == nil &&
+            session.catalog.days.contains(context.glance.day)
+    }
+
+    /// Value-copy preview of a historical day without changing the latest glance or writing a journal.
+    func previewHistoricalReview(
+        _ context: HistoricalReviewContext, selection: ObservationGap,
+        source: ObservationGap, classification: ReviewClassification, sample: ClockSample
+    ) throws -> WorktimeReviewProposal {
+        guard isCurrent(context), context.glance.reviewableGaps.contains(source),
+              selection.start >= source.start, selection.end <= source.end, selection.start < selection.end
+        else { throw HistoricalReviewError.staleContext }
+        var checked = clock
+        _ = try checked.advance(to: sample)
+        let current = try repository.revalidate(session, now: sample.wall)
+        let id = context.glance.day.id
+        let before = try WorktimeGlance(catalog: current.catalog, now: sample.wall, dayID: id)
+        let stored = try current.previewReview(dayID: id, selection: selection,
+                                               classification: classification, now: sample.wall)
+        var proposed = current.catalog
+        try proposed.commitReview(stored.preview, now: sample.wall)
+        let after = try WorktimeGlance(catalog: proposed, now: sample.wall, dayID: id)
+        return WorktimeReviewProposal(stored: stored, before: before, after: after)
     }
 }
