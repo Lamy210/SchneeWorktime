@@ -2,7 +2,7 @@ import Foundation
 import WorktimeDomain
 
 public enum CatalogPersistenceError: Error, Equatable {
-    case unsupportedSchema, invalidJournal, futureEvent, eventLimit
+    case unsupportedSchema, invalidJournal, futureEvent, eventLimit, insufficientStartCapacity
 }
 
 public struct CatalogSession: Sendable {
@@ -125,6 +125,10 @@ public struct CatalogRepository: Sendable {
     private func mutate(_ event: JournalEvent, expected: StoreVersion) throws -> CatalogSession {
         var loaded = try read(now: event.now)
         guard loaded.session.version == expected else { throw SnapshotStoreError.staleVersion }
+        if case let .command(command, _) = event.action, command.opensWorkday,
+           !loaded.session.journalCapacity.canOpenWorkday {
+            throw CatalogPersistenceError.insufficientStartCapacity
+        }
         var catalog = loaded.session.catalog
         try event.apply(to: &catalog)
         if catalog == loaded.session.catalog {
