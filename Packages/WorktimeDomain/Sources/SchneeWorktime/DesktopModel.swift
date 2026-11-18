@@ -200,7 +200,7 @@
                 cancelReview()
                 queueReminders(force: true)
             } catch {
-                if current.isCurrent(proposal) {
+                if error is CommittedCheckpointError || current.isCurrent(proposal) {
                     fail(error)
                 } else {
                     do {
@@ -251,7 +251,9 @@
             ready = false
             reminderStateUntrusted = true
             queueReminders(force: true)
-            if let lockError = error as? LocalSessionLockError {
+            if error is CommittedCheckpointError {
+                message = "操作は保存済みですが観測情報の保存に失敗しました。再操作せず既存データを再読込してください。"
+            } else if let lockError = error as? LocalSessionLockError {
                 switch lockError {
                 case .alreadyLocked:
                     message = "別の起動中のSchneeWorktimeを終了してから再読込してください。"

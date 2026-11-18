@@ -56,6 +56,8 @@
             proposal = nil
             do {
                 try model.confirmRetrospectiveStart(value)
+            } catch is CommittedCheckpointError {
+                notice = "操作は保存済みです。観測情報の保存に失敗したため再読込してください。"
             } catch {
                 notice = "確定できませんでした。最新の勤務状態・保存結果を確認してください。"
             }
