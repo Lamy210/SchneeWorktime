@@ -139,12 +139,15 @@ public struct SnapshotStore: Sendable {
     }
 
     private func connection<T>(create: Bool = false, _ body: (OpaquePointer) throws -> T) throws -> T {
-        try DatabaseFileGuard.validate(url)
+        let identity = try DatabaseFileGuard.identity(url)
         var handle: OpaquePointer?
-        let flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX | SQLITE_OPEN_NOFOLLOW
+        // The app-private directory and session lock are the primary boundary.
+        // SQLite NOFOLLOW rejected ordinary macOS paths in CI; verify identity around open instead.
+        let flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX
         let status = sqlite3_open_v2(url.path, &handle, flags, nil)
         defer { sqlite3_close(handle) }
         guard status == SQLITE_OK, let db = handle else { throw SnapshotStoreError.sqlite(status) }
+        guard try DatabaseFileGuard.identity(url) == identity else { throw DatabaseFileError.unsafeFile }
         try Self.check(sqlite3_busy_timeout(db, 5000))
         try Self.execute(db, "PRAGMA synchronous = FULL")
         try Self.execute(db, "PRAGMA trusted_schema = OFF")

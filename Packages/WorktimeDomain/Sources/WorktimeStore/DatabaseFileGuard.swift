@@ -12,8 +12,8 @@ public enum DatabaseFileError: Error, Equatable {
 
 /// Defense in depth for the app's private local directory. The caller owns its directory and session lock.
 enum DatabaseFileGuard {
-    // macOS exposes legitimate ancestor aliases (for example /var -> /private/var).
-    // Resolve only the parent: resolving the final component would hide prohibited database links.
+    /// macOS exposes legitimate ancestor aliases (for example /var -> /private/var).
+    /// Resolve only the parent: resolving the final component would hide prohibited database links.
     static func canonicalURL(_ url: URL) throws -> URL {
         guard url.isFileURL, !url.hasDirectoryPath else { throw DatabaseFileError.invalidURL }
         return url.deletingLastPathComponent().resolvingSymlinksInPath()
@@ -35,9 +35,15 @@ enum DatabaseFileGuard {
         return true
     }
 
-    static func validate(_ url: URL) throws {
-        guard try existsAndValidate(url.path) else { throw DatabaseFileError.system(ENOENT) }
+    struct Identity: Equatable {
+        let device: UInt64
+        let inode: UInt64
+    }
+
+    static func identity(_ url: URL) throws -> Identity {
+        guard let info = try metadata(url.path) else { throw DatabaseFileError.system(ENOENT) }
         try validateSidecars(url)
+        return Identity(device: UInt64(truncatingIfNeeded: info.st_dev), inode: UInt64(info.st_ino))
     }
 
     private static func validateSidecars(_ url: URL) throws {
@@ -47,17 +53,21 @@ enum DatabaseFileGuard {
     }
 
     private static func existsAndValidate(_ path: String) throws -> Bool {
+        try metadata(path) != nil
+    }
+
+    private static func metadata(_ path: String) throws -> stat? {
         var info = stat()
         guard lstat(path, &info) == 0 else {
             let code = errno
             if code == ENOENT {
-                return false
+                return nil
             }
             throw DatabaseFileError.system(code)
         }
         guard info.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG), info.st_uid == geteuid(),
               info.st_nlink == 1, info.st_mode & 0o077 == 0
         else { throw DatabaseFileError.unsafeFile }
-        return true
+        return info
     }
 }
