@@ -8,6 +8,7 @@ import Foundation
 
 public enum BackupFileError: Error, Equatable {
     case invalidDestination, unsafeDirectory, unsafeFile, tooLarge, system(Int32)
+    case publicationUncertain(Int32)
 }
 
 /// Local plaintext archive I/O. A private directory is required; this is not protection against the same user.
@@ -15,14 +16,22 @@ package enum BackupFile {
     static let maxBytes = 24 * 1024 * 1024
 
     package static func publish(_ data: Data, to url: URL) throws {
+        try publish(data, to: url, synchronizeDirectory: syncDirectory)
+    }
+
+    /// The final file may exist if publication succeeded but directory synchronization failed.
+    static func publish(_ data: Data, to url: URL, synchronizeDirectory: (Int32) throws -> Void) throws {
         guard data.count <= maxBytes else { throw BackupFileError.tooLarge }
         try withDirectory(url) { directory, name in
             let temp = ".worktime-\(UUID().uuidString).partial"
             let fd = openat(directory, temp, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0o600)
             guard fd >= 0 else { throw BackupFileError.system(errno) }
+            var temporaryExists = true
             defer {
                 close(fd)
-                unlinkat(directory, temp, 0)
+                if temporaryExists {
+                    unlinkat(directory, temp, 0)
+                }
             }
             guard fchmod(fd, 0o600) == 0 else { throw BackupFileError.system(errno) }
             try writeAll(data, fd: fd)
@@ -31,6 +40,16 @@ package enum BackupFile {
             guard linkat(directory, temp, directory, name, 0) == 0 else {
                 throw BackupFileError.system(errno)
             }
+            guard unlinkat(directory, temp, 0) == 0 else { throw BackupFileError.publicationUncertain(errno) }
+            temporaryExists = false
+            try synchronizeDirectory(directory)
+        }
+    }
+
+    private static func syncDirectory(_ directory: Int32) throws {
+        while fsync(directory) != 0 {
+            let code = errno
+            guard code == EINTR else { throw BackupFileError.publicationUncertain(code) }
         }
     }
 
