@@ -50,6 +50,10 @@
             }
             open(create: false)
             updateObservationTimer()
+            observationTimer.observeLifecycle { [weak self] in
+                self?.nextReminderCheck = 0
+                self?.tick()
+            }
         }
 
         private func updateObservationTimer() {
