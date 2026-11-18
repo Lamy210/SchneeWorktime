@@ -441,3 +441,22 @@ public extension WorktimeController {
         return WorktimeReviewProposal(stored: stored, before: before, after: after)
     }
 }
+
+public extension WorktimeController {
+    /// Explicit read of committed history; period navigation never writes observations or reminders.
+    func summary(
+        period: WorktimeSummaryPeriod, sample: ClockSample, previous: WorktimeSummary? = nil
+    ) throws -> WorktimeSummary {
+        var checked = clock
+        _ = try checked.advance(to: sample)
+        let stored = try repository.revalidate(session, now: sample.wall)
+        if let previous, previous.version != stored.version {
+            throw WorktimeSummaryError.staleSummary
+        }
+        return try WorktimeSummary(session: stored, period: period, now: sample.wall)
+    }
+
+    func isCurrent(_ summary: WorktimeSummary) -> Bool {
+        session.version == summary.version
+    }
+}
