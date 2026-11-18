@@ -12,7 +12,7 @@
 
         var body: some View {
             DisclosureGroup("退勤済みの勤務履歴") {
-                Text("直近30件。読込時点の保存済み記録です。正式な勤怠集計ではありません。")
+                Text("1ページ30件。読込時点の保存済み記録です。正式な勤怠集計ではありません。")
                     .font(.caption)
                 Button("履歴を読み込む") { reload() }
                     .disabled(model.choosingBackupDestination)
@@ -23,8 +23,7 @@
                 if let history {
                     Text("読込日時：\(time(history.loadedAt)) · revision \(history.version.revision)")
                         .font(.caption)
-                    Text("\(history.rows.count) / \(history.totalEndedDays)件")
-                        .font(.caption)
+                    pageNavigation(history)
                     if history.rows.isEmpty {
                         Text("退勤済みの勤務履歴はありません。").font(.caption)
                     }
@@ -42,6 +41,20 @@
                     }
                 }
             }
+        }
+
+        private func pageNavigation(_ page: WorktimeHistory) -> some View {
+            HStack {
+                if let previous = page.previousOffset {
+                    Button("新しい履歴") { reload(offset: previous, previous: page) }
+                }
+                Text("\(page.rows.isEmpty ? 0 : page.offset + 1)〜\(page.offset + page.rows.count) / \(page.totalEndedDays)")
+                    .font(.caption)
+                if let next = page.nextOffset {
+                    Button("古い履歴") { reload(offset: next, previous: page) }
+                }
+            }
+            .disabled(model.reviewProposal != nil || model.choosingBackupDestination)
         }
 
         @ViewBuilder
@@ -74,15 +87,17 @@
             }
         }
 
-        private func reload() {
+        private func reload(offset: Int = 0, previous: WorktimeHistory? = nil) {
             historical = nil
             history = nil
             notice = nil
             do {
-                history = try model.recentHistory()
+                history = try model.recentHistory(offset: offset, previous: previous)
                 if history == nil {
                     notice = "勤務記録を再読込してください。"
                 }
+            } catch WorktimeHistoryError.stalePage {
+                notice = "履歴が更新されました。最新ページから読み込んでください。"
             } catch {
                 notice = "勤務履歴を読み込めませんでした。既存記録は変更していません。"
             }

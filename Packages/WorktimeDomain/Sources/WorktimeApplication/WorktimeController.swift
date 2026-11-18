@@ -187,10 +187,16 @@ public struct WorktimeController {
     }
 
     /// One committed snapshot, with no observation or persistence side effects.
-    public func recentHistory(now: Int64) throws -> WorktimeHistory {
-        let stored = try repository.load(now: now)
-        guard stored.version == session.version else { throw SnapshotStoreError.staleVersion }
-        return try WorktimeHistory(session: stored, now: now)
+    public func recentHistory(
+        now: Int64, offset: Int = 0, previous: WorktimeHistory? = nil
+    ) throws -> WorktimeHistory {
+        let stored = try repository.revalidate(session, now: now)
+        if let previous {
+            guard previous.version == stored.version else { throw WorktimeHistoryError.stalePage }
+        } else if offset != 0 {
+            throw WorktimeHistoryError.stalePage
+        }
+        return try WorktimeHistory(session: stored, now: now, offset: offset)
     }
 
     /// Export only the committed journal, never an unsaved review proposal.

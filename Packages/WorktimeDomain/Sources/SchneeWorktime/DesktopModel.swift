@@ -100,8 +100,8 @@
             ready = false
         }
 
-        func recentHistory() throws -> WorktimeHistory? {
-            try controller?.recentHistory(now: Self.sample().wall)
+        func recentHistory(offset: Int = 0, previous: WorktimeHistory? = nil) throws -> WorktimeHistory? {
+            try controller?.recentHistory(now: Self.sample().wall, offset: offset, previous: previous)
         }
 
         func historicalReviewContext(dayID: UUID, history: WorktimeHistory) throws -> HistoricalReviewContext {

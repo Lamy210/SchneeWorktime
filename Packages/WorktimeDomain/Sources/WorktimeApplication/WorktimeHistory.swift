@@ -14,19 +14,37 @@ public struct WorktimeHistoryRow: Sendable, Equatable, Identifiable {
     public let corrections: Int
 }
 
+public enum WorktimeHistoryError: Error, Equatable {
+    case invalidOffset, stalePage
+}
+
 /// A bounded, read-only view of committed ended workdays, not payroll or a calendar-day aggregate.
 public struct WorktimeHistory: Sendable, Equatable {
     public let version: StoreVersion
     public let loadedAt: Int64
     public let totalEndedDays: Int
     public let rows: [WorktimeHistoryRow]
+    public let offset: Int
+    public static let pageSize = 30
 
-    public init(session: CatalogSession, now: Int64) throws {
+    public var previousOffset: Int? {
+        offset == 0 ? nil : offset - Self.pageSize
+    }
+
+    public var nextOffset: Int? {
+        offset + rows.count < totalEndedDays ? offset + Self.pageSize : nil
+    }
+
+    public init(session: CatalogSession, now: Int64, offset: Int = 0) throws {
         version = session.version
         loadedAt = now
         let ended = session.catalog.days.filter { $0.state == .ended }
         totalEndedDays = ended.count
-        let selected = ended.suffix(30).reversed()
+        guard offset >= 0, offset.isMultiple(of: Self.pageSize),
+              offset == 0 || offset < ended.count
+        else { throw WorktimeHistoryError.invalidOffset }
+        self.offset = offset
+        let selected = ended.reversed().dropFirst(offset).prefix(Self.pageSize)
         let corrections = Dictionary(grouping: session.catalog.reviewAudit, by: \.dayID)
         rows = try selected.map { day in
             guard let start = day.intervals.first?.start, let end = day.intervals.last?.end else {
