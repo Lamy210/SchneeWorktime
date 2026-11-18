@@ -28,13 +28,19 @@ struct BackupFileTests {
             let url = root.appendingPathComponent("backup.json")
             let original = Data([1, 2, 3])
             let failure = BackupFileError.publicationUncertain(5)
-            #expect(throws: failure) {
+            var synchronized = false
+            do {
                 try BackupFile.publish(original, to: url, synchronizeDirectory: { _ in
-                    #expect(try BackupFile.load(url) == original)
-                    #expect(try FileManager.default.contentsOfDirectory(atPath: root.path) == ["backup.json"])
+                    let published = try BackupFile.load(url)
+                    let names = try FileManager.default.contentsOfDirectory(atPath: root.path)
+                    synchronized = published == original && names == ["backup.json"]
                     throw failure
                 })
+                Issue.record("Expected directory synchronization failure")
+            } catch let error as BackupFileError {
+                #expect(error == failure)
             }
+            #expect(synchronized)
             #expect(try BackupFile.load(url) == original)
             #expect(throws: BackupFileError.self) {
                 try BackupFile.publish(Data([9]), to: url)
