@@ -1,4 +1,6 @@
 #if os(macOS)
+    import AppKit
+    import Combine
     import Foundation
     import WorktimeApplication
 
@@ -8,6 +10,19 @@
         private var timer: Timer?
         private var cadence: ObservationCadence?
         private var generation = UUID()
+        private var lifecycleObservers: Set<AnyCancellable> = []
+
+        /// These events request a fresh observation, never assert that the user worked during sleep.
+        func observeLifecycle(refresh: @escaping @MainActor @Sendable () -> Void) {
+            guard lifecycleObservers.isEmpty else { return }
+            let center = NSWorkspace.shared.notificationCenter
+            for name in [NSWorkspace.didWakeNotification, NSWorkspace.sessionDidBecomeActiveNotification] {
+                center.publisher(for: name).sink { _ in
+                    Task { @MainActor in refresh() }
+                }
+                .store(in: &lifecycleObservers)
+            }
+        }
 
         func update(to next: ObservationCadence, tick: @escaping @MainActor @Sendable () -> Void) {
             guard cadence != next else { return }
