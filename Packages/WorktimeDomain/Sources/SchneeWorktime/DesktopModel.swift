@@ -121,7 +121,8 @@
         var actionContext: PanelActionContext {
             PanelActionContext(
                 day: glance?.day,
-                enabled: ready && reviewProposal == nil && !choosingBackupDestination
+                enabled: ready && reviewProposal == nil && !choosingBackupDestination,
+                canOpenWorkday: controller?.journalCapacity.canOpenWorkday == true
             )
         }
 

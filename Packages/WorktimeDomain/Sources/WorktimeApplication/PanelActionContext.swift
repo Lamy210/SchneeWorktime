@@ -19,15 +19,17 @@ public enum PanelWorkAction: String, Sendable, CaseIterable {
 public struct PanelActionContext: Sendable, Equatable {
     public let day: Workday?
     public let enabled: Bool
+    public let canOpenWorkday: Bool
 
-    public init(day: Workday?, enabled: Bool) {
+    public init(day: Workday?, enabled: Bool, canOpenWorkday: Bool = true) {
         self.day = day
         self.enabled = enabled
+        self.canOpenWorkday = canOpenWorkday
     }
 
     public func available(at instant: Int64) -> [PanelWorkAction] {
         guard enabled else { return [] }
-        guard let day else { return [.start] }
+        guard let day else { return canOpenWorkday ? [.start] : [] }
         guard let last = day.intervals.last else { return [] }
         switch day.state {
         case .working:
@@ -36,7 +38,7 @@ public struct PanelActionContext: Sendable, Equatable {
             return instant > last.start ? [.endBreak, .clockOut] : []
         case .ended:
             guard let end = last.end, instant >= end else { return [] }
-            return [.start, .resume]
+            return canOpenWorkday ? [.start, .resume] : []
         }
     }
 

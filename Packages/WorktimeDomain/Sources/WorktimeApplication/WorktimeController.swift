@@ -75,6 +75,10 @@ public struct WorktimeController {
     private var checkpointVersion: StoreVersion?
     private var checkpointAt: Int64?
 
+    public var journalCapacity: JournalCapacity {
+        session.journalCapacity
+    }
+
     public init(url: URL, createIfMissing: Bool = false, sample: ClockSample) throws {
         repository = try CatalogRepository(url: url, createIfMissing: createIfMissing)
         session = try repository.load(now: sample.wall)
@@ -154,6 +158,7 @@ public struct WorktimeController {
         _ = try observation.advance(to: sample)
         let stored = try repository.load(now: sample.wall)
         guard stored.version == session.version else { throw SnapshotStoreError.staleVersion }
+        guard stored.journalCapacity.canOpenWorkday else { throw CatalogPersistenceError.insufficientStartCapacity }
         guard instant < sample.wall, stored.catalog.activeID == nil else {
             throw RetrospectiveStartError.invalidStart
         }
