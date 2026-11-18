@@ -30,7 +30,7 @@
                     ForEach(history.rows) { row in
                         Divider()
                         rowView(row)
-                        if model.glance?.day.id != row.id, model.glance?.day.state == .ended {
+                        if model.glance?.day.id != row.id {
                             Button("この勤務日の要確認区間") { select(row.id, from: history) }
                                 .disabled(model.reviewProposal != nil || model.choosingBackupDestination)
                         }
@@ -85,7 +85,7 @@
             do {
                 historical = try model.historicalReviewContext(dayID: dayID, history: history)
             } catch {
-                notice = "過去勤務日を選択できません。勤務終了後に最新履歴を読み込んでください。"
+                notice = "過去勤務日を選択できません。最新履歴を読み込んでください。"
             }
         }
 

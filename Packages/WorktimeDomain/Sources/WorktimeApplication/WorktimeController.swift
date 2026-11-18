@@ -407,7 +407,7 @@ public extension WorktimeController {
         var checked = clock
         _ = try checked.advance(to: sample)
         let stored = try repository.revalidate(session, now: sample.wall)
-        guard stored.version == history.version, stored.catalog.activeID == nil,
+        guard stored.version == history.version,
               history.rows.contains(where: { $0.id == dayID }), stored.catalog.days.last?.id != dayID
         else { throw HistoricalReviewError.staleContext }
         let selected = try WorktimeGlance(catalog: stored.catalog, now: sample.wall, dayID: dayID)
@@ -416,7 +416,7 @@ public extension WorktimeController {
     }
 
     func isCurrent(_ context: HistoricalReviewContext) -> Bool {
-        session.version == context.version && session.catalog.activeID == nil &&
+        session.version == context.version && session.catalog.days.last?.id != context.glance.day.id &&
             session.catalog.days.contains(context.glance.day)
     }
 

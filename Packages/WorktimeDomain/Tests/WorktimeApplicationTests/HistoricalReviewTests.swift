@@ -54,7 +54,7 @@ struct HistoricalReviewTests {
         }
     }
 
-    @Test func `latest and active day reject historical selection and stale confirmation`() throws {
+    @Test func `latest day and stale selection reject historical confirmation`() throws {
         try withHistory { url, controller, first, latest in
             let history = try controller.recentHistory(now: 220)
             #expect(throws: HistoricalReviewError.staleContext) {
@@ -80,6 +80,58 @@ struct HistoricalReviewTests {
                 try controller.commitReview(proposal, sample: sample(223))
             }
             #expect(try repository.load(now: 223).version == before.version)
+        }
+    }
+
+    @Test(arguments: [false, true])
+    func `historical correction during active work preserves active day`(onBreak: Bool) throws {
+        try withHistory { url, controller, first, _ in
+            let activeID = UUID()
+            _ = try controller.perform(.clockIn(id: activeID, profile: WorkdayProfile()), sample: sample(220))
+            if onBreak {
+                _ = try controller.perform(.startBreak, sample: sample(221))
+            }
+            let history = try controller.recentHistory(now: 222)
+            let context = try controller.historicalReviewContext(dayID: first, history: history, sample: sample(222))
+            let gap = try #require(context.glance.reviewableGaps.first)
+            let repository = try CatalogRepository(url: url)
+            let before = try repository.load(now: 222)
+            let proposal = try controller.previewHistoricalReview(
+                context, selection: gap, source: gap, classification: .rest, sample: sample(223)
+            )
+            #expect(proposal.after.day.id == first)
+            #expect(try repository.load(now: 223).version == before.version)
+            let current = try controller.commitReview(proposal, sample: sample(224))
+            let saved = try repository.load(now: 224)
+            #expect(saved.catalog.activeID == activeID)
+            #expect(saved.catalog.days.last == before.catalog.days.last)
+            #expect(current?.day == before.catalog.days.last)
+            #expect(saved.catalog.reviewAudit.last?.dayID == first)
+            #expect(saved.catalog.observations[activeID] == before.catalog.observations[activeID])
+            #expect(!controller.isCurrent(context))
+        }
+    }
+
+    @Test func `new observation gap during historical confirmation invalidates proposal`() throws {
+        try withHistory { url, controller, first, _ in
+            let activeID = UUID()
+            _ = try controller.perform(.clockIn(id: activeID, profile: WorkdayProfile()), sample: sample(220))
+            let history = try controller.recentHistory(now: 221)
+            let context = try controller.historicalReviewContext(dayID: first, history: history, sample: sample(221))
+            let gap = try #require(context.glance.reviewableGaps.first)
+            let proposal = try controller.previewHistoricalReview(
+                context, selection: gap, source: gap, classification: .rest, sample: sample(222)
+            )
+            let repository = try CatalogRepository(url: url)
+            let before = try repository.load(now: 222)
+            #expect(throws: SnapshotStoreError.staleVersion) {
+                try controller.commitReview(proposal, sample: sample(240))
+            }
+            let saved = try repository.load(now: 240)
+            #expect(saved.catalog.activeID == activeID)
+            #expect(saved.catalog.reviewAudit == before.catalog.reviewAudit)
+            #expect(saved.catalog.days.first == before.catalog.days.first)
+            #expect(saved.catalog.observations[activeID] == [ObservationGap(start: 220, end: 240)])
         }
     }
 }
