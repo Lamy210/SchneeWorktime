@@ -35,6 +35,8 @@ public enum WorktimeSummaryCSV {
     /// Even a caller-supplied alias must not introduce a CSV formula or separator.
     private static func safeTimezone(_ value: String) -> String {
         let escaped = value.replacingOccurrences(of: "\"", with: "\"\"")
-        return "\"'\(escaped)\""
+        let unsafeStart = value.first.map { "=+-@".contains($0) || $0.isWhitespace || $0.isNewline } ?? true
+        let prefix = unsafeStart ? "'" : ""
+        return "\"\(prefix)\(escaped)\""
     }
 }
