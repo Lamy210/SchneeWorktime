@@ -72,27 +72,34 @@
                 } else {
                     unavailableContent
                 }
-                if model.ready {
-                    if settingsValid, model.glance == nil || model.glance?.day.state == .ended {
-                        RetrospectiveStartView(model: model, targetMinutes: targetMinutes, restMinutes: restMinutes)
-                    }
-                    nextDaySettings
-                    reminderSettings
-                    backupSettings
-                    WorktimeHistoryView(model: model)
-                    WorktimeSummaryView(model: model)
-                }
+                readySettings
                 backupInspectionSettings
                 BackupRollbackView(model: model)
+                HistoryResetView(model: model)
                 Divider()
                 Button("アプリを終了") { NSApplication.shared.terminate(nil) }
+                    .disabled(model.maintenanceInProgress)
+            }
+        }
+
+        @ViewBuilder
+        private var readySettings: some View {
+            if model.ready {
+                if settingsValid, model.glance == nil || model.glance?.day.state == .ended {
+                    RetrospectiveStartView(model: model, targetMinutes: targetMinutes, restMinutes: restMinutes)
+                }
+                nextDaySettings
+                reminderSettings
+                backupSettings
+                WorktimeHistoryView(model: model)
+                WorktimeSummaryView(model: model)
             }
         }
 
         @ViewBuilder
         private var unavailableContent: some View {
-            if model.rollbackInProgress {
-                Text("復元中は操作できません。").font(.caption)
+            if model.maintenanceInProgress {
+                Text("履歴の保守処理中は操作できません。").font(.caption)
             } else {
                 Text(model.message ?? "記録を読み込めません")
                     .font(.caption)
@@ -130,7 +137,7 @@
                 Text("既存の勤務記録を変更せずに、バックアップの構造と履歴を検証します。")
                     .font(.caption)
                 Button("確認するファイルを選択") { model.chooseBackupForInspection() }
-                    .disabled(model.choosingBackupDestination)
+                    .disabled(model.choosingBackupDestination || model.maintenanceInProgress)
                 if let inspection = model.backupInspection {
                     Text("勤務日：\(inspection.days)件")
                     Text("訂正履歴：\(inspection.corrections)件")

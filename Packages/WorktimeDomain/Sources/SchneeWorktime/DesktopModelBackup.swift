@@ -27,7 +27,7 @@
         }
 
         func chooseBackupForInspection() {
-            guard !rollbackInProgress, !choosingBackupDestination else { return }
+            guard !maintenanceInProgress, !choosingBackupDestination else { return }
             choosingBackupDestination = true
             defer { choosingBackupDestination = false }
             backupInspection = nil
@@ -52,7 +52,8 @@
     extension DesktopModel {
         var canPreviewRollback: Bool {
             ready && sessionLock != nil && glance?.day.state == .ended &&
-                reviewProposal == nil && !choosingBackupDestination && !rollbackInProgress
+                reviewProposal == nil && resetState.proposal == nil &&
+                !choosingBackupDestination && !maintenanceInProgress
         }
 
         var canConfirmRollback: Bool {
@@ -84,7 +85,7 @@
         }
 
         func cancelRollback() {
-            guard !rollbackInProgress, !choosingBackupDestination else { return }
+            guard !maintenanceInProgress, !choosingBackupDestination else { return }
             rollbackProposal = nil
             rollbackNotice = nil
         }
@@ -106,8 +107,8 @@
             }
             let name = "SchneeWorktime-before-rollback-\(UUID().uuidString).json"
             let destination = directory.appendingPathComponent(name)
-            rollbackInProgress = true
-            suspendForRollback()
+            maintenanceInProgress = true
+            suspendForMaintenance()
             rollbackProposal = nil
             rollbackNotice = "通知停止と現履歴の保全を確認中"
             Task {
@@ -131,7 +132,7 @@
             } catch {
                 rollbackNotice = "復元を確認できませんでした。再読込結果と保全先を確認してください：\(destination.path)"
             }
-            rollbackInProgress = false
+            maintenanceInProgress = false
             open(create: false)
             if committed, !ready {
                 rollbackNotice = "復元後の再読込に失敗しました。保全ファイル：\(destination.path)"

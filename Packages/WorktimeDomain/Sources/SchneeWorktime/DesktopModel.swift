@@ -21,7 +21,8 @@
         @Published var inspectionNotice: String?
         @Published var rollbackProposal: WorktimeRollbackProposal?
         @Published var rollbackNotice: String?
-        @Published var rollbackInProgress = false
+        @Published var maintenanceInProgress = false
+        @Published var resetState = DesktopResetState()
 
         @Published private(set) var remindersEnabled = UserDefaults.standard.bool(forKey: "departureReminderEnabled")
         @Published private(set) var departureLeads = ReminderLeadSettings.decode(
@@ -63,8 +64,9 @@
         }
 
         func open(create: Bool) {
-            guard !rollbackInProgress, !choosingBackupDestination else { return }
+            guard !maintenanceInProgress, !choosingBackupDestination else { return }
             rollbackProposal = nil
+            resetState.proposal = nil
             cancelReview()
             controller = nil
             ready = false
@@ -100,8 +102,9 @@
             }
         }
 
-        func suspendForRollback() {
+        func suspendForMaintenance() {
             ready = false
+            glance = nil
         }
 
         func recentHistory(offset: Int = 0, previous: WorktimeHistory? = nil) throws -> WorktimeHistory? {
@@ -218,7 +221,7 @@
         }
 
         private func tick() {
-            guard !rollbackInProgress else { return }
+            guard !maintenanceInProgress else { return }
             guard var current = controller else {
                 queueReminders()
                 return
@@ -329,7 +332,7 @@
         }
 
         func disableReminders() {
-            guard !rollbackInProgress, sessionLock != nil, !requestingReminderPermission else { return }
+            guard !maintenanceInProgress, sessionLock != nil, !requestingReminderPermission else { return }
             remindersEnabled = false
             UserDefaults.standard.set(false, forKey: "departureReminderEnabled")
             reminderStatus = "通知予約の取消を確認中"
@@ -351,7 +354,7 @@
         }
 
         private func queueReminders(force: Bool = false) {
-            guard !rollbackInProgress else { return }
+            guard !maintenanceInProgress else { return }
             if force {
                 nextReminderCheck = 0
             }
