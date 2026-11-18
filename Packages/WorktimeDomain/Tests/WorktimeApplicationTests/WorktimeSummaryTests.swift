@@ -28,11 +28,11 @@ struct WorktimeSummaryTests {
         let fallDay = try WorktimeSummaryPeriod(containing: fall, unit: .day, timeZoneID: "America/New_York")
         #expect(fallDay.end - fallDay.start == 25 * 3600)
         let week = try WorktimeSummaryPeriod(containing: spring, unit: .week, timeZoneID: "America/New_York")
-        #expect(week.start == (try instant("2026-03-02T05:00:00Z")))
-        #expect(week.end == (try instant("2026-03-09T04:00:00Z")))
+        #expect(try week.start == instant("2026-03-02T05:00:00Z"))
+        #expect(try week.end == instant("2026-03-09T04:00:00Z"))
         let month = try WorktimeSummaryPeriod(containing: spring, unit: .month, timeZoneID: "Asia/Tokyo")
-        #expect(month.start == (try instant("2026-02-28T15:00:00Z")))
-        #expect(month.end == (try instant("2026-03-31T15:00:00Z")))
+        #expect(try month.start == instant("2026-02-28T15:00:00Z"))
+        #expect(try month.end == instant("2026-03-31T15:00:00Z"))
         #expect(throws: WorktimeSummaryError.invalidTimeZone) {
             try WorktimeSummaryPeriod(containing: spring, unit: .day, timeZoneID: "invalid")
         }
