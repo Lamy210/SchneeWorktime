@@ -11,7 +11,9 @@ extension CatalogRepository {
         do {
             try saveObservationCheckpoint(dayID: dayID, observedAt: instant, expected: version)
         } catch {
-            if afterMutation { throw CommittedCheckpointError(version: version) }
+            if afterMutation {
+                throw CommittedCheckpointError(version: version)
+            }
             throw error
         }
     }
