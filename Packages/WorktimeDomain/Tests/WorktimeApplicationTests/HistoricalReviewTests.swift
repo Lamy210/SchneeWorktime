@@ -29,6 +29,7 @@ struct HistoricalReviewTests {
     @Test func `historical partial correction preserves latest day and records original day audit`() throws {
         try withHistory { url, controller, first, latest in
             let history = try controller.recentHistory(now: 220)
+            #expect(controller.isCurrent(history))
             let context = try controller.historicalReviewContext(dayID: first, history: history, sample: sample(220))
             let gap = try #require(context.glance.reviewableGaps.first)
             let selection = ObservationGap(start: 120, end: 130)
@@ -51,6 +52,24 @@ struct HistoricalReviewTests {
             ])
             #expect(!controller.isCurrent(context))
             #expect(!controller.isCurrent(proposal))
+            #expect(!controller.isCurrent(history))
+            let refreshed = try controller.recentHistory(now: 222)
+            #expect(controller.isCurrent(refreshed))
+            #expect(refreshed.rows.first(where: { $0.id == first })?.rest == 10)
+        }
+    }
+
+    @Test func `previous history page is stale after database generation changes`() throws {
+        try withHistory { url, controller, _, _ in
+            let history = try controller.recentHistory(now: 220)
+            #expect(controller.isCurrent(history))
+            let proposal = try controller.previewReset(sample: sample(221))
+            try controller.commitReset(proposal, sample: sample(222))
+            let reopened = try WorktimeController(url: url, sample: sample(223))
+            #expect(!reopened.isCurrent(history))
+            let empty = try reopened.recentHistory(now: 223)
+            #expect(reopened.isCurrent(empty))
+            #expect(empty.rows.isEmpty)
         }
     }
 
