@@ -23,6 +23,26 @@ struct BackupFileTests {
         }
     }
 
+    @Test func `directory sync failure is reported without discarding the published backup`() throws {
+        try withDirectory { root in
+            let url = root.appendingPathComponent("backup.json")
+            let original = Data([1, 2, 3])
+            let failure = BackupFileError.publicationUncertain(5)
+            #expect(throws: failure) {
+                try BackupFile.publish(original, to: url, synchronizeDirectory: { _ in
+                    #expect(try BackupFile.load(url) == original)
+                    #expect(try FileManager.default.contentsOfDirectory(atPath: root.path) == ["backup.json"])
+                    throw failure
+                })
+            }
+            #expect(try BackupFile.load(url) == original)
+            #expect(throws: BackupFileError.self) {
+                try BackupFile.publish(Data([9]), to: url)
+            }
+            #expect(try BackupFile.load(url) == original)
+        }
+    }
+
     @Test func `existing destination remains untouched and temporary file is removed`() throws {
         try withDirectory { root in
             let url = root.appendingPathComponent("backup.json")
