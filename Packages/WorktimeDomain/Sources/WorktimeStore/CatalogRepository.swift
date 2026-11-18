@@ -125,9 +125,8 @@ public struct CatalogRepository: Sendable {
     private func mutate(_ event: JournalEvent, expected: StoreVersion) throws -> CatalogSession {
         var loaded = try read(now: event.now)
         guard loaded.session.version == expected else { throw SnapshotStoreError.staleVersion }
-        if case let .command(command, _) = event.action, command.opensWorkday,
-           !loaded.session.journalCapacity.canOpenWorkday
-        {
+        let canOpenWorkday = loaded.session.journalCapacity.canOpenWorkday
+        if case let .command(command, _) = event.action, command.opensWorkday, !canOpenWorkday {
             throw CatalogPersistenceError.insufficientStartCapacity
         }
         var catalog = loaded.session.catalog
