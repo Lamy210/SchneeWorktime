@@ -221,3 +221,34 @@ public extension CatalogRepository {
         )
     }
 }
+
+public struct CatalogResetProposal: Sendable {
+    public let version: StoreVersion
+    public let workdays: Int
+    public let corrections: Int
+    public let hasActiveWorkday: Bool
+    fileprivate let source: StoredSnapshot
+}
+
+public extension CatalogRepository {
+    /// Read-only deletion preview of one validated catalog. No backup or external file is changed.
+    func previewReset(now: Int64, expected: StoreVersion) throws -> CatalogResetProposal {
+        let current = try load(now: now)
+        guard current.version == expected else { throw SnapshotStoreError.staleVersion }
+        return CatalogResetProposal(
+            version: current.version, workdays: current.catalog.days.count,
+            corrections: current.catalog.reviewAudit.count, hasActiveWorkday: current.catalog.activeID != nil,
+            source: current.validatedSnapshot
+        )
+    }
+
+    /// Caller must obtain explicit confirmation and stop application writers and owned notifications.
+    /// This resets live logical records, not filesystem remnants or backup/export files.
+    func commitReset(_ proposal: CatalogResetProposal, now: Int64) throws -> CatalogSession {
+        let current = try load(now: now)
+        guard current.version == proposal.version else { throw SnapshotStoreError.staleVersion }
+        guard current.validatedSnapshot == proposal.source else { throw CatalogPersistenceError.invalidJournal }
+        let version = try store.reset(expected: proposal.version)
+        return try CatalogBackup.validateSnapshot(StoredSnapshot(version: version, payload: nil), now: now)
+    }
+}
