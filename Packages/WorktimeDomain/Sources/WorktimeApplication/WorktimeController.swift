@@ -186,6 +186,10 @@ public struct WorktimeController {
         return try glance(now: sample.wall)
     }
 
+    public func isCurrent(_ history: WorktimeHistory) -> Bool {
+        session.version == history.version
+    }
+
     /// One committed snapshot, with no observation or persistence side effects.
     public func recentHistory(
         now: Int64, offset: Int = 0, previous: WorktimeHistory? = nil

@@ -21,24 +21,35 @@
                 }
                 historicalSelection
                 if let history {
-                    Text("読込日時：\(time(history.loadedAt)) · revision \(history.version.revision)")
-                        .font(.caption)
-                    pageNavigation(history)
-                    if history.rows.isEmpty {
-                        Text("退勤済みの勤務履歴はありません。").font(.caption)
-                    }
-                    ForEach(history.rows) { row in
-                        Divider()
-                        rowView(row)
-                        if model.glance?.day.id != row.id {
-                            Button("この勤務日の要確認区間") { select(row.id, from: history) }
-                                .disabled(model.reviewProposal != nil || model.choosingBackupDestination)
-                        }
+                    if model.ready, model.controller?.isCurrent(history) == true {
+                        pageContent(history)
+                    } else {
+                        Text("保存版が変わりました。最新の履歴を読み込んでください。")
+                            .font(.caption)
+                            .foregroundStyle(.orange)
                     }
                     Button("履歴表示を消去") {
                         self.history = nil
                         historical = nil
                     }
+                }
+            }
+        }
+
+        @ViewBuilder
+        private func pageContent(_ page: WorktimeHistory) -> some View {
+            Text("読込日時：\(time(page.loadedAt)) · revision \(page.version.revision)")
+                .font(.caption)
+            pageNavigation(page)
+            if page.rows.isEmpty {
+                Text("退勤済みの勤務履歴はありません。").font(.caption)
+            }
+            ForEach(page.rows) { row in
+                Divider()
+                rowView(row)
+                if model.glance?.day.id != row.id {
+                    Button("この勤務日の要確認区間") { select(row.id, from: page) }
+                        .disabled(model.reviewProposal != nil || model.choosingBackupDestination)
                 }
             }
         }
