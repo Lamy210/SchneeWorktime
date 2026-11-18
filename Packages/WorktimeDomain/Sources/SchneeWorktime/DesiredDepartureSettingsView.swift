@@ -83,6 +83,8 @@
             do {
                 try model.confirmDesiredDeparture(value, warningAcknowledged: warning)
                 notice = "希望退勤を保存しました。"
+            } catch is CommittedCheckpointError {
+                notice = "操作は保存済みです。観測情報の保存に失敗したため再読込してください。"
             } catch {
                 notice = "保存できませんでした。最新の条件で再確認してください。"
             }
@@ -93,6 +95,8 @@
             do {
                 try model.clearDesiredDeparture(expectedDay: day)
                 notice = "希望退勤を解除しました。"
+            } catch is CommittedCheckpointError {
+                notice = "操作は保存済みです。観測情報の保存に失敗したため再読込してください。"
             } catch {
                 notice = "解除できませんでした。最新の勤務状態を確認してください。"
             }
