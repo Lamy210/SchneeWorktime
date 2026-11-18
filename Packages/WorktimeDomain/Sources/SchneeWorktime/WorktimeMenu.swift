@@ -72,22 +72,27 @@
                 } else {
                     unavailableContent
                 }
-                if model.ready {
-                    if settingsValid, model.glance == nil || model.glance?.day.state == .ended {
-                        RetrospectiveStartView(model: model, targetMinutes: targetMinutes, restMinutes: restMinutes)
-                    }
-                    nextDaySettings
-                    reminderSettings
-                    backupSettings
-                    WorktimeHistoryView(model: model)
-                    WorktimeSummaryView(model: model)
-                }
+                readySettings
                 backupInspectionSettings
                 BackupRollbackView(model: model)
                 HistoryResetView(model: model)
                 Divider()
                 Button("アプリを終了") { NSApplication.shared.terminate(nil) }
                     .disabled(model.maintenanceInProgress)
+            }
+        }
+
+        @ViewBuilder
+        private var readySettings: some View {
+            if model.ready {
+                if settingsValid, model.glance == nil || model.glance?.day.state == .ended {
+                    RetrospectiveStartView(model: model, targetMinutes: targetMinutes, restMinutes: restMinutes)
+                }
+                nextDaySettings
+                reminderSettings
+                backupSettings
+                WorktimeHistoryView(model: model)
+                WorktimeSummaryView(model: model)
             }
         }
 

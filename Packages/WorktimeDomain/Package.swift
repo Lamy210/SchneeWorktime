@@ -14,7 +14,7 @@ let package = Package(
         .testTarget(name: "WorktimeDomainTests", dependencies: ["WorktimeDomain"]),
         .systemLibrary(name: "CSQLite", pkgConfig: "sqlite3"),
         .target(name: "WorktimeStore", dependencies: ["CSQLite", "WorktimeDomain"]),
-        .testTarget(name: "WorktimeStoreTests", dependencies: ["WorktimeStore", "WorktimeDomain"]),
+        .testTarget(name: "WorktimeStoreTests", dependencies: ["WorktimeStore", "WorktimeDomain", "CSQLite"]),
         .target(name: "WorktimeApplication", dependencies: ["WorktimeStore", "WorktimeDomain"]),
         .testTarget(
             name: "WorktimeApplicationTests", dependencies: ["WorktimeApplication", "WorktimeStore", "WorktimeDomain"]
