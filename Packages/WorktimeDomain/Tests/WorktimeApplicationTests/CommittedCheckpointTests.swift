@@ -43,7 +43,8 @@ struct CommittedCheckpointTests {
             }
             try execute("DROP VIEW observation_checkpoint", at: url)
             var reopened = try WorktimeController(url: url, sample: sample(110))
-            let glance = try #require(reopened.refresh(sample: sample(110)))
+            let refreshed = try reopened.refresh(sample: sample(110))
+            let glance = try #require(refreshed)
             #expect(glance.day.id == id)
             #expect(glance.snapshot.bounds.lower == 0)
             #expect(glance.snapshot.bounds.upper == 9)
