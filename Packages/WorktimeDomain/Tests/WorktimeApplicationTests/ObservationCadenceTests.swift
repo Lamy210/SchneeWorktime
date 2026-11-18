@@ -36,4 +36,23 @@ struct ObservationCadenceTests {
             try clock.advance(to: invalid)
         }
     }
+
+    @Test func `duplicate wake observations do not duplicate clock gaps or establish attendance`() throws {
+        let start = try ClockSample(wall: 100, uptime: 100)
+        var clock = ClockObservation(initial: start)
+        let wake = try ClockSample(wall: 160, uptime: 160)
+        #expect(try clock.advance(to: wake) == ObservationGap(start: 100, end: 160))
+        #expect(try clock.advance(to: wake) == nil)
+        let next = try ClockSample(wall: 161, uptime: 161)
+        #expect(try clock.advance(to: next) == nil)
+    }
+
+    @Test func `wake with divergent wall and monotonic clock still fails closed`() throws {
+        let start = try ClockSample(wall: 100, uptime: 100)
+        var clock = ClockObservation(initial: start)
+        let wake = try ClockSample(wall: 160, uptime: 101)
+        #expect(throws: ApplicationClockError.unreliableClock) {
+            try clock.advance(to: wake)
+        }
+    }
 }
