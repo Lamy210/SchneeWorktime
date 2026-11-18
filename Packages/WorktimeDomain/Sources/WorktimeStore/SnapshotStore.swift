@@ -22,8 +22,8 @@ public struct SnapshotStore: Sendable {
     private static let maxPayload = 16 * 1024 * 1024
 
     public init(url: URL, createIfMissing: Bool = false) throws {
-        self.url = url
-        let create = try DatabaseFileGuard.prepare(url, createIfMissing: createIfMissing)
+        self.url = try DatabaseFileGuard.canonicalURL(url)
+        let create = try DatabaseFileGuard.prepare(self.url, createIfMissing: createIfMissing)
         try connection(create: create) { db in
             try Self.transaction(db) {
                 let schema = try Self.scalar(db, "PRAGMA user_version")

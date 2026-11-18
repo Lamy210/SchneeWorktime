@@ -53,6 +53,16 @@ struct DatabaseFileGuardTests {
         }
     }
 
+    @Test func `parent directory alias does not resolve the final database component`() throws {
+        try withStore { url, store in
+            let directory = url.deletingLastPathComponent()
+            let alias = directory.appendingPathComponent("parent-alias")
+            try FileManager.default.createSymbolicLink(at: alias, withDestinationURL: directory)
+            let aliasedURL = alias.appendingPathComponent(url.lastPathComponent)
+            #expect(try SnapshotStore(url: aliasedURL).load() == store.load())
+        }
+    }
+
     @Test func `dangling database link cannot be initialized`() throws {
         try withStore { url, _ in
             try FileManager.default.removeItem(at: url)
