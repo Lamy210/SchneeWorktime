@@ -49,6 +49,14 @@ public struct WorktimeSummaryPeriod: Sendable, Equatable {
     }
 }
 
+/// One local start date, possibly containing multiple completed Workday UUIDs.
+public struct WorktimeDailySummary: Sendable, Equatable, Identifiable {
+    public let id: Int64
+    public let endedDays: Int
+    public let worked: ClosedRange<Int64>
+    public let target: Int64
+}
+
 /// Personal retrospective, not payroll, statutory overtime or flex-period settlement.
 /// A completed workday belongs entirely to the period containing its first start instant.
 public struct WorktimeSummary: Sendable, Equatable {
@@ -62,9 +70,14 @@ public struct WorktimeSummary: Sendable, Equatable {
     public let target: Int64
     public let dailyShortfall: ClosedRange<Int64>
     public let dailySurplus: ClosedRange<Int64>
+    public let daily: [WorktimeDailySummary]
 
     public init(session: CatalogSession, period: WorktimeSummaryPeriod, now: Int64) throws {
         var totals = SummaryTotals()
+        var grouped: [Int64: SummaryTotals] = [:]
+        guard let zone = TimeZone(identifier: period.timeZoneID) else { throw WorktimeSummaryError.invalidTimeZone }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = zone
         for day in session.catalog.days where day.state == .ended {
             guard let start = day.intervals.first?.start else { throw WorkdayError.invalidEventTime }
             guard start >= period.start, start < period.end else { continue }
@@ -76,6 +89,13 @@ public struct WorktimeSummary: Sendable, Equatable {
             )
             try totals.accumulate(bounds: bounds, rest: snapshot.recordedRest, target: day.profile.target,
                                   forecast: forecast)
+            let date = calendar.startOfDay(for: Date(timeIntervalSince1970: Double(start)))
+            guard let key = Int64(exactly: date.timeIntervalSince1970) else {
+                throw WorktimeSummaryError.invalidPeriod
+            }
+            try grouped[key, default: SummaryTotals()].accumulate(
+                bounds: bounds, rest: snapshot.recordedRest, target: day.profile.target, forecast: forecast
+            )
         }
         version = session.version
         loadedAt = now
@@ -87,6 +107,11 @@ public struct WorktimeSummary: Sendable, Equatable {
         target = totals.target
         dailyShortfall = totals.shortfall
         dailySurplus = totals.surplus
+        daily = grouped.keys.sorted().compactMap { key in
+            grouped[key].map { value in
+                WorktimeDailySummary(id: key, endedDays: value.endedDays, worked: value.worked, target: value.target)
+            }
+        }
     }
 }
 

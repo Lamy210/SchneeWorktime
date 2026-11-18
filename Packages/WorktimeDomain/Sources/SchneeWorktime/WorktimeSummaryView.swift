@@ -62,6 +62,7 @@
                 Text("日次不足合計：\(duration(value.dailyShortfall))")
                 Text("日次超過合計：\(duration(value.dailySurplus))")
                 Text("日次不足と超過は相殺しません。").font(.caption)
+                WorktimeDailyChart(summary: value)
             }
         }
 

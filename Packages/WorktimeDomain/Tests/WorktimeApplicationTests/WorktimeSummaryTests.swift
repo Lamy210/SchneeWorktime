@@ -75,6 +75,11 @@ struct WorktimeSummaryTests {
             #expect(summary.dailyShortfall == 10 ... 30)
             #expect(summary.dailySurplus == 30 ... 30)
             #expect(summary.recordedRest == 0)
+            #expect(summary.daily.count == 1)
+            #expect(summary.daily.first?.id == period.start)
+            #expect(summary.daily.first?.endedDays == 2)
+            #expect(summary.daily.first?.worked == summary.worked)
+            #expect(summary.daily.first?.target == summary.target)
             #expect(try repository.load(now: 500).version == active.version)
         }
     }
@@ -93,6 +98,9 @@ struct WorktimeSummaryTests {
             #expect(first.worked == 70 ... 70)
             #expect(second.endedDays == 1)
             #expect(second.worked == 20 ... 20)
+            #expect(first.daily.map(\.id) == [period.start])
+            #expect(second.daily.map(\.id) == [next.start])
+            #expect(first.daily.first?.worked == 70 ... 70)
         }
     }
 }
