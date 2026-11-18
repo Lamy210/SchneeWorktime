@@ -473,3 +473,23 @@ public extension WorktimeController {
         try BackupFile.publish(WorktimeSummaryCSV.encode(displayed), to: url)
     }
 }
+
+public extension WorktimeController {
+    func previewReset(sample: ClockSample) throws -> CatalogResetProposal {
+        var checked = clock
+        _ = try checked.advance(to: sample)
+        return try repository.previewReset(now: sample.wall, expected: session.version)
+    }
+
+    func isCurrent(_ proposal: CatalogResetProposal) -> Bool {
+        session.version == proposal.version
+    }
+
+    /// Quiesce all application writers and owned notifications, then discard this controller.
+    func commitReset(_ proposal: CatalogResetProposal, sample: ClockSample) throws {
+        guard isCurrent(proposal) else { throw SnapshotStoreError.staleVersion }
+        var checked = clock
+        _ = try checked.advance(to: sample)
+        _ = try repository.commitReset(proposal, now: sample.wall)
+    }
+}

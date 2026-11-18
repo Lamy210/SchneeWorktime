@@ -32,9 +32,9 @@
                         acknowledged = false
                         model.cancelRollback()
                     }
-                    .disabled(model.choosingBackupDestination || model.rollbackInProgress)
+                    .disabled(model.choosingBackupDestination || model.maintenanceInProgress)
                 }
-                if model.rollbackInProgress {
+                if model.maintenanceInProgress, !model.resetState.inProgress {
                     ProgressView("復元処理中")
                 }
                 if let notice = model.rollbackNotice {
