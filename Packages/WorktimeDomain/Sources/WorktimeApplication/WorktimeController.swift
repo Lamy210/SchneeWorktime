@@ -92,7 +92,7 @@ public struct WorktimeController {
     public mutating func perform(_ command: WorkdayCommand, sample: ClockSample) throws -> WorktimeGlance? {
         try observe(sample)
         session = try repository.apply(command, at: sample.wall, now: sample.wall, expected: session.version)
-        try saveCheckpoint(sample: sample)
+        try saveCheckpoint(sample: sample, afterMutation: true)
         return try glance(now: sample.wall)
     }
 
@@ -113,7 +113,7 @@ public struct WorktimeController {
             now: sample.wall, expected: session.version
         )
         clock = updated
-        try saveCheckpoint(sample: sample)
+        try saveCheckpoint(sample: sample, afterMutation: true)
         return try glance(now: sample.wall)
     }
 
@@ -142,7 +142,7 @@ public struct WorktimeController {
         try observe(sample)
         guard isCurrent(proposal) else { throw SnapshotStoreError.staleVersion }
         session = try repository.commitReview(proposal.stored, now: sample.wall)
-        try saveCheckpoint(sample: sample)
+        try saveCheckpoint(sample: sample, afterMutation: true)
         return try glance(now: sample.wall)
     }
 
@@ -182,7 +182,7 @@ public struct WorktimeController {
             proposal.command, at: proposal.startedAt, now: sample.wall, expected: proposal.version
         )
         clock = updated
-        try saveCheckpoint(sample: sample)
+        try saveCheckpoint(sample: sample, afterMutation: true)
         return try glance(now: sample.wall)
     }
 
@@ -251,7 +251,7 @@ public struct WorktimeController {
     }
 
     /// Persist only after clock observation and any gap/command/review commits have succeeded.
-    private mutating func saveCheckpoint(sample: ClockSample) throws {
+    private mutating func saveCheckpoint(sample: ClockSample, afterMutation: Bool = false) throws {
         guard let day = activeWorkingDay else {
             checkpointVersion = nil
             checkpointAt = nil
@@ -260,7 +260,8 @@ public struct WorktimeController {
         if checkpointVersion == session.version, let checkpointAt, sample.wall - checkpointAt < 10 {
             return
         }
-        try repository.saveObservationCheckpoint(dayID: day.id, observedAt: sample.wall, expected: session.version)
+        try repository.persistCheckpoint(dayID: day.id, at: sample.wall,
+                                         version: session.version, afterMutation: afterMutation)
         checkpointVersion = session.version
         checkpointAt = sample.wall
     }
@@ -339,7 +340,7 @@ public extension WorktimeController {
             warningAcknowledged: warningAcknowledged, now: sample.wall, expected: proposal.version
         )
         clock = updated
-        try saveCheckpoint(sample: sample)
+        try saveCheckpoint(sample: sample, afterMutation: true)
         return try glance(now: sample.wall)
     }
 
@@ -354,28 +355,8 @@ public extension WorktimeController {
             now: sample.wall, expected: session.version
         )
         clock = updated
-        try saveCheckpoint(sample: sample)
+        try saveCheckpoint(sample: sample, afterMutation: true)
         return try glance(now: sample.wall)
-    }
-}
-
-public struct WorktimeRollbackProposal: Sendable {
-    fileprivate let stored: CatalogRollbackProposal
-
-    public var currentDays: Int {
-        stored.currentDays
-    }
-
-    public var restoredDays: Int {
-        stored.restoredDays
-    }
-
-    public var currentRevision: Int64 {
-        stored.currentVersion.revision
-    }
-
-    public var sourceRevision: Int64 {
-        stored.sourceVersion.revision
     }
 }
 

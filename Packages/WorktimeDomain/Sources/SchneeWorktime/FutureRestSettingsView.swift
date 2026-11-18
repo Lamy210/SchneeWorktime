@@ -32,6 +32,8 @@
             do {
                 try model.setFutureRest(minutes: value, expectedDay: day)
                 notice = "休憩予定を更新しました。"
+            } catch is CommittedCheckpointError {
+                notice = "操作は保存済みです。観測情報の保存に失敗したため再読込してください。"
             } catch {
                 notice = "保存できませんでした。最新の勤務状態・時計・保存結果を確認してください。"
             }
