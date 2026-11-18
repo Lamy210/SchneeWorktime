@@ -33,7 +33,8 @@ struct RestEndCorrectionTests {
             let backup = try repo.makeBackup(now: 321, expected: saved.version)
             #expect(try CatalogBackup.inspect(backup, now: 321).catalog == saved.catalog)
             let csv = try CatalogCSV.encode(saved)
-            #expect(String(decoding: csv, as: UTF8.self).contains("rest_end_correction"))
+            let text = try #require(String(data: csv, encoding: .utf8))
+            #expect(text.contains("rest_end_correction"))
             #expect(throws: SnapshotStoreError.staleVersion) {
                 try repo.commitRestEndCorrection(preview, now: 322)
             }
