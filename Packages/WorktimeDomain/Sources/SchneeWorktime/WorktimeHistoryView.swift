@@ -44,11 +44,13 @@
         }
 
         private func pageNavigation(_ page: WorktimeHistory) -> some View {
-            HStack {
+            let first = page.rows.isEmpty ? 0 : page.offset + 1
+            let last = page.offset + page.rows.count
+            return HStack {
                 if let previous = page.previousOffset {
                     Button("新しい履歴") { reload(offset: previous, previous: page) }
                 }
-                Text("\(page.rows.isEmpty ? 0 : page.offset + 1)〜\(page.offset + page.rows.count) / \(page.totalEndedDays)")
+                Text("\(first)〜\(last) / \(page.totalEndedDays)")
                     .font(.caption)
                 if let next = page.nextOffset {
                     Button("古い履歴") { reload(offset: next, previous: page) }
