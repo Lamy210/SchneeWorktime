@@ -51,4 +51,19 @@ struct CommittedCheckpointTests {
             #expect(try repository.load(now: 110).catalog.days.count == 1)
         }
     }
+
+    @Test func `checkpoint failure during passive refresh is not a committed user operation`() throws {
+        try withDatabase { url in
+            var controller = try WorktimeController(url: url, createIfMissing: true, sample: sample(100))
+            _ = try controller.perform(.clockIn(id: UUID(), profile: WorkdayProfile()), sample: sample(101))
+            let store = try SnapshotStore(url: url)
+            let before = try store.load()
+            try execute("DROP TABLE observation_checkpoint", at: url)
+            try execute("CREATE VIEW observation_checkpoint AS SELECT 1 AS id", at: url)
+            #expect(throws: SnapshotStoreError.self) {
+                try controller.refresh(sample: sample(111))
+            }
+            #expect(try store.load() == before)
+        }
+    }
 }
