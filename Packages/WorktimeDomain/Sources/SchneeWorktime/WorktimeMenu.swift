@@ -320,6 +320,10 @@
             if let proposal = model.reviewProposal {
                 Divider()
                 Text("訂正案（未保存）").font(.headline)
+                if proposal.before.day.id != glance.day.id {
+                    Text("過去勤務日：\(reviewTimeLabel(proposal.before.day.intervals.first?.start ?? 0))")
+                        .font(.caption)
+                }
                 Text("\(reviewTimeLabel(proposal.selection.start))〜\(reviewTimeLabel(proposal.selection.end))")
                     .font(.caption)
                 Text("分類：\(classificationLabel(proposal.classification))")

@@ -104,6 +104,13 @@
             try controller?.recentHistory(now: Self.sample().wall)
         }
 
+        func historicalReviewContext(dayID: UUID, history: WorktimeHistory) throws -> HistoricalReviewContext {
+            guard ready, !choosingBackupDestination, reviewProposal == nil, let controller else {
+                throw HistoricalReviewError.staleContext
+            }
+            return try controller.historicalReviewContext(dayID: dayID, history: history, sample: Self.sample())
+        }
+
         var actionContext: PanelActionContext {
             PanelActionContext(
                 day: glance?.day,

@@ -1,12 +1,14 @@
 #if os(macOS)
     import SwiftUI
     import WorktimeApplication
+    import WorktimeDomain
 
     @MainActor
     struct WorktimeHistoryView: View {
         @ObservedObject var model: DesktopModel
         @State private var history: WorktimeHistory?
         @State private var notice: String?
+        @State private var historical: HistoricalReviewContext?
 
         var body: some View {
             DisclosureGroup("退勤済みの勤務履歴") {
@@ -17,6 +19,7 @@
                 if let notice {
                     Text(notice).font(.caption)
                 }
+                historicalSelection
                 if let history {
                     Text("読込日時：\(time(history.loadedAt)) · revision \(history.version.revision)")
                         .font(.caption)
@@ -28,13 +31,51 @@
                     ForEach(history.rows) { row in
                         Divider()
                         rowView(row)
+                        if model.glance?.day.id != row.id, model.glance?.day.state == .ended {
+                            Button("この勤務日の要確認区間") { select(row.id, from: history) }
+                                .disabled(model.reviewProposal != nil || model.choosingBackupDestination)
+                        }
                     }
-                    Button("履歴表示を消去") { self.history = nil }
+                    Button("履歴表示を消去") {
+                        self.history = nil
+                        historical = nil
+                    }
                 }
             }
         }
 
+        @ViewBuilder
+        private var historicalSelection: some View {
+            if let historical, model.reviewProposal == nil {
+                Divider()
+                Text("選択中の過去勤務日：\(time(historical.glance.day.intervals.first?.start ?? 0))")
+                    .font(.headline)
+                if model.ready, model.controller?.isCurrent(historical) == true {
+                    if historical.glance.reviewableGaps.isEmpty {
+                        Text("要確認区間はありません。").font(.caption)
+                    } else {
+                        ReviewRangeSettingsView(model: model, glance: historical.glance, historical: historical)
+                            .id(historical.glance.day.id)
+                    }
+                } else {
+                    Text("履歴が更新されました。履歴を読み込んで再選択してください。").font(.caption)
+                }
+                Button("過去勤務日の選択を解除") { self.historical = nil }
+            }
+        }
+
+        private func select(_ dayID: UUID, from history: WorktimeHistory) {
+            historical = nil
+            notice = nil
+            do {
+                historical = try model.historicalReviewContext(dayID: dayID, history: history)
+            } catch {
+                notice = "過去勤務日を選択できません。勤務終了後に最新履歴を読み込んでください。"
+            }
+        }
+
         private func reload() {
+            historical = nil
             history = nil
             notice = nil
             do {
