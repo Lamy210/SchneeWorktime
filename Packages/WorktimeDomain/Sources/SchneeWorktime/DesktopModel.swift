@@ -100,8 +100,15 @@
             ready = false
         }
 
-        func recentHistory() throws -> WorktimeHistory? {
-            try controller?.recentHistory(now: Self.sample().wall)
+        func recentHistory(offset: Int = 0, previous: WorktimeHistory? = nil) throws -> WorktimeHistory? {
+            try controller?.recentHistory(now: Self.sample().wall, offset: offset, previous: previous)
+        }
+
+        func historicalReviewContext(dayID: UUID, history: WorktimeHistory) throws -> HistoricalReviewContext {
+            guard ready, !choosingBackupDestination, reviewProposal == nil, let controller else {
+                throw HistoricalReviewError.staleContext
+            }
+            return try controller.historicalReviewContext(dayID: dayID, history: history, sample: Self.sample())
         }
 
         var actionContext: PanelActionContext {
@@ -138,10 +145,11 @@
 
         func prepareReview(
             selection: ObservationGap, classification: ReviewClassification,
-            expectedDay: Workday, source: ObservationGap
+            expectedDay: Workday, source: ObservationGap, historical: HistoricalReviewContext? = nil
         ) {
             guard ready, !choosingBackupDestination, reviewProposal == nil,
-                  let displayed = glance, displayed.day == expectedDay, displayed.reviewableGaps.contains(source),
+                  let displayed = historical?.glance ?? glance,
+                  displayed.day == expectedDay, displayed.reviewableGaps.contains(source),
                   selection.start >= source.start, selection.end <= source.end, selection.start < selection.end,
                   var current = controller
             else {
@@ -150,14 +158,23 @@
             }
             do {
                 let sample = try Self.sample()
-                let proposal = try current.previewReview(
-                    selection: selection, classification: classification, sample: sample
-                )
-                glance = proposal.before
+                let proposal: WorktimeReviewProposal
+                if let historical {
+                    proposal = try current.previewHistoricalReview(
+                        historical, selection: selection, source: source, classification: classification, sample: sample
+                    )
+                } else {
+                    proposal = try current.previewReview(
+                        selection: selection, classification: classification, sample: sample
+                    )
+                    glance = proposal.before
+                }
                 controller = current
                 reviewProposal = proposal
                 reviewNotice = nil
                 queueReminders(force: true)
+            } catch HistoricalReviewError.staleContext {
+                reviewNotice = "履歴が更新されました。過去勤務日を再選択してください。"
             } catch {
                 fail(error)
             }

@@ -45,7 +45,7 @@ struct WorktimeHistoryTests {
     }
 
     @Test func `recent history is bounded and newest first`() throws {
-        try withRepository { _, repo in
+        try withRepository { url, repo in
             var session = try repo.load(now: 100)
             let profile = try WorkdayProfile()
             var ids: [UUID] = []
@@ -60,6 +60,37 @@ struct WorktimeHistoryTests {
             let history = try WorktimeHistory(session: session, now: 500)
             #expect(history.totalEndedDays == 31)
             #expect(history.rows.map(\.id) == Array(ids.suffix(30).reversed()))
+            #expect(history.previousOffset == nil)
+            #expect(history.nextOffset == 30)
+            let controller = try WorktimeController(url: url, sample: ClockSample(wall: 500, uptime: 500))
+            let older = try controller.recentHistory(now: 500, offset: 30, previous: history)
+            #expect(older.rows.map(\.id) == [ids[0]])
+            #expect(older.previousOffset == 0)
+            #expect(older.nextOffset == nil)
+            let returned = try controller.recentHistory(now: 500, offset: 0, previous: older)
+            #expect(returned == history)
+            for offset in [-1, 1, 31, 60, Int.max] {
+                #expect(throws: WorktimeHistoryError.invalidOffset) {
+                    try controller.recentHistory(now: 500, offset: offset, previous: history)
+                }
+            }
+            #expect(throws: WorktimeHistoryError.stalePage) {
+                try controller.recentHistory(now: 500, offset: 30)
+            }
+        }
+    }
+
+    @Test func `page navigation rejects a history from an earlier revision`() throws {
+        try withRepository { url, _ in
+            var controller = try WorktimeController(url: url, sample: ClockSample(wall: 100, uptime: 100))
+            let history = try controller.recentHistory(now: 100)
+            _ = try controller.perform(
+                .clockIn(id: UUID(), profile: WorkdayProfile()), sample: ClockSample(wall: 101, uptime: 101)
+            )
+            #expect(throws: WorktimeHistoryError.stalePage) {
+                try controller.recentHistory(now: 102, offset: 0, previous: history)
+            }
+            #expect(try controller.recentHistory(now: 102).version != history.version)
         }
     }
 
