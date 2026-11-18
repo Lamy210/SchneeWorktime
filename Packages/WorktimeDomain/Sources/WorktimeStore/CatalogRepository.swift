@@ -23,7 +23,7 @@ public struct CatalogSession: Sendable {
     ) throws -> StoredReviewPreview {
         let preview = try catalog.previewReview(dayID: dayID, selection: selection,
                                                 classification: classification, now: now)
-        return StoredReviewPreview(version: version, preview: preview)
+        return StoredReviewPreview(version: version, preview: preview, source: validatedSnapshot)
     }
 }
 
@@ -45,6 +45,7 @@ public extension CatalogSession {
 public struct StoredReviewPreview: Sendable {
     public let version: StoreVersion
     public let preview: CatalogReviewPreview
+    fileprivate let source: StoredSnapshot
 }
 
 struct LoadedCatalog {
@@ -124,6 +125,7 @@ public struct CatalogRepository: Sendable {
         let event = JournalEvent(action: action, now: now)
         var loaded = try read(now: now)
         guard loaded.session.version == proposal.version else { throw SnapshotStoreError.staleVersion }
+        guard loaded.session.validatedSnapshot == proposal.source else { throw CatalogPersistenceError.invalidJournal }
         var catalog = loaded.session.catalog
         try catalog.commitReview(preview, now: now)
         return try commit(event, catalog: catalog, loaded: &loaded)
@@ -192,7 +194,8 @@ public struct CatalogRepository: Sendable {
         }
         loaded.journal.events.append(event)
         let payload = try JSONEncoder().encode(loaded.journal)
-        let version = try store.save(payload, expected: loaded.session.version)
+        let version = try store.save(payload, expected: loaded.session.version,
+                                     matching: loaded.session.validatedSnapshot)
         let snapshot = StoredSnapshot(version: version, payload: payload)
         return CatalogSession(snapshot: snapshot, catalog: catalog, now: event.now)
     }
@@ -219,11 +222,12 @@ public extension CatalogRepository {
     ) throws -> CatalogSession {
         let current = try store.load()
         guard current.version == proposal.currentVersion else { throw SnapshotStoreError.staleVersion }
+        guard current == proposal.currentSnapshot else { throw CatalogPersistenceError.invalidJournal }
         _ = try Self.rollbackProposal(source: proposal.source, current: current, now: now)
         let original = try CatalogBackup.encode(current, now: now)
         try BackupFile.publish(original, to: destination)
         guard try BackupFile.load(destination) == original else { throw CatalogRollbackError.preservationFailed }
-        let version = try store.replaceForRecovery(proposal.source, expected: current.version)
+        let version = try store.replaceForRecovery(proposal.source, matching: current)
         return try CatalogBackup.validateSnapshot(
             StoredSnapshot(version: version, payload: proposal.source.payload), now: now
         )
@@ -248,7 +252,7 @@ public extension CatalogRepository {
             throw CatalogRollbackError.divergentHistory
         }
         return CatalogRollbackProposal(
-            source: source, currentVersion: current.version,
+            source: source, currentSnapshot: current, currentVersion: current.version,
             currentDays: original.catalog.days.count, restoredDays: restored.catalog.days.count
         )
     }
