@@ -25,7 +25,7 @@
                         ReviewRangeEditor(
                             model: model, day: glance.day, gap: gap, duration: duration, historical: historical
                         )
-                            .id("\(glance.day.id)-\(glance.day.revision)-\(gap.start)-\(gap.end)")
+                        .id("\(glance.day.id)-\(glance.day.revision)-\(gap.start)-\(gap.end)")
                     }
                 }
             }
