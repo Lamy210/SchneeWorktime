@@ -34,14 +34,18 @@ struct JournalCapacityTests {
         var journal = fixture(id: id)
         let resume = JournalEvent(action: .command(.resume(id: id), at: 10001), now: 10001)
         journal.events.append(resume)
-        let close = JournalEvent(action: .command(.clockOut(confirmBreak: false), at: 10002), now: 10002)
-        journal.events.append(close)
         let source = StoredSnapshot(
             version: .init(epoch: UUID(), revision: Int64(journal.events.count)),
             payload: try JSONEncoder().encode(journal)
         )
-        let version = try store.seedRecovery(source, expected: store.load().version)
+        let activeVersion = try store.seedRecovery(source, expected: store.load().version)
         let repository = try CatalogRepository(url: url)
+        #expect(activeVersion.revision == 9901)
+        // A legacy active day near the limit must still be able to close.
+        let ended = try repository.apply(.clockOut(confirmBreak: false),
+                                         at: 10002, now: 10002, expected: activeVersion)
+        let version = ended.version
+        #expect(ended.catalog.activeID == nil)
         let before = try store.load()
         #expect(version.revision == 9902)
         #expect(throws: CatalogPersistenceError.insufficientStartCapacity) {
