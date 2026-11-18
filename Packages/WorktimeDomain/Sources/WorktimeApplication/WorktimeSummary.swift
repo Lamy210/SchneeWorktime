@@ -3,10 +3,10 @@ import WorktimeDomain
 import WorktimeStore
 
 public enum WorktimeSummaryError: Error, Equatable {
-    case invalidPeriod, invalidTimeZone, overflow
+    case invalidPeriod, invalidTimeZone, overflow, staleSummary
 }
 
-public enum WorktimeSummaryUnit: Sendable, Equatable {
+public enum WorktimeSummaryUnit: Sendable, Hashable {
     case day, week, month
 }
 
@@ -41,6 +41,11 @@ public struct WorktimeSummaryPeriod: Sendable, Equatable {
         self.timeZoneID = timeZoneID
         start = lower
         end = upper
+    }
+
+    public func adjacent(previous: Bool) throws -> WorktimeSummaryPeriod {
+        let instant = previous ? start - 1 : end
+        return try WorktimeSummaryPeriod(containing: instant, unit: unit, timeZoneID: timeZoneID)
     }
 }
 

@@ -80,6 +80,7 @@
                     reminderSettings
                     backupSettings
                     WorktimeHistoryView(model: model)
+                    WorktimeSummaryView(model: model)
                 }
                 backupInspectionSettings
                 BackupRollbackView(model: model)
