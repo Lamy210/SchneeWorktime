@@ -63,6 +63,32 @@
                 Text("日次超過合計：\(duration(value.dailySurplus))")
                 Text("日次不足と超過は相殺しません。").font(.caption)
                 WorktimeDailyChart(summary: value)
+                Button("この集計をCSVで保存") { export(value) }
+                    .disabled(!current || model.reviewProposal != nil)
+            }
+        }
+
+        private func export(_ value: WorktimeSummary) {
+            guard model.ready, model.sessionLock != nil, !model.choosingBackupDestination,
+                  model.reviewProposal == nil, model.controller?.isCurrent(value) == true
+            else { return }
+            model.choosingBackupDestination = true
+            defer { model.choosingBackupDestination = false }
+            let initial = try? model.databaseURL().deletingLastPathComponent()
+            guard let directory = WorktimeExportFormat.csv.chooseDirectory(initialDirectory: initial) else { return }
+            guard model.ready, model.sessionLock != nil, model.reviewProposal == nil,
+                  let controller = model.controller
+            else {
+                notice = "勤務記録が変わりました。CSVは保存していません。"
+                return
+            }
+            let name = "SchneeWorktime-summary-\(UUID().uuidString).csv"
+            do {
+                try controller.writeSummaryCSV(value, to: directory.appendingPathComponent(name),
+                                               sample: DesktopModel.sample())
+                notice = "保存しました：\(name)"
+            } catch {
+                notice = "集計または保存先を確認してください。既存ファイルは上書きしません。"
             }
         }
 
