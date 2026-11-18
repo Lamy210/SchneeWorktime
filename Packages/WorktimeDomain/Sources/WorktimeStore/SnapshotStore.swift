@@ -114,7 +114,8 @@ public struct SnapshotStore: Sendable {
         }
     }
 
-    /// Logical reset only. Old backups and filesystem remnants are not erased by this operation.
+    /// Logical reset of the entire live catalog and observation metadata.
+    /// Old backups and filesystem remnants are not erased by this operation.
     @discardableResult
     public func reset(expected: StoreVersion) throws -> StoreVersion {
         try connection { db in
@@ -123,6 +124,7 @@ public struct SnapshotStore: Sendable {
                 guard current.version == expected else { throw SnapshotStoreError.staleVersion }
                 let next = StoreVersion(epoch: UUID(), revision: 0)
                 try Self.write(db, version: next, payload: nil)
+                try Self.execute(db, "DROP TABLE IF EXISTS observation_checkpoint")
                 return next
             }
         }
