@@ -32,8 +32,9 @@ public enum CatalogCSV {
         }
         for audit in session.catalog.reviewAudit {
             let review = audit.review
+            let recordType = audit.origin == .recordedRestEnd ? "rest_end_correction" : "correction"
             let fields = [
-                "correction", audit.dayID.uuidString, "", "", classification(review.classification),
+                recordType, audit.dayID.uuidString, "", "", classification(review.classification),
                 String(review.selection.start), String(review.selection.end), "", "",
                 String(audit.revision), String(audit.observationGeneration), String(review.reviewedAt),
                 epoch, revision

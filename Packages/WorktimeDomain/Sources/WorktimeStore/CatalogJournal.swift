@@ -75,6 +75,7 @@ enum JournalAction: Codable, Equatable {
     case futureRest(dayID: UUID, remainingSeconds: Int64?)
     case desiredDeparture(dayID: UUID, candidate: Int64?, warningAcknowledged: Bool)
     case review(dayID: UUID, start: Int64, end: Int64, classification: JournalClassification)
+    case correctRestEnd(dayID: UUID, oldEnd: Int64, newEnd: Int64)
 }
 
 struct JournalEvent: Codable, Equatable {
@@ -100,6 +101,9 @@ struct JournalEvent: Codable, Equatable {
             let preview = try catalog.previewReview(dayID: dayID, selection: .init(start: start, end: end),
                                                     classification: classification.domain, now: now)
             try catalog.commitReview(preview, now: now)
+        case let .correctRestEnd(dayID, oldEnd, newEnd):
+            let preview = try catalog.previewRestEndCorrection(dayID: dayID, oldEnd: oldEnd, newEnd: newEnd, now: now)
+            try catalog.commitRestEndCorrection(preview, now: now)
         }
     }
 }
