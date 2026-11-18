@@ -2,49 +2,6 @@ import Foundation
 import WorktimeDomain
 import WorktimeStore
 
-public struct WorktimeGlance: Sendable {
-    public let day: Workday
-    public let snapshot: TimelineSnapshot
-    public let forecast: DailyForecast
-    public let reviewableGaps: [ObservationGap]
-    public let observedAt: Int64
-    public let desiredDepartureAt: Int64?
-
-    public init(catalog: WorkdayCatalog, now: Int64, dayID: UUID? = nil) throws {
-        let selected = if let dayID {
-            catalog.days.first(where: { $0.id == dayID })
-        } else {
-            catalog.days.last
-        }
-        guard let day = selected else { throw WorkdayError.noActiveDay }
-        let snapshot = try catalog.snapshot(dayID: day.id, now: now)
-        let state: PreviewState = switch day.state {
-        case .working: .working
-        case .onBreak: .onBreak(returnAt: nil)
-        case .ended: .ended
-        }
-        self.day = day
-        desiredDepartureAt = catalog.desiredDepartures[day.id]
-        observedAt = now
-        self.snapshot = snapshot
-        reviewableGaps = Self.reviewable(day: day, gaps: catalog.observations[day.id] ?? [], now: now)
-        forecast = try DailyForecast.calculate(
-            worked: snapshot.bounds.lower ... snapshot.bounds.upper,
-            target: day.profile.target, remainingRest: snapshot.remainingRest, now: now, state: state
-        )
-    }
-
-    private static func reviewable(day: Workday, gaps: [ObservationGap], now: Int64) -> [ObservationGap] {
-        day.intervals.filter { $0.kind == .work }.flatMap { interval in
-            gaps.compactMap { gap in
-                let start = max(interval.start, gap.start)
-                let end = min(interval.end ?? now, gap.end)
-                return start < end ? ObservationGap(start: start, end: end) : nil
-            }
-        }
-    }
-}
-
 public struct WorktimeReviewProposal: Sendable {
     fileprivate let stored: StoredReviewPreview
     public let before: WorktimeGlance
@@ -481,5 +438,41 @@ public extension WorktimeController {
         var checked = clock
         _ = try checked.advance(to: sample)
         _ = try repository.commitReset(proposal, now: sample.wall)
+    }
+}
+
+public extension WorktimeController {
+    func previewRestEndCorrection(
+        expectedDay: Workday, oldEnd: Int64, newEnd: Int64, sample: ClockSample
+    ) throws -> WorktimeRestEndProposal {
+        var checked = clock
+        guard try checked.advance(to: sample) == nil else { throw RestEndInteractionError.staleProposal }
+        let stored = try repository.revalidate(session, now: sample.wall)
+        guard stored.catalog.days.last == expectedDay else { throw RestEndInteractionError.staleProposal }
+        let preview = try stored.previewRestEndCorrection(
+            dayID: expectedDay.id, oldEnd: oldEnd, newEnd: newEnd, now: sample.wall
+        )
+        var proposed = stored.catalog
+        try proposed.commitRestEndCorrection(preview.preview, now: sample.wall)
+        let before = try WorktimeGlance(catalog: stored.catalog, now: sample.wall)
+        let after = try WorktimeGlance(catalog: proposed, now: sample.wall)
+        return WorktimeRestEndProposal(stored: preview, before: before, after: after)
+    }
+
+    func isCurrent(_ proposal: WorktimeRestEndProposal) -> Bool {
+        session.version == proposal.stored.version && session.catalog.days.last == proposal.before.day
+    }
+
+    mutating func commitRestEndCorrection(
+        _ proposal: WorktimeRestEndProposal, sample: ClockSample
+    ) throws -> WorktimeGlance? {
+        var checked = clock
+        guard isCurrent(proposal), try checked.advance(to: sample) == nil else {
+            throw RestEndInteractionError.staleProposal
+        }
+        session = try repository.commitRestEndCorrection(proposal.stored, now: sample.wall)
+        clock = checked
+        try saveCheckpoint(sample: sample, afterMutation: true)
+        return try glance(now: sample.wall)
     }
 }
