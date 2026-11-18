@@ -9,7 +9,7 @@ public enum WorktimeSummaryCSV {
             "recorded_rest_seconds", "uncertain_workday_count", "shortfall_lower_seconds", "shortfall_upper_seconds",
             "surplus_lower_seconds", "surplus_upper_seconds", "source_epoch", "source_revision", "loaded_at_utc"
         ]
-        let unit: String = switch summary.period.unit {
+        let unit = switch summary.period.unit {
         case .day: "day"
         case .week: "week"
         case .month: "month"
