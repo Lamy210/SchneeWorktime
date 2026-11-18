@@ -34,9 +34,10 @@ struct JournalCapacityTests {
         var journal = fixture(id: id)
         let resume = JournalEvent(action: .command(.resume(id: id), at: 10001), now: 10001)
         journal.events.append(resume)
+        let payload = try JSONEncoder().encode(journal)
         let source = StoredSnapshot(
             version: .init(epoch: UUID(), revision: Int64(journal.events.count)),
-            payload: try JSONEncoder().encode(journal)
+            payload: payload
         )
         let activeVersion = try store.seedRecovery(source, expected: store.load().version)
         let repository = try CatalogRepository(url: url)

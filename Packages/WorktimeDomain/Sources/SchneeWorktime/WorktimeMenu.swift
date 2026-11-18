@@ -87,7 +87,8 @@
             if model.ready {
                 JournalCapacityView(model: model)
                 if settingsValid, model.actionContext.canOpenWorkday,
-                   model.glance == nil || model.glance?.day.state == .ended {
+                   model.glance == nil || model.glance?.day.state == .ended
+                {
                     RetrospectiveStartView(model: model, targetMinutes: targetMinutes, restMinutes: restMinutes)
                 }
                 nextDaySettings

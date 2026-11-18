@@ -126,7 +126,8 @@ public struct CatalogRepository: Sendable {
         var loaded = try read(now: event.now)
         guard loaded.session.version == expected else { throw SnapshotStoreError.staleVersion }
         if case let .command(command, _) = event.action, command.opensWorkday,
-           !loaded.session.journalCapacity.canOpenWorkday {
+           !loaded.session.journalCapacity.canOpenWorkday
+        {
             throw CatalogPersistenceError.insufficientStartCapacity
         }
         var catalog = loaded.session.catalog
