@@ -421,20 +421,29 @@ public extension WorktimeController {
 
 public extension WorktimeController {
     func previewRestEndCorrection(
-        expectedDay: Workday, oldEnd: Int64, newEnd: Int64, sample: ClockSample
+        expectedDay: Workday, oldEnd: Int64, newEnd: Int64,
+        historical: HistoricalReviewContext? = nil, sample: ClockSample
     ) throws -> WorktimeRestEndProposal {
         try previewRestBoundaryCorrection(
-            expectedDay: expectedDay, old: oldEnd, new: newEnd, boundary: .end, sample: sample
+            expectedDay: expectedDay, old: oldEnd, new: newEnd, boundary: .end,
+            historical: historical, sample: sample
         )
     }
 
     func previewRestBoundaryCorrection(
-        expectedDay: Workday, old: Int64, new: Int64, boundary: RestBoundary, sample: ClockSample
+        expectedDay: Workday, old: Int64, new: Int64, boundary: RestBoundary,
+        historical: HistoricalReviewContext? = nil, sample: ClockSample
     ) throws -> WorktimeRestEndProposal {
         var checked = clock
         guard try checked.advance(to: sample) == nil else { throw RestEndInteractionError.staleProposal }
         let stored = try repository.revalidate(session, now: sample.wall)
-        guard stored.catalog.days.last == expectedDay else { throw RestEndInteractionError.staleProposal }
+        if let historical {
+            guard isCurrent(historical), historical.glance.day == expectedDay else {
+                throw RestEndInteractionError.staleProposal
+            }
+        } else if stored.catalog.days.last != expectedDay {
+            throw RestEndInteractionError.staleProposal
+        }
         let preview: StoredRestEndCorrection
         var proposed = stored.catalog
         switch boundary {
@@ -449,13 +458,13 @@ public extension WorktimeController {
             )
             try proposed.commitRestEndCorrection(preview.preview, now: sample.wall)
         }
-        let before = try WorktimeGlance(catalog: stored.catalog, now: sample.wall)
-        let after = try WorktimeGlance(catalog: proposed, now: sample.wall)
+        let before = try WorktimeGlance(catalog: stored.catalog, now: sample.wall, dayID: expectedDay.id)
+        let after = try WorktimeGlance(catalog: proposed, now: sample.wall, dayID: expectedDay.id)
         return WorktimeRestEndProposal(stored: preview, before: before, after: after)
     }
 
     func isCurrent(_ proposal: WorktimeRestEndProposal) -> Bool {
-        session.version == proposal.stored.version && session.catalog.days.last == proposal.before.day
+        session.version == proposal.stored.version && session.catalog.days.contains(proposal.before.day)
     }
 
     mutating func commitRestEndCorrection(

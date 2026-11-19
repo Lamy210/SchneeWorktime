@@ -48,7 +48,7 @@
                 Divider()
                 rowView(row)
                 if model.glance?.day.id != row.id {
-                    Button("この勤務日の要確認区間") { select(row.id, from: page) }
+                    Button("この勤務日の訂正") { select(row.id, from: page) }
                         .disabled(model.reviewProposal != nil || model.choosingBackupDestination)
                 }
             }
@@ -83,6 +83,12 @@
                         ReviewRangeSettingsView(model: model, glance: historical.glance, historical: historical)
                             .id(historical.glance.day.id)
                     }
+                    RestEndCorrectionView(
+                        model: model, day: historical.glance.day, boundary: .start, historical: historical
+                    )
+                    .id(historical.glance.day.id)
+                    RestEndCorrectionView(model: model, day: historical.glance.day, historical: historical)
+                        .id(historical.glance.day.id)
                 } else {
                     Text("履歴が更新されました。履歴を読み込んで再選択してください。").font(.caption)
                 }

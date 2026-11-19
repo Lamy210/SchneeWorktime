@@ -72,4 +72,42 @@ struct RestStartInteractionTests {
             #expect(try repo.load(now: 48664).catalog == saved.catalog)
         }
     }
+
+    @Test func `historical rest start correction preserves current attendance and rejects stale context`() throws {
+        try withController { url, controller in
+            let repo = try CatalogRepository(url: url)
+            let original = try repo.load(now: 48660)
+            let day = try #require(original.catalog.days.last)
+            _ = try controller.perform(.clockOut(confirmBreak: false), sample: sample(48661))
+            let activeID = UUID()
+            _ = try controller.perform(.clockIn(id: activeID, profile: WorkdayProfile()), sample: sample(48700))
+            let page = try controller.recentHistory(now: 48701)
+            let context = try controller.historicalReviewContext(dayID: day.id, history: page, sample: sample(48701))
+            let before = try repo.load(now: 48701)
+            let reminder = try controller.reminderState(sample: sample(48701))
+            let proposal = try controller.previewRestBoundaryCorrection(
+                expectedDay: context.glance.day, old: 43200, new: 41400, boundary: .start,
+                historical: context, sample: sample(48701)
+            )
+            #expect(proposal.after.snapshot.recordedRest == 5400)
+            #expect(try repo.load(now: 48701).version == before.version)
+            let committed = try controller.commitRestBoundaryCorrection(proposal, sample: sample(48702))
+            let saved = try repo.load(now: 48702)
+            let updated = try controller.reminderState(sample: sample(48702))
+            #expect(saved.catalog.activeID == activeID)
+            #expect(committed?.day == before.catalog.days.last)
+            #expect(saved.catalog.days.last == before.catalog.days.last)
+            #expect(saved.catalog.observations[activeID] == before.catalog.observations[activeID])
+            #expect(reminder?.desired == updated?.desired)
+            #expect(saved.catalog.reviewAudit.last?.dayID == day.id)
+            #expect(saved.catalog.reviewAudit.last?.origin == .recordedRestStart)
+            #expect(!controller.isCurrent(page))
+            #expect(throws: RestEndInteractionError.staleProposal) {
+                try controller.previewRestBoundaryCorrection(
+                    expectedDay: context.glance.day, old: 43200, new: 41400, boundary: .start,
+                    historical: context, sample: sample(48703)
+                )
+            }
+        }
+    }
 }

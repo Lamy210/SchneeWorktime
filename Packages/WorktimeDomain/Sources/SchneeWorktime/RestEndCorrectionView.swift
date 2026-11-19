@@ -9,15 +9,20 @@
         @ObservedObject var model: DesktopModel
         let day: Workday
         let boundary: RestBoundary
+        let historical: HistoricalReviewContext?
         @State private var selectedEnd: Int64
         @State private var offsetMinutes = "30"
         @State private var proposal: WorktimeRestEndProposal?
         @State private var notice: String?
 
-        init(model: DesktopModel, day: Workday, boundary: RestBoundary = .end) {
+        init(
+            model: DesktopModel, day: Workday, boundary: RestBoundary = .end,
+            historical: HistoricalReviewContext? = nil
+        ) {
             self.model = model
             self.day = day
             self.boundary = boundary
+            self.historical = historical
             _selectedEnd = State(initialValue: Self.boundaries(day, boundary: boundary).first ?? 0)
         }
 
@@ -92,7 +97,7 @@
             guard !overflow else { return }
             do {
                 proposal = try model.previewRestBoundaryCorrection(
-                    day: day, old: selectedEnd, new: newEnd, boundary: boundary
+                    day: day, old: selectedEnd, new: newEnd, boundary: boundary, historical: historical
                 )
             } catch {
                 notice = "時刻・区間・要確認記録を確認してください。訂正案は保存されていません。"
