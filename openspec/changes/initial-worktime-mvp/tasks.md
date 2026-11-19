@@ -167,4 +167,5 @@
   - 最新/過去終了日の退勤訂正画面を追加。±1440分の相対入力、秒を維持した時刻表示、実働上下限・日次不足/超過の比較、明示確定/取消、旧提案拒否、保存後のみ通知再調整。休憩中退勤は対象外と表示。PR #72のHEAD cbd3ca12で5ワークフロー成功後main統合（d4e7311e）。macOS buildはCI成功、VoiceOver/通知配送・実機操作未確認。
 - [ ] 18.5 始業時刻の事後訂正は別途仕様化し、前勤務日、捕捉timezone/論理開始日、参考時刻、観測checkpointの整合を定義してから実装する
   - PR #73はDomainプレビュー6件・全5 CI成功後main統合済み。PR #74の旧HEAD a6e6c4bdはStore回帰5件・全5 CI成功。旧参照なしと同一保存版/異なるbytesの拒否を検証する試験2件を追加し、main統合後のCIを再確認する。Application/UI、実機QAは未完了。
+  - PR #74はStore回帰7件・全5 CI成功後main統合済み（9b234959）。Applicationの非破壊preview/確定、最新・過去日、選択した集計timezone/unitの変更前後比較（期間を跨ぐ場合は双方）、保存版/時計/観測checkpoint照合を接続する。Application回帰3件追加（CI未確認）。UIと実機QAは別途。
 - [ ] 18.6 新journalイベント使用後の旧版ダウングレード非対応を配布・復旧手順に記載し、OpenSpec strict validationと受入マトリクスの対応を確認する
