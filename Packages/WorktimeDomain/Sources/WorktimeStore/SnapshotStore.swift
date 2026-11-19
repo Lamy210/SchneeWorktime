@@ -56,13 +56,17 @@ public struct SnapshotStore: Sendable {
 
     @discardableResult
     public func save(_ payload: Data, expected: StoreVersion) throws -> StoreVersion {
+        try save(payload, expected: expected, matching: nil)
+    }
+
+    func save(_ payload: Data, expected: StoreVersion, matching snapshot: StoredSnapshot?) throws -> StoreVersion {
         guard !payload.isEmpty, payload.count <= Self.maxPayload else {
             throw SnapshotStoreError.invalidPayload
         }
         return try connection { db in
             try Self.transaction(db) {
                 let current = try Self.read(db)
-                guard current.version == expected else { throw SnapshotStoreError.staleVersion }
+                try Self.checkSnapshot(current, expected: expected, matching: snapshot)
                 guard expected.revision < Int64.max else { throw SnapshotStoreError.revisionOverflow }
                 let next = StoreVersion(epoch: expected.epoch, revision: expected.revision + 1)
                 try Self.write(db, version: next, payload: payload)
@@ -98,7 +102,8 @@ public struct SnapshotStore: Sendable {
     }
 
     /// Internal only: the repository has validated both journals and preserved the current one.
-    func replaceForRecovery(_ source: StoredSnapshot, expected: StoreVersion) throws -> StoreVersion {
+    func replaceForRecovery(_ source: StoredSnapshot, matching snapshot: StoredSnapshot) throws -> StoreVersion {
+        let expected = snapshot.version
         guard source.version.epoch == expected.epoch,
               source.version.revision > 0, source.version.revision < expected.revision,
               let payload = source.payload, !payload.isEmpty, payload.count <= Self.maxPayload
@@ -106,7 +111,7 @@ public struct SnapshotStore: Sendable {
         return try connection { db in
             try Self.transaction(db) {
                 let current = try Self.read(db)
-                guard current.version == expected else { throw SnapshotStoreError.staleVersion }
+                try Self.checkSnapshot(current, expected: expected, matching: snapshot)
                 let next = StoreVersion(epoch: UUID(), revision: source.version.revision)
                 try Self.write(db, version: next, payload: payload)
                 return next
@@ -126,15 +131,21 @@ public struct SnapshotStore: Sendable {
         try connection { db in
             try Self.transaction(db) {
                 let current = try Self.read(db)
-                guard current.version == expected else { throw SnapshotStoreError.staleVersion }
-                if let snapshot, current != snapshot {
-                    throw CatalogPersistenceError.invalidJournal
-                }
+                try Self.checkSnapshot(current, expected: expected, matching: snapshot)
                 let next = StoreVersion(epoch: UUID(), revision: 0)
                 try Self.write(db, version: next, payload: nil)
                 try Self.execute(db, "DROP TABLE IF EXISTS observation_checkpoint")
                 return next
             }
+        }
+    }
+
+    private static func checkSnapshot(
+        _ current: StoredSnapshot, expected: StoreVersion, matching snapshot: StoredSnapshot?
+    ) throws {
+        guard current.version == expected else { throw SnapshotStoreError.staleVersion }
+        if let snapshot, current != snapshot {
+            throw CatalogPersistenceError.invalidJournal
         }
     }
 

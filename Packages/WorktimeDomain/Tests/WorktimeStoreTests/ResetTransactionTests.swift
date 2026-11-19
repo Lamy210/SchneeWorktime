@@ -36,6 +36,41 @@ struct ResetTransactionTests {
         }
     }
 
+    @Test func `same revision payload alteration rejects a guarded append and preserves changed bytes`() throws {
+        try withStore { url, store in
+            let version = try store.save(Data([1]), expected: store.load().version)
+            let confirmed = try store.load()
+            try execute("UPDATE snapshot SET payload = X'02' WHERE id = 1", at: url)
+            let changed = try store.load()
+            #expect(throws: CatalogPersistenceError.invalidJournal) {
+                try store.save(Data([3]), expected: version, matching: confirmed)
+            }
+            #expect(try store.load() == changed)
+            let next = try store.save(Data([3]), expected: version, matching: changed)
+            #expect(next.revision == version.revision + 1)
+            #expect(try store.load().payload == Data([3]))
+        }
+    }
+
+    @Test func `rollback refuses to replace bytes different from the preserved snapshot`() throws {
+        try withStore { url, store in
+            let first = try store.save(Data([1]), expected: store.load().version)
+            let source = try store.load()
+            _ = try store.save(Data([2]), expected: first)
+            let preserved = try store.load()
+            try execute("UPDATE snapshot SET payload = X'03' WHERE id = 1", at: url)
+            let changed = try store.load()
+            #expect(throws: CatalogPersistenceError.invalidJournal) {
+                try store.replaceForRecovery(source, matching: preserved)
+            }
+            #expect(try store.load() == changed)
+            let restored = try store.replaceForRecovery(source, matching: changed)
+            #expect(restored.epoch != changed.version.epoch)
+            #expect(restored.revision == first.revision)
+            #expect(try store.load().payload == source.payload)
+        }
+    }
+
     @Test func `checkpoint cleanup failure rolls back logical reset and epoch change`() throws {
         try withStore { url, store in
             let version = try store.save(Data([1]), expected: store.load().version)
