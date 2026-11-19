@@ -89,6 +89,8 @@
                     .id(historical.glance.day.id)
                     RestEndCorrectionView(model: model, day: historical.glance.day, historical: historical)
                         .id(historical.glance.day.id)
+                    ClockOutCorrectionView(model: model, day: historical.glance.day, historical: historical)
+                        .id(historical.glance.day.id)
                 } else {
                     Text("履歴が更新されました。履歴を読み込んで再選択してください。").font(.caption)
                 }
