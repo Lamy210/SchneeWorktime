@@ -397,13 +397,6 @@
     }
 
     extension DesktopModel {
-        func previewDesiredDeparture(at instant: Int64) throws -> DesiredDepartureProposal {
-            guard ready, !choosingBackupDestination, reviewProposal == nil, let controller else {
-                throw DesiredDepartureSaveError.staleProposal
-            }
-            return try controller.previewDesiredDeparture(at: instant, sample: Self.sample())
-        }
-
         func confirmDesiredDeparture(_ proposal: DesiredDepartureProposal, warningAcknowledged: Bool) throws {
             guard ready, !choosingBackupDestination, reviewProposal == nil, var current = controller else {
                 throw DesiredDepartureSaveError.staleProposal
@@ -458,16 +451,20 @@
     }
 
     extension DesktopModel {
-        func previewRetrospectiveStart(
-            at instant: Int64, targetMinutes: Int, restMinutes: Int
-        ) throws -> RetrospectiveStartProposal {
-            guard ready, !choosingBackupDestination, reviewProposal == nil, let controller else {
-                throw RetrospectiveStartError.staleProposal
+        func confirmRestEndCorrection(_ proposal: WorktimeRestEndProposal) throws {
+            guard ready, !choosingBackupDestination, reviewProposal == nil,
+                  var current = controller, current.isCurrent(proposal)
+            else { throw RestEndInteractionError.staleProposal }
+            do {
+                glance = try current.commitRestEndCorrection(proposal, sample: Self.sample())
+                controller = current
+                queueReminders(force: true)
+            } catch let error as RestEndInteractionError {
+                throw error
+            } catch {
+                fail(error)
+                throw error
             }
-            let settings = try NextDaySettings(targetMinutes: targetMinutes, restMinutes: restMinutes)
-            return try controller.previewRetrospectiveStart(
-                at: instant, profile: capturedProfile(settings.profile, at: instant), sample: Self.sample()
-            )
         }
 
         func confirmRetrospectiveStart(_ proposal: RetrospectiveStartProposal) throws {
