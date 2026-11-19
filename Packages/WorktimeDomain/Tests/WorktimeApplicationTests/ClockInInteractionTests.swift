@@ -26,7 +26,7 @@ struct ClockInInteractionTests {
         try body(repo, &controller)
     }
 
-    @Test func previewDoesNotSaveAndMovesSummaryPeriod() throws {
+    @Test func `preview does not save and moves summary period`() throws {
         try withController { repo, controller in
             let before = try repo.load(now: 61211)
             let day = try #require(before.catalog.days.last)
@@ -63,7 +63,7 @@ struct ClockInInteractionTests {
         }
     }
 
-    @Test func historicalCorrectionPreservesActiveDayAndCheckpoint() throws {
+    @Test func `historical correction preserves active day and checkpoint`() throws {
         try withController { repo, controller in
             let ended = try #require(repo.load(now: 61210).catalog.days.last)
             let id = UUID()
@@ -84,7 +84,7 @@ struct ClockInInteractionTests {
             #expect(result?.day == before.catalog.days.last)
             #expect(saved.catalog.activeID == id)
             #expect(saved.catalog.days.last == before.catalog.days.last)
-            let checkpoint = try #require(repo.loadObservationCheckpoint(expected: saved.version))
+            let checkpoint = try #require(try repo.loadObservationCheckpoint(expected: saved.version))
             #expect(checkpoint.dayID == id)
             #expect(checkpoint.observedAt == 61213)
             #expect(try controller.reminderState(sample: sample(61213))?.desired == reminders?.desired)
@@ -92,7 +92,7 @@ struct ClockInInteractionTests {
         }
     }
 
-    @Test func observationGapInvalidatesHistoricalProposal() throws {
+    @Test func `observation gap invalidates historical proposal`() throws {
         try withController { repo, controller in
             let ended = try #require(repo.load(now: 61210).catalog.days.last)
             _ = try controller.perform(.clockIn(id: UUID(), profile: WorkdayProfile()), sample: sample(61211))
