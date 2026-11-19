@@ -130,3 +130,12 @@ DepartureScenarioTests 5件を追加。入力範囲と前日profileの不変性�
 | 記録済み始業訂正 | 過去日訂正失敗時に捕捉参考情報・現在の勤務日・checkpoint・元journalを維持。再試行で監査証跡と訂正済み実働が一致し、旧案を拒否 |
 
 ローカルSQLiteの隔離fixtureでFAIL直後にはUPDATE済み行が見え、ROLLBACK後に元の行へ復帰することを確認。Swift統合試験の結果はCIで確認する。実際の電源断・ディスク満杯・複数プロセス・macOS実機の合格を意味しない。既存のreset障害試験は `ResetTransactionTests`、確定後checkpoint失敗の試験は `CommittedCheckpointTests` を参照。テストを実データに適用しない。
+
+## 同時writerの回帰試験（AC-131/135/146/157/158）
+
+`ConcurrentCatalogWriterTests` は同じ保存版を共有する独立Repositoryの2つのTaskをactorの開始ゲートで待ち合わせ、同時に操作を投入する。順次stale試験を維持し、実際のSQLite接続からの同時要求を追加する。
+
+- 異なるUUIDの出社競合: 片方のみ確定、他方はstaleVersion、再open後のactiveが1件、revisionが1回だけ増える。
+- 論理reset対出社: 片方のみ確定。reset勝利時は新epoch・空payload、出社勝利時は旧epoch・元の終了日と新active。いずれも旧保存版での再試行を拒否し再open後の完全snapshotを維持する。
+
+開始ゲートのSwift 6 strict concurrency隔離fixtureは成功。統合テストは新規CI待ち。OSによる実SQLの重なり方は非決定的で、両順序の網羅や別プロセス、強制終了、実機QAの合格を意味しない。ACの最終合格は実機・復旧検証との照合後に判断する。
