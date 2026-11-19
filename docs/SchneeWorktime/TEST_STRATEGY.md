@@ -118,3 +118,15 @@ Application回帰試験を4件追加する（累計9件、全体65件を予定�
 
 ### 次回勤務設定・非破壊退勤試算
 DepartureScenarioTests 5件を追加。入力範囲と前日profileの不変性、実績と将来仮定の分離、実現不能/過去/今帰る、休憩中の復帰仮定、未確認範囲と退勤済みの結果を検証する。全体70件予定。追加テスト、macOS GUIビルド・操作は未確認。希望時刻の保存と当日設定反映は今後の別タスクで検証する。
+
+## 訂正保存のSQLiteエラー注入（AC-72/153/161）
+
+`CorrectionTransactionTests` はテスト専用DBで snapshot UPDATE の AFTER trigger に `RAISE(FAIL)` を注入する。FAIL はそれ以前の同一statementの変更を取り消さないため、単なる入力拒否ではなく保存transactionのエラー処理を検証する。
+
+| 対象 | 検証する不変条件 |
+|---|---|
+| 未確認観測レビュー | 失敗後の再openで元のjournal bytes・revision・監査・観測・checkpointを維持。障害を解消して同じ確認案を再試行すると1件だけ確定し、三度目の旧版保存を拒否 |
+| 記録済み退勤訂正 | 失敗後に元の終了区間と監査を維持。再試行で区間・監査・revisionが一体で更新され、再openでも一致 |
+| 記録済み始業訂正 | 過去日訂正失敗時に捕捉参考情報・現在の勤務日・checkpoint・元journalを維持。再試行で監査証跡と訂正済み実働が一致し、旧案を拒否 |
+
+ローカルSQLiteの隔離fixtureでFAIL直後にはUPDATE済み行が見え、ROLLBACK後に元の行へ復帰することを確認。Swift統合試験の結果はCIで確認する。実際の電源断・ディスク満杯・複数プロセス・macOS実機の合格を意味しない。既存のreset障害試験は `ResetTransactionTests`、確定後checkpoint失敗の試験は `CommittedCheckpointTests` を参照。テストを実データに適用しない。
