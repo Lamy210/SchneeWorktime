@@ -279,9 +279,8 @@ public struct CatalogRepository: Sendable {
         guard loaded.journal.events.count < CatalogJournal.maxEvents else {
             throw CatalogPersistenceError.eventLimit
         }
-        if loaded.session.catalog.activeID != nil,
-           !loaded.session.journalCapacity.allowsActiveMutation(event.action)
-        {
+        let capacity = loaded.session.journalCapacity
+        if loaded.session.catalog.activeID != nil, !capacity.allowsActiveMutation(event.action) {
             throw CatalogPersistenceError.reservedExitCapacity
         }
         loaded.journal.events.append(event)
