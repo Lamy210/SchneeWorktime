@@ -2,7 +2,7 @@ import Foundation
 import WorktimeDomain
 
 public enum CatalogPersistenceError: Error, Equatable {
-    case unsupportedSchema, invalidJournal, futureEvent, eventLimit, insufficientStartCapacity
+    case unsupportedSchema, invalidJournal, futureEvent, eventLimit, insufficientStartCapacity, reservedExitCapacity
 }
 
 public struct CatalogSession: Sendable {
@@ -278,6 +278,10 @@ public struct CatalogRepository: Sendable {
     ) throws -> CatalogSession {
         guard loaded.journal.events.count < CatalogJournal.maxEvents else {
             throw CatalogPersistenceError.eventLimit
+        }
+        let capacity = loaded.session.journalCapacity
+        if loaded.session.catalog.activeID != nil, !capacity.allowsActiveMutation(event.action) {
+            throw CatalogPersistenceError.reservedExitCapacity
         }
         loaded.journal.events.append(event)
         let payload = try JSONEncoder().encode(loaded.journal)
