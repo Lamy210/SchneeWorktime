@@ -63,11 +63,14 @@
                             ClockOutCorrectionView(model: model, day: glance.day)
                         }
                         .id("\(glance.day.id)-\(glance.day.revision)")
+                        .disabled(!model.allowsOptionalJournalMutation)
                         if glance.day.state != .ended, model.reviewProposal == nil {
                             FutureRestSettingsView(model: model, day: glance.day)
                                 .id(glance.day.id)
+                                .disabled(!model.allowsOptionalJournalMutation)
                             DesiredDepartureSettingsView(model: model, day: glance.day)
                                 .id(glance.day.id)
+                                .disabled(!model.allowsOptionalJournalMutation)
                             DepartureScenarioView(glance: glance)
                         }
                     }
@@ -352,10 +355,12 @@
                 HStack {
                     Button("キャンセル") { model.cancelReview() }
                     Button("訂正を保存") { model.acceptReview() }
+                        .disabled(!model.allowsOptionalJournalMutation)
                 }
             } else if !glance.reviewableGaps.isEmpty {
                 Divider()
                 ReviewRangeSettingsView(model: model, glance: glance)
+                    .disabled(!model.allowsOptionalJournalMutation)
             }
         }
 
