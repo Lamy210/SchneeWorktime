@@ -156,3 +156,12 @@
 - [ ] 17.8 ローカル検証用 .app の生成、Info.plist/LSUIElement/macOS 15/実行属性、既存バンドル保護、秘密情報不要のCIでMach-O/Plist/tar生成を確認。Python fixture単体試験5件はLinuxで成功、macOS実ビルド・起動・署名/公証・公開の検証は未完了。
 
 - [ ] 17.9 アプリのDBオープン前にprivate directoryと協調プロセス用flockを取得し、再読込時も保持する。危険な権限・リンク・重複起動を拒否。LocalSessionLockTests 5件を隔離Linux Swift 6.2.1で確認。macOS複数プロセス・DB本体/sidecar保護・ACL・強制終了復旧は別途検証。
+
+
+## 18. 記録済み時刻の監査付き訂正
+- [ ] 18.1 休憩開始・終了境界の訂正、非破壊preview、明示確定、監査・保存・通知再調整（PR #69は5ワークフロー成功後main統合済み。実機QA未実施）
+- [ ] 18.2 退勤済み勤務日の末尾勤務区間の終了訂正をDomain/Storeに実装。未来・ゼロ長・後続日重複・未確認区間・休憩中退勤を拒否。監査・journal再生・CSV/バックアップと再開後の新観測保持を検証（ClockOutCorrectionTests、PR #70、修正後CI未確認）
+- [ ] 18.3 退勤訂正のApplication preview/commitを保存epoch/revision・観測世代・時計と照合し、最新/過去勤務日を区別する。過去日訂正でactive日を維持し、観測checkpointと通知を最新確定状態へ再収束させる（検証: 非破壊・取消・競合・時計異常・再開・過去日回帰）
+- [ ] 18.4 退勤訂正の確認UIを最新/過去履歴に接続し、前後の実働・不足/超過を表示する（検証: macOS build、VoiceOver、実機操作、通知）
+- [ ] 18.5 始業時刻の事後訂正は別途仕様化し、前勤務日、捕捉timezone/論理開始日、参考時刻、観測checkpointの整合を定義してから実装する
+- [ ] 18.6 新journalイベント使用後の旧版ダウングレード非対応を配布・復旧手順に記載し、OpenSpec strict validationと受入マトリクスの対応を確認する

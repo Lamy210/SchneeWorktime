@@ -126,3 +126,7 @@ Detailed rationale: `FORECAST_SEMANTICS.md`, `NOTIFICATION_POLICY.md`.
 ### 記録済み休憩開始の訂正（保存基盤）
 
 既存の勤務→休憩の共有境界だけを前後に移動できる。閉じた休憩・開いた休憩の双方を対象とし、状態・休憩終了時刻・他勤務日・予定休憩を維持する。未来・ゼロ長・未確認区間との交差を拒否。recordedRestStart監査とrest_start_correction CSV種別を追加。旧correctRestEnd journalイベントの形式は変更せず、新correctRestStartイベントを追加する。プレビュー型の旧End名はAPI互換性のため維持し、boundaryを必須の区別とする。新イベント保存後の旧版ダウングレードは非対応。UI/通知接続と実機・CI検証は後続。
+
+### 記録済み退勤時刻の訂正（保存基盤）
+
+退勤済み勤務日の末尾の閉じた勤務区間のみ終了境界を訂正する。休憩中退勤・開いた勤務・ゼロ長・未来・後続勤務日との重複・未確認区間の交差は拒否。後続日の開始と一致は許可。始業、捕捉済み基準時刻、休憩、他勤務日を変えない。recordedClockOut監査とclock_out_correction CSV種別を追加。短縮で実績から除外した範囲は新しい再開後の観測を抑制してはならない。新journal event保存後の旧版ダウングレードは非対応。始業訂正・退勤訂正UI・通知との接続は後続。CI・実機未確認。
