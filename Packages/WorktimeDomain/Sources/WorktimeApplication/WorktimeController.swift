@@ -419,74 +419,34 @@ public extension WorktimeController {
     }
 }
 
-public extension WorktimeController {
-    func previewRestEndCorrection(
-        expectedDay: Workday, oldEnd: Int64, newEnd: Int64,
-        historical: HistoricalReviewContext? = nil, sample: ClockSample
-    ) throws -> WorktimeRestEndProposal {
-        try previewRestBoundaryCorrection(
-            expectedDay: expectedDay, old: oldEnd, new: newEnd, boundary: .end,
-            historical: historical, sample: sample
-        )
-    }
-
-    func previewRestBoundaryCorrection(
-        expectedDay: Workday, old: Int64, new: Int64, boundary: RestBoundary,
-        historical: HistoricalReviewContext? = nil, sample: ClockSample
-    ) throws -> WorktimeRestEndProposal {
+extension WorktimeController {
+    func correctionSession(
+        expectedDay: Workday, historical: HistoricalReviewContext?, sample: ClockSample, stale: Error
+    ) throws -> CatalogSession {
         var checked = clock
-        guard try checked.advance(to: sample) == nil else { throw RestEndInteractionError.staleProposal }
+        guard try checked.advance(to: sample) == nil else { throw stale }
         let stored = try repository.revalidate(session, now: sample.wall)
         if let historical {
-            guard isCurrent(historical), historical.glance.day == expectedDay else {
-                throw RestEndInteractionError.staleProposal
-            }
+            guard isCurrent(historical), historical.glance.day == expectedDay else { throw stale }
         } else if stored.catalog.days.last != expectedDay {
-            throw RestEndInteractionError.staleProposal
+            throw stale
         }
-        let preview: StoredRestEndCorrection
-        var proposed = stored.catalog
-        switch boundary {
-        case .start:
-            preview = try stored.previewRestStartCorrection(
-                dayID: expectedDay.id, oldStart: old, newStart: new, now: sample.wall
-            )
-            try proposed.commitRestStartCorrection(preview.preview, now: sample.wall)
-        case .end:
-            preview = try stored.previewRestEndCorrection(
-                dayID: expectedDay.id, oldEnd: old, newEnd: new, now: sample.wall
-            )
-            try proposed.commitRestEndCorrection(preview.preview, now: sample.wall)
-        }
-        let before = try WorktimeGlance(catalog: stored.catalog, now: sample.wall, dayID: expectedDay.id)
-        let after = try WorktimeGlance(catalog: proposed, now: sample.wall, dayID: expectedDay.id)
-        return WorktimeRestEndProposal(stored: preview, before: before, after: after)
+        return stored
     }
 
-    func isCurrent(_ proposal: WorktimeRestEndProposal) -> Bool {
-        session.version == proposal.stored.version && session.catalog.days.contains(proposal.before.day)
+    func isCurrentCorrection(version: StoreVersion, day: Workday) -> Bool {
+        session.version == version && session.catalog.days.contains(day)
     }
 
-    mutating func commitRestEndCorrection(
-        _ proposal: WorktimeRestEndProposal, sample: ClockSample
-    ) throws -> WorktimeGlance? {
-        guard proposal.boundary == .end else { throw RestEndInteractionError.staleProposal }
-        return try commitRestBoundaryCorrection(proposal, sample: sample)
-    }
-
-    mutating func commitRestBoundaryCorrection(
-        _ proposal: WorktimeRestEndProposal, sample: ClockSample
+    mutating func commitCorrection(
+        version: StoreVersion, day: Workday, sample: ClockSample, stale: Error,
+        apply: (CatalogRepository) throws -> CatalogSession
     ) throws -> WorktimeGlance? {
         var checked = clock
-        guard isCurrent(proposal), try checked.advance(to: sample) == nil else {
-            throw RestEndInteractionError.staleProposal
+        guard isCurrentCorrection(version: version, day: day), try checked.advance(to: sample) == nil else {
+            throw stale
         }
-        switch proposal.boundary {
-        case .start:
-            session = try repository.commitRestStartCorrection(proposal.stored, now: sample.wall)
-        case .end:
-            session = try repository.commitRestEndCorrection(proposal.stored, now: sample.wall)
-        }
+        session = try apply(repository)
         clock = checked
         try saveCheckpoint(sample: sample, afterMutation: true)
         return try glance(now: sample.wall)
