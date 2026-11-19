@@ -73,15 +73,19 @@ public struct WorktimeSummary: Sendable, Equatable {
     public let daily: [WorktimeDailySummary]
 
     public init(session: CatalogSession, period: WorktimeSummaryPeriod, now: Int64) throws {
+        try self.init(catalog: session.catalog, version: session.version, period: period, now: now)
+    }
+
+    init(catalog: WorkdayCatalog, version: StoreVersion, period: WorktimeSummaryPeriod, now: Int64) throws {
         var totals = SummaryTotals()
         var grouped: [Int64: SummaryTotals] = [:]
         guard let zone = TimeZone(identifier: period.timeZoneID) else { throw WorktimeSummaryError.invalidTimeZone }
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = zone
-        for day in session.catalog.days where day.state == .ended {
+        for day in catalog.days where day.state == .ended {
             guard let start = day.intervals.first?.start else { throw WorkdayError.invalidEventTime }
             guard start >= period.start, start < period.end else { continue }
-            let snapshot = try day.snapshot(now: now, uncertainty: session.catalog.observations[day.id] ?? [])
+            let snapshot = try day.snapshot(now: now, uncertainty: catalog.observations[day.id] ?? [])
             let bounds = snapshot.bounds.lower ... snapshot.bounds.upper
             let forecast = try DailyForecast.calculate(
                 worked: bounds, target: day.profile.target, remainingRest: snapshot.remainingRest,
@@ -97,7 +101,7 @@ public struct WorktimeSummary: Sendable, Equatable {
                 bounds: bounds, rest: snapshot.recordedRest, target: day.profile.target, forecast: forecast
             )
         }
-        version = session.version
+        self.version = version
         loadedAt = now
         self.period = period
         endedDays = totals.endedDays
