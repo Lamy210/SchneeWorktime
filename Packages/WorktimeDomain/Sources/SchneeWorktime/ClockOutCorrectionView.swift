@@ -8,7 +8,7 @@
     struct ClockOutCorrectionView: View {
         @ObservedObject var model: DesktopModel
         let day: Workday
-        var historical: HistoricalReviewContext? = nil
+        var historical: HistoricalReviewContext?
         @State private var offsetMinutes = "30"
         @State private var proposal: WorktimeClockOutProposal?
         @State private var notice: String?
