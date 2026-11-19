@@ -118,3 +118,7 @@ Detailed rationale: `FORECAST_SEMANTICS.md`, `NOTIFICATION_POLICY.md`.
 ## 記録済み休憩終了の訂正（AC-10の保存基盤）
 
 隣接する閉じた休憩と勤務の共有境界だけを前後に変更する。ゼロ長・未来・非隣接・要確認区間との交差は拒否し、勤務日の開始・終了・状態・予定休憩・他勤務日は維持する。確認時は両Domain世代、store epoch/revision、保存済みsnapshotと訂正前後を照合する。監査の由来はrecordedRestEnd、CSVではrest_end_correction（列構成は維持）。新journal eventは旧版で読めないため更新後のダウングレードは禁止。UIの明示確認・通知再計算・AC-10全体の受入は後続。最新CI未確認。
+
+### 記録済み休憩開始の訂正（保存基盤）
+
+既存の勤務→休憩の共有境界だけを前後に移動できる。閉じた休憩・開いた休憩の双方を対象とし、状態・休憩終了時刻・他勤務日・予定休憩を維持する。未来・ゼロ長・未確認区間との交差を拒否。recordedRestStart監査とrest_start_correction CSV種別を追加。旧correctRestEnd journalイベントの形式は変更せず、新correctRestStartイベントを追加する。プレビュー型の旧End名はAPI互換性のため維持し、boundaryを必須の区別とする。新イベント保存後の旧版ダウングレードは非対応。UI/通知接続と実機・CI検証は後続。

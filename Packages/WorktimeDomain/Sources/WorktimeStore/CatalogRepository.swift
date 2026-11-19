@@ -40,6 +40,15 @@ public extension CatalogSession {
         let preview = try catalog.previewRestEndCorrection(dayID: dayID, oldEnd: oldEnd, newEnd: newEnd, now: now)
         return StoredRestEndCorrection(version: version, preview: preview, source: validatedSnapshot)
     }
+
+    func previewRestStartCorrection(
+        dayID: UUID, oldStart: Int64, newStart: Int64, now: Int64
+    ) throws -> StoredRestEndCorrection {
+        let preview = try catalog.previewRestStartCorrection(
+            dayID: dayID, oldStart: oldStart, newStart: newStart, now: now
+        )
+        return StoredRestEndCorrection(version: version, preview: preview, source: validatedSnapshot)
+    }
 }
 
 public struct StoredReviewPreview: Sendable {
@@ -134,13 +143,34 @@ public struct CatalogRepository: Sendable {
     public func commitRestEndCorrection(
         _ proposal: StoredRestEndCorrection, now: Int64
     ) throws -> CatalogSession {
+        guard proposal.preview.boundary == .end else { throw RestEndCorrectionError.changedPreview }
+        return try commitRestBoundaryCorrection(proposal, now: now)
+    }
+
+    public func commitRestStartCorrection(
+        _ proposal: StoredRestEndCorrection, now: Int64
+    ) throws -> CatalogSession {
+        guard proposal.preview.boundary == .start else { throw RestEndCorrectionError.changedPreview }
+        return try commitRestBoundaryCorrection(proposal, now: now)
+    }
+
+    private func commitRestBoundaryCorrection(
+        _ proposal: StoredRestEndCorrection, now: Int64
+    ) throws -> CatalogSession {
         var loaded = try read(now: now)
         guard loaded.session.version == proposal.version else { throw SnapshotStoreError.staleVersion }
         guard loaded.session.validatedSnapshot == proposal.source else { throw CatalogPersistenceError.invalidJournal }
         var catalog = loaded.session.catalog
-        try catalog.commitRestEndCorrection(proposal.preview, now: now)
         let preview = proposal.preview
-        let action = JournalAction.correctRestEnd(dayID: preview.dayID, oldEnd: preview.oldEnd, newEnd: preview.newEnd)
+        let action: JournalAction
+        switch preview.boundary {
+        case .start:
+            try catalog.commitRestStartCorrection(preview, now: now)
+            action = .correctRestStart(dayID: preview.dayID, oldStart: preview.oldEnd, newStart: preview.newEnd)
+        case .end:
+            try catalog.commitRestEndCorrection(preview, now: now)
+            action = .correctRestEnd(dayID: preview.dayID, oldEnd: preview.oldEnd, newEnd: preview.newEnd)
+        }
         return try commit(JournalEvent(action: action, now: now), catalog: catalog, loaded: &loaded)
     }
 

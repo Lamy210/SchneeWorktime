@@ -32,7 +32,11 @@ public enum CatalogCSV {
         }
         for audit in session.catalog.reviewAudit {
             let review = audit.review
-            let recordType = audit.origin == .recordedRestEnd ? "rest_end_correction" : "correction"
+            let recordType = switch audit.origin {
+            case .observation: "correction"
+            case .recordedRestEnd: "rest_end_correction"
+            case .recordedRestStart: "rest_start_correction"
+            }
             let fields = [
                 recordType, audit.dayID.uuidString, "", "", classification(review.classification),
                 String(review.selection.start), String(review.selection.end), "", "",
