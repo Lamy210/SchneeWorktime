@@ -160,3 +160,18 @@ The repository SHALL return changed canonical state only after the durable store
 #### Scenario: Duplicate durable observation
 - **WHEN** 既に受理した観測範囲を同じ保存版で再送する
 - **THEN** payloadの追加保存・store revisionの更新を行わない
+
+### Requirement: Preserve final journal slots for active workday exit
+The storage coordinator SHALL reserve the final two available event slots while a workday is active for a necessary observation and clock-out. It SHALL refuse other mutations that would consume either slot, and refuse a new observation that would consume the final slot. Already-covered duplicate observations SHALL remain no-ops. The coordinator SHALL still validate actual clock-out and retain the existing hard limits. Capacity refusal SHALL preserve the previous durable state; the application SHALL NOT bypass necessary observation or invent attendance. This is a bounded mitigation, not a guarantee that all active workdays can close, and does not migrate a full journal or reserve physical disk space.
+
+#### Scenario: Enter exit reserve
+- **WHEN** active勤務の残枠が2件となり、休憩・予定変更・訂正を新規保存しようとする
+- **THEN** 保存を拒否して原本を維持し、退勤と保全を優先するように案内する
+
+#### Scenario: Observe and close with two remaining slots
+- **WHEN** 残2件で新たな要確認観測が必要となり、保存後に追加観測なしで明示退勤する
+- **THEN** 観測と退勤をそれぞれ通常の検証と原子的保存で記録する。重複観測は枠を消費しない
+
+#### Scenario: Further observation would consume final slot
+- **WHEN** active勤務の残1件で新しい観測が必要となる
+- **THEN** 観測を拒否して原本を維持し、観測を省略して退勤を確定しない。既存の記録停止・復旧案内へ進む
