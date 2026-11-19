@@ -47,7 +47,7 @@ struct ClockOutInteractionTests {
         }
     }
 
-    @Test func `historical correction preserves active day and refuses unobserved gap`() throws {
+    @Test func `historical correction preserves active day and reminders`() throws {
         try withController { repo, controller in
             let ended = try #require(repo.load(now: 220).catalog.days.last)
             let activeID = UUID()
@@ -60,9 +60,6 @@ struct ClockOutInteractionTests {
                 expectedDay: context.glance.day, oldEnd: 200, newEnd: 210,
                 historical: context, sample: sample(222)
             )
-            #expect(throws: ClockOutInteractionError.staleProposal) {
-                try controller.commitClockOutCorrection(proposal, sample: sample(240))
-            }
             #expect(try repo.load(now: 222).version == before.version)
             let result = try controller.commitClockOutCorrection(proposal, sample: sample(223))
             let saved = try repo.load(now: 223)
@@ -72,6 +69,29 @@ struct ClockOutInteractionTests {
             #expect(saved.catalog.observations[activeID] == before.catalog.observations[activeID])
             #expect(try controller.reminderState(sample: sample(223))?.desired == reminders?.desired)
             #expect(!controller.isCurrent(page))
+        }
+    }
+
+    @Test func `unobserved gap rejects confirmation without writing and refresh invalidates it`() throws {
+        try withController { repo, controller in
+            let ended = try #require(repo.load(now: 220).catalog.days.last)
+            _ = try controller.perform(.clockIn(id: UUID(), profile: WorkdayProfile()), sample: sample(221))
+            let page = try controller.recentHistory(now: 222)
+            let context = try controller.historicalReviewContext(dayID: ended.id, history: page, sample: sample(222))
+            let proposal = try controller.previewClockOutCorrection(
+                expectedDay: context.glance.day, oldEnd: 200, newEnd: 210,
+                historical: context, sample: sample(222)
+            )
+            let before = try repo.load(now: 222)
+            #expect(throws: ClockOutInteractionError.staleProposal) {
+                try controller.commitClockOutCorrection(proposal, sample: sample(240))
+            }
+            #expect(try repo.load(now: 240).version == before.version)
+            _ = try controller.refresh(sample: sample(240))
+            #expect(!controller.isCurrent(proposal))
+            #expect(throws: ClockOutInteractionError.staleProposal) {
+                try controller.commitClockOutCorrection(proposal, sample: sample(241))
+            }
         }
     }
 }
