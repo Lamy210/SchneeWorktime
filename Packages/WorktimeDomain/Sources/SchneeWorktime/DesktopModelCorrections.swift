@@ -20,6 +20,15 @@
             )
         }
 
+        func confirmClockInCorrection(_ proposal: WorktimeClockInProposal) throws {
+            try confirmBoundaryCorrection(
+                stale: ClockInInteractionError.staleProposal, isCurrent: { $0.isCurrent(proposal) },
+                commit: { current in
+                    try current.commitClockInCorrection(proposal, sample: Self.sample())
+                }
+            )
+        }
+
         func confirmRetrospectiveStart(_ proposal: RetrospectiveStartProposal) throws {
             let stale = RetrospectiveStartError.staleProposal
             try confirmBoundaryCorrection(

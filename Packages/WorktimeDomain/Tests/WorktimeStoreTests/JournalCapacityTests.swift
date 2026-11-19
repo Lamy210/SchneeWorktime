@@ -75,9 +75,9 @@ struct JournalCapacityTests {
             let now = Int64(100 + index)
             journal.events.append(.init(action: .futureRest(dayID: id, remainingSeconds: Int64(index % 2)), now: now))
         }
+        let payload = try JSONEncoder().encode(journal)
         let source = StoredSnapshot(
-            version: .init(epoch: UUID(), revision: Int64(eventCount)),
-            payload: try JSONEncoder().encode(journal)
+            version: .init(epoch: UUID(), revision: Int64(eventCount)), payload: payload
         )
         let version = try store.seedRecovery(source, expected: store.load().version)
         try body(CatalogRepository(url: url), store, version, id)

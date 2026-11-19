@@ -168,4 +168,5 @@
 - [ ] 18.5 始業時刻の事後訂正は別途仕様化し、前勤務日、捕捉timezone/論理開始日、参考時刻、観測checkpointの整合を定義してから実装する
   - PR #73はDomainプレビュー6件・全5 CI成功後main統合済み。PR #74の旧HEAD a6e6c4bdはStore回帰5件・全5 CI成功。旧参照なしと同一保存版/異なるbytesの拒否を検証する試験2件を追加し、main統合後のCIを再確認する。Application/UI、実機QAは未完了。
   - PR #74はStore回帰7件・全5 CI成功後main統合済み（9b234959）。Applicationの非破壊preview/確定、最新・過去日、選択した集計timezone/unitの変更前後比較（期間を跨ぐ場合は双方）、保存版/時計/観測checkpoint照合を接続する。Application回帰3件追加（CI未確認）。UIと実機QAは別途。
+  - 終了済み最新/過去日の始業訂正UI、日/週/月の集計差分、集計期間移動警告、明示確定/取消、保存版失効、通知再調整を接続する。macOS build/VoiceOver/実機QAは未確認。
 - [ ] 18.6 新journalイベント使用後の旧版ダウングレード非対応を配布・復旧手順に記載し、OpenSpec strict validationと受入マトリクスの対応を確認する
