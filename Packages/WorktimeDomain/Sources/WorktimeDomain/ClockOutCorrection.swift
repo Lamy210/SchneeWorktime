@@ -22,10 +22,10 @@ public extension WorkdayCatalog {
         guard day.state == .ended, let last = day.intervals.last, last.kind == .work,
               last.end == oldEnd, newEnd != oldEnd, last.start < newEnd, newEnd <= now
         else { throw ClockOutCorrectionError.invalidBoundary }
-        if index + 1 < days.count,
-           let nextStart = days[index + 1].intervals.first?.start, newEnd > nextStart
-        {
-            throw ClockOutCorrectionError.overlapsNextDay
+        if index + 1 < days.count {
+            if let nextStart = days[index + 1].intervals.first?.start, newEnd > nextStart {
+                throw ClockOutCorrectionError.overlapsNextDay
+            }
         }
         _ = try snapshot(dayID: dayID, now: now)
         let selection = ObservationGap(start: min(oldEnd, newEnd), end: max(oldEnd, newEnd))
