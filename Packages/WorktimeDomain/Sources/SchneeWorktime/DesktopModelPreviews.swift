@@ -23,13 +23,13 @@
         }
 
         func previewRestEndCorrection(
-            day: Workday, oldEnd: Int64, newEnd: Int64
+            day: Workday, oldEnd: Int64, newEnd: Int64, historical: HistoricalReviewContext? = nil
         ) throws -> WorktimeRestEndProposal {
-            guard ready, !choosingBackupDestination, reviewProposal == nil,
-                  glance?.day == day, let controller
-            else { throw RestEndInteractionError.staleProposal }
+            guard ready, !choosingBackupDestination, reviewProposal == nil, let controller else {
+                throw RestEndInteractionError.staleProposal
+            }
             return try controller.previewRestEndCorrection(
-                expectedDay: day, oldEnd: oldEnd, newEnd: newEnd, sample: Self.sample()
+                expectedDay: day, oldEnd: oldEnd, newEnd: newEnd, historical: historical, sample: Self.sample()
             )
         }
     }
