@@ -8,14 +8,16 @@
     struct RestEndCorrectionView: View {
         @ObservedObject var model: DesktopModel
         let day: Workday
+        let historical: HistoricalReviewContext?
         @State private var selectedEnd: Int64
         @State private var offsetMinutes = "30"
         @State private var proposal: WorktimeRestEndProposal?
         @State private var notice: String?
 
-        init(model: DesktopModel, day: Workday) {
+        init(model: DesktopModel, day: Workday, historical: HistoricalReviewContext? = nil) {
             self.model = model
             self.day = day
+            self.historical = historical
             _selectedEnd = State(initialValue: Self.boundaries(day).first ?? 0)
         }
 
@@ -83,7 +85,9 @@
             let (newEnd, overflow) = selectedEnd.addingReportingOverflow(minutes * 60)
             guard !overflow else { return }
             do {
-                proposal = try model.previewRestEndCorrection(day: day, oldEnd: selectedEnd, newEnd: newEnd)
+                proposal = try model.previewRestEndCorrection(
+                    day: day, oldEnd: selectedEnd, newEnd: newEnd, historical: historical
+                )
             } catch {
                 notice = "時刻・区間・要確認記録を確認してください。訂正案は保存されていません。"
             }

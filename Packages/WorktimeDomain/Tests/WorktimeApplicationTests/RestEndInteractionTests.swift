@@ -67,4 +67,69 @@ struct RestEndInteractionTests {
             #expect(!controller.isCurrent(proposal))
         }
     }
+
+    @Test(arguments: [false, true])
+    func `historical rest correction preserves current working or resting day`(onBreak: Bool) throws {
+        try withRecordedRest { url, controller, day in
+            _ = try controller.perform(.clockOut(confirmBreak: false), sample: sample(48662))
+            let activeID = UUID()
+            _ = try controller.perform(.clockIn(id: activeID, profile: WorkdayProfile()), sample: sample(48700))
+            if onBreak {
+                _ = try controller.perform(.startBreak, sample: sample(48701))
+            }
+            let page = try controller.recentHistory(now: 48702)
+            let context = try controller.historicalReviewContext(dayID: day.id, history: page, sample: sample(48702))
+            let repo = try CatalogRepository(url: url)
+            let before = try repo.load(now: 48702)
+            let reminder = try controller.reminderState(sample: sample(48702))
+            let proposal = try controller.previewRestEndCorrection(
+                expectedDay: context.glance.day, oldEnd: 46800, newEnd: 48600,
+                historical: context, sample: sample(48702)
+            )
+            #expect(proposal.before.day.id == day.id)
+            #expect(proposal.after.snapshot.recordedRest == 5400)
+            #expect(try repo.load(now: 48702).version == before.version)
+            let committed = try controller.commitRestEndCorrection(proposal, sample: sample(48703))
+            let saved = try repo.load(now: 48703)
+            let updated = try controller.reminderState(sample: sample(48703))
+            #expect(saved.catalog.activeID == activeID)
+            #expect(saved.catalog.days.last == before.catalog.days.last)
+            #expect(saved.catalog.observations[activeID] == before.catalog.observations[activeID])
+            #expect(committed?.day == before.catalog.days.last)
+            #expect(reminder?.desired == updated?.desired)
+            #expect(saved.catalog.reviewAudit.last?.dayID == day.id)
+            #expect(!controller.isCurrent(page))
+            #expect(!controller.isCurrent(context))
+            #expect(throws: RestEndInteractionError.staleProposal) {
+                try controller.previewRestEndCorrection(
+                    expectedDay: context.glance.day, oldEnd: 46800, newEnd: 48600,
+                    historical: context, sample: sample(48704)
+                )
+            }
+        }
+    }
+
+    @Test func `historical correction requires a current explicit history selection`() throws {
+        try withRecordedRest { url, controller, day in
+            _ = try controller.perform(.clockOut(confirmBreak: false), sample: sample(48662))
+            _ = try controller.perform(.clockIn(id: UUID(), profile: WorkdayProfile()), sample: sample(48700))
+            let page = try controller.recentHistory(now: 48701)
+            let context = try controller.historicalReviewContext(dayID: day.id, history: page, sample: sample(48701))
+            #expect(throws: RestEndInteractionError.staleProposal) {
+                try controller.previewRestEndCorrection(
+                    expectedDay: context.glance.day, oldEnd: 46800, newEnd: 48600, sample: sample(48701)
+                )
+            }
+            _ = try controller.refresh(sample: sample(48730))
+            let repo = try CatalogRepository(url: url)
+            let before = try repo.load(now: 48730)
+            #expect(throws: RestEndInteractionError.staleProposal) {
+                try controller.previewRestEndCorrection(
+                    expectedDay: context.glance.day, oldEnd: 46800, newEnd: 48600,
+                    historical: context, sample: sample(48731)
+                )
+            }
+            #expect(try repo.load(now: 48731).catalog == before.catalog)
+        }
+    }
 }
