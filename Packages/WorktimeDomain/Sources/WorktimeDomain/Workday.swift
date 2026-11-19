@@ -226,7 +226,7 @@ public struct ReviewVersion: Sendable, Equatable {
 }
 
 public enum WorkdayCorrectionOrigin: Sendable, Equatable {
-    case observation, recordedRestEnd
+    case observation, recordedRestEnd, recordedRestStart
 }
 
 public struct WorkdayReviewAudit: Sendable, Equatable {
@@ -340,16 +340,27 @@ public extension WorkdayCatalog {
 
     /// The preview is immutable; revalidate the original selection and both domain generations before commit.
     mutating func commitRestEndCorrection(_ preview: RestEndCorrectionPreview, now: Int64) throws {
+        guard preview.boundary == .end else { throw RestEndCorrectionError.changedPreview }
+        try commitRestBoundaryCorrection(preview, now: now)
+    }
+
+    mutating func commitRestStartCorrection(_ preview: RestEndCorrectionPreview, now: Int64) throws {
+        guard preview.boundary == .start else { throw RestEndCorrectionError.changedPreview }
+        try commitRestBoundaryCorrection(preview, now: now)
+    }
+
+    private mutating func commitRestBoundaryCorrection(_ preview: RestEndCorrectionPreview, now: Int64) throws {
         try checkVersion(preview.version)
         guard now >= preview.review.reviewedAt else { throw WorkdayError.invalidEventTime }
         guard revision < UInt64.max else { throw WorkdayError.revisionOverflow }
         guard observationGeneration < UInt64.max else { throw CatalogReviewError.generationOverflow }
-        let confirmed = try previewRestEndCorrection(
-            dayID: preview.dayID, oldEnd: preview.oldEnd, newEnd: preview.newEnd, now: preview.review.reviewedAt
+        let confirmed = try previewRestBoundaryCorrection(
+            dayID: preview.dayID, old: preview.oldEnd, new: preview.newEnd,
+            boundary: preview.boundary, now: preview.review.reviewedAt
         )
         guard confirmed == preview else { throw RestEndCorrectionError.changedPreview }
-        let fresh = try previewRestEndCorrection(
-            dayID: preview.dayID, oldEnd: preview.oldEnd, newEnd: preview.newEnd, now: now
+        let fresh = try previewRestBoundaryCorrection(
+            dayID: preview.dayID, old: preview.oldEnd, new: preview.newEnd, boundary: preview.boundary, now: now
         ).review
         guard let index = days.firstIndex(where: { $0.id == preview.dayID }) else {
             throw CatalogReviewError.unknownDay
@@ -360,7 +371,7 @@ public extension WorkdayCatalog {
                            futureRestPlan: old.futureRestPlan)
         let audit = WorkdayReviewAudit(
             dayID: old.id, revision: revision + 1, observationGeneration: observationGeneration + 1,
-            review: fresh, origin: .recordedRestEnd
+            review: fresh, origin: preview.boundary == .start ? .recordedRestStart : .recordedRestEnd
         )
         days[index] = next
         reviewAudit.append(audit)
