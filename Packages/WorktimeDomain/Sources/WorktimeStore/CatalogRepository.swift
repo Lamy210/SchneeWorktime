@@ -27,6 +27,21 @@ public struct CatalogSession: Sendable {
     }
 }
 
+public struct StoredClockOutCorrection: Sendable {
+    public let version: StoreVersion
+    public let preview: ClockOutCorrectionPreview
+    fileprivate let source: StoredSnapshot
+}
+
+public extension CatalogSession {
+    func previewClockOutCorrection(
+        dayID: UUID, oldEnd: Int64, newEnd: Int64, now: Int64
+    ) throws -> StoredClockOutCorrection {
+        let preview = try catalog.previewClockOutCorrection(dayID: dayID, oldEnd: oldEnd, newEnd: newEnd, now: now)
+        return StoredClockOutCorrection(version: version, preview: preview, source: validatedSnapshot)
+    }
+}
+
 public struct StoredRestEndCorrection: Sendable {
     public let version: StoreVersion
     public let preview: RestEndCorrectionPreview
@@ -171,6 +186,19 @@ public struct CatalogRepository: Sendable {
             try catalog.commitRestEndCorrection(preview, now: now)
             action = .correctRestEnd(dayID: preview.dayID, oldEnd: preview.oldEnd, newEnd: preview.newEnd)
         }
+        return try commit(JournalEvent(action: action, now: now), catalog: catalog, loaded: &loaded)
+    }
+
+    public func commitClockOutCorrection(
+        _ proposal: StoredClockOutCorrection, now: Int64
+    ) throws -> CatalogSession {
+        var loaded = try read(now: now)
+        guard loaded.session.version == proposal.version else { throw SnapshotStoreError.staleVersion }
+        guard loaded.session.validatedSnapshot == proposal.source else { throw CatalogPersistenceError.invalidJournal }
+        var catalog = loaded.session.catalog
+        let preview = proposal.preview
+        try catalog.commitClockOutCorrection(preview, now: now)
+        let action = JournalAction.correctClockOut(dayID: preview.dayID, oldEnd: preview.oldEnd, newEnd: preview.newEnd)
         return try commit(JournalEvent(action: action, now: now), catalog: catalog, loaded: &loaded)
     }
 

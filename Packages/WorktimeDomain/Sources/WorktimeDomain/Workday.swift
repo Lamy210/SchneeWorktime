@@ -226,7 +226,7 @@ public struct ReviewVersion: Sendable, Equatable {
 }
 
 public enum WorkdayCorrectionOrigin: Sendable, Equatable {
-    case observation, recordedRestEnd, recordedRestStart
+    case observation, recordedRestEnd, recordedRestStart, recordedClockOut
 }
 
 public struct WorkdayReviewAudit: Sendable, Equatable {
@@ -278,7 +278,7 @@ public extension WorkdayCatalog {
         guard gap.start < gap.end, gap.end <= now else { throw WorktimeError.invalidInterval }
         guard let day = days.last else { throw CatalogReviewError.unknownDay }
         var pieces = [gap]
-        for audit in reviewAudit where audit.dayID == dayID {
+        for audit in reviewAudit where audit.dayID == dayID && audit.origin != .recordedClockOut {
             pieces = pieces.flatMap { Self.subtract(audit.review.selection, from: $0) }
         }
         let existing = observations[dayID] ?? []
@@ -372,6 +372,35 @@ public extension WorkdayCatalog {
         let audit = WorkdayReviewAudit(
             dayID: old.id, revision: revision + 1, observationGeneration: observationGeneration + 1,
             review: fresh, origin: preview.boundary == .start ? .recordedRestStart : .recordedRestEnd
+        )
+        days[index] = next
+        reviewAudit.append(audit)
+        revision += 1
+        observationGeneration += 1
+    }
+
+    mutating func commitClockOutCorrection(_ preview: ClockOutCorrectionPreview, now: Int64) throws {
+        try checkVersion(preview.version)
+        guard now >= preview.review.reviewedAt else { throw WorkdayError.invalidEventTime }
+        guard revision < UInt64.max else { throw WorkdayError.revisionOverflow }
+        guard observationGeneration < UInt64.max else { throw CatalogReviewError.generationOverflow }
+        let confirmed = try previewClockOutCorrection(
+            dayID: preview.dayID, oldEnd: preview.oldEnd, newEnd: preview.newEnd, now: preview.review.reviewedAt
+        )
+        guard confirmed == preview else { throw ClockOutCorrectionError.changedPreview }
+        let fresh = try previewClockOutCorrection(
+            dayID: preview.dayID, oldEnd: preview.oldEnd, newEnd: preview.newEnd, now: now
+        ).review
+        guard let index = days.firstIndex(where: { $0.id == preview.dayID }) else {
+            throw CatalogReviewError.unknownDay
+        }
+        let old = days[index]
+        let next = Workday(id: old.id, profile: old.profile, state: old.state,
+                           intervals: fresh.afterIntervals, revision: revision + 1,
+                           futureRestPlan: old.futureRestPlan)
+        let audit = WorkdayReviewAudit(
+            dayID: old.id, revision: revision + 1, observationGeneration: observationGeneration + 1,
+            review: fresh, origin: .recordedClockOut
         )
         days[index] = next
         reviewAudit.append(audit)
