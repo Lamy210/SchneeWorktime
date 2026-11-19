@@ -127,5 +127,6 @@ DepartureScenarioTests 5件を追加。入力範囲と前日profileの不変性�
 |---|---|
 | 未確認観測レビュー | 失敗後の再openで元のjournal bytes・revision・監査・観測・checkpointを維持。障害を解消して同じ確認案を再試行すると1件だけ確定し、三度目の旧版保存を拒否 |
 | 記録済み退勤訂正 | 失敗後に元の終了区間と監査を維持。再試行で区間・監査・revisionが一体で更新され、再openでも一致 |
+| 記録済み始業訂正 | 過去日訂正失敗時に捕捉参考情報・現在の勤務日・checkpoint・元journalを維持。再試行で監査証跡と訂正済み実働が一致し、旧案を拒否 |
 
 ローカルSQLiteの隔離fixtureでFAIL直後にはUPDATE済み行が見え、ROLLBACK後に元の行へ復帰することを確認。Swift統合試験の結果はCIで確認する。実際の電源断・ディスク満杯・複数プロセス・macOS実機の合格を意味しない。既存のreset障害試験は `ResetTransactionTests`、確定後checkpoint失敗の試験は `CommittedCheckpointTests` を参照。テストを実データに適用しない。

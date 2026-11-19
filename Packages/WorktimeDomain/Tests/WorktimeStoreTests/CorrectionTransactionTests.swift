@@ -92,4 +92,45 @@ struct CorrectionTransactionTests {
             }
         }
     }
+
+    @Test func `failed clock in correction preserves captured reference and later active day`() throws {
+        try withRepository { url, repo in
+            let id = UUID()
+            let activeID = UUID()
+            let reference = try CapturedReference(startedAt: 3600, timeZoneID: "UTC", wallTime: ReferenceWallTime())
+            let initial = try repo.load(now: 3600)
+            let started = try repo.apply(
+                .clockIn(id: id, profile: WorkdayProfile(reference: reference)),
+                at: 3600, now: 3600, expected: initial.version
+            )
+            let ended = try repo.apply(.clockOut(confirmBreak: false), at: 7200, now: 7200, expected: started.version)
+            let active = try repo.apply(
+                .clockIn(id: activeID, profile: WorkdayProfile()), at: 7400, now: 7400, expected: ended.version
+            )
+            try repo.saveObservationCheckpoint(dayID: activeID, observedAt: 7500, expected: active.version)
+            let marker = try #require(repo.loadObservationCheckpoint(expected: active.version))
+            let proposal = try active.previewClockInCorrection(dayID: id, oldStart: 3600, newStart: 1800, now: 7500)
+            try rejectWrites(at: url)
+            #expect(throws: SnapshotStoreError.sqlite(SQLITE_CONSTRAINT)) {
+                try repo.commitClockInCorrection(proposal, now: 7501)
+            }
+            let reopened = try CatalogRepository(url: url).load(now: 7501)
+            #expect(reopened.validatedSnapshot == active.validatedSnapshot)
+            #expect(reopened.catalog == active.catalog)
+            #expect(reopened.catalog.days.first?.profile.reference == reference)
+            #expect(try repo.loadObservationCheckpoint(expected: active.version) == marker)
+            try execute("DROP TRIGGER reject_snapshot_update", at: url)
+            let saved = try repo.commitClockInCorrection(proposal, now: 7502)
+            #expect(saved.version.revision == active.version.revision + 1)
+            #expect(saved.catalog.activeID == activeID)
+            #expect(saved.catalog.days.last == active.catalog.days.last)
+            #expect(saved.catalog.reviewAudit.count == 1)
+            #expect(saved.catalog.reviewAudit.last?.clockInRecord == proposal.preview.record)
+            #expect(try saved.catalog.snapshot(dayID: id, now: 7502).bounds.lower == 5400)
+            #expect(try CatalogRepository(url: url).load(now: 7502).catalog == saved.catalog)
+            #expect(throws: SnapshotStoreError.staleVersion) {
+                try repo.commitClockInCorrection(proposal, now: 7503)
+            }
+        }
+    }
 }

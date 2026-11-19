@@ -226,7 +226,11 @@ public struct ReviewVersion: Sendable, Equatable {
 }
 
 public enum WorkdayCorrectionOrigin: Sendable, Equatable {
-    case observation, recordedRestEnd, recordedRestStart, recordedClockOut
+    case observation, recordedRestEnd, recordedRestStart, recordedClockOut, recordedClockIn
+
+    var resolvesObservation: Bool {
+        self != .recordedClockOut && self != .recordedClockIn
+    }
 }
 
 public struct WorkdayReviewAudit: Sendable, Equatable {
@@ -235,16 +239,19 @@ public struct WorkdayReviewAudit: Sendable, Equatable {
     public let observationGeneration: UInt64
     public let review: HistoryReviewResult
     public let origin: WorkdayCorrectionOrigin
+    public let clockInRecord: ClockInCorrectionRecord?
 
     init(
         dayID: UUID, revision: UInt64, observationGeneration: UInt64,
-        review: HistoryReviewResult, origin: WorkdayCorrectionOrigin = .observation
+        review: HistoryReviewResult, origin: WorkdayCorrectionOrigin = .observation,
+        clockInRecord: ClockInCorrectionRecord? = nil
     ) {
         self.dayID = dayID
         self.revision = revision
         self.observationGeneration = observationGeneration
         self.review = review
         self.origin = origin
+        self.clockInRecord = clockInRecord
     }
 }
 
@@ -278,7 +285,7 @@ public extension WorkdayCatalog {
         guard gap.start < gap.end, gap.end <= now else { throw WorktimeError.invalidInterval }
         guard let day = days.last else { throw CatalogReviewError.unknownDay }
         var pieces = [gap]
-        for audit in reviewAudit where audit.dayID == dayID && audit.origin != .recordedClockOut {
+        for audit in reviewAudit where audit.dayID == dayID && audit.origin.resolvesObservation {
             pieces = pieces.flatMap { Self.subtract(audit.review.selection, from: $0) }
         }
         let existing = observations[dayID] ?? []
@@ -401,6 +408,37 @@ public extension WorkdayCatalog {
         let audit = WorkdayReviewAudit(
             dayID: old.id, revision: revision + 1, observationGeneration: observationGeneration + 1,
             review: fresh, origin: .recordedClockOut
+        )
+        days[index] = next
+        reviewAudit.append(audit)
+        revision += 1
+        observationGeneration += 1
+    }
+
+    mutating func commitClockInCorrection(_ preview: ClockInCorrectionPreview, now: Int64) throws {
+        try checkVersion(preview.version)
+        guard now >= preview.review.reviewedAt else { throw WorkdayError.invalidEventTime }
+        let confirmed = try previewClockInCorrection(
+            dayID: preview.dayID, oldStart: preview.record.oldStart,
+            newStart: preview.record.newStart, now: preview.review.reviewedAt
+        )
+        guard confirmed == preview else { throw ClockInCorrectionError.changedPreview }
+        try replayClockInCorrection(preview.record, now: now)
+    }
+
+    /// For trusted journal replay only; interactive callers use the version-fenced preview API.
+    package mutating func replayClockInCorrection(_ record: ClockInCorrectionRecord, now: Int64) throws {
+        guard revision < UInt64.max else { throw WorkdayError.revisionOverflow }
+        guard observationGeneration < UInt64.max else { throw CatalogReviewError.generationOverflow }
+        let fresh = try clockInReplayPreview(record, now: now)
+        guard let index = days.firstIndex(where: { $0.id == record.dayID }) else {
+            throw CatalogReviewError.unknownDay
+        }
+        var next = fresh.after
+        next.revision = revision + 1
+        let audit = WorkdayReviewAudit(
+            dayID: next.id, revision: revision + 1, observationGeneration: observationGeneration + 1,
+            review: fresh.review, origin: .recordedClockIn, clockInRecord: record
         )
         days[index] = next
         reviewAudit.append(audit)
