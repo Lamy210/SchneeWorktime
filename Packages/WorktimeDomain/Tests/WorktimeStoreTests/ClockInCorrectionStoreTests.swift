@@ -75,4 +75,46 @@ struct ClockInCorrectionStoreTests {
             #expect(catalog == before)
         }
     }
+
+    @Test func `replay does not resolve a recorded timezone using current timezone rules`() throws {
+        let unavailableZone = "SchneeWorktime/UnavailableZone"
+        #expect(TimeZone(identifier: unavailableZone) == nil)
+        let before = try unavailableReference(at: 3600, zone: unavailableZone)
+        let after = try unavailableReference(at: 1800, zone: unavailableZone)
+        let id = UUID()
+        var catalog = WorkdayCatalog()
+        try catalog.apply(.clockIn(id: id, profile: WorkdayProfile(reference: before)),
+                          at: 3600, now: 3600, expectedRevision: 0)
+        try catalog.apply(.clockOut(confirmBreak: false), at: 7200, now: 7200, expectedRevision: 1)
+        let record = ClockInCorrectionRecord(
+            dayID: id, oldStart: 3600, newStart: 1800, beforeReference: before, afterReference: after
+        )
+        let event = JournalEvent(action: .correctClockIn(record), now: 7300)
+        let encoded = try JSONEncoder().encode(event)
+        try JSONDecoder().decode(JournalEvent.self, from: encoded).apply(to: &catalog)
+        #expect(catalog.days.last?.profile.reference == after)
+        #expect(catalog.reviewAudit.last?.clockInRecord == record)
+        #expect(try catalog.snapshot(dayID: id, now: 7300).bounds.lower == 5400)
+    }
+
+    private func unavailableReference(at start: Int64, zone: String) throws -> CapturedReference {
+        let reference = try CapturedReference(startedAt: start, timeZoneID: "UTC", wallTime: ReferenceWallTime())
+        let encoded = try JSONEncoder().encode(reference)
+        var fields = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+        fields["timeZoneID"] = zone
+        return try JSONDecoder().decode(CapturedReference.self, from: JSONSerialization.data(withJSONObject: fields))
+    }
+
+    @Test func `clock in correction alone never suppresses later observations`() throws {
+        try withRepository { repo, ended, id in
+            let preview = try ended.previewClockInCorrection(dayID: id, oldStart: 3600, newStart: 4000, now: 7300)
+            let saved = try repo.commitClockInCorrection(preview, now: 7301)
+            let resumed = try repo.apply(.resume(id: id), at: 7400, now: 7400, expected: saved.version)
+            let observed = try repo.recordObservation(
+                dayID: id, gap: .init(start: 3700, end: 7500), now: 7500, expected: resumed.version
+            )
+            #expect(observed.catalog.observations[id] == [.init(start: 3700, end: 7500)])
+            #expect(try repo.load(now: 7500).catalog == observed.catalog)
+        }
+    }
 }

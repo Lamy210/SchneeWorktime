@@ -427,7 +427,7 @@ public extension WorkdayCatalog {
     }
 
     /// For trusted journal replay only; interactive callers use the version-fenced preview API.
-    mutating func replayClockInCorrection(_ record: ClockInCorrectionRecord, now: Int64) throws {
+    package mutating func replayClockInCorrection(_ record: ClockInCorrectionRecord, now: Int64) throws {
         guard revision < UInt64.max else { throw WorkdayError.revisionOverflow }
         guard observationGeneration < UInt64.max else { throw CatalogReviewError.generationOverflow }
         let fresh = try clockInReplayPreview(record, now: now)

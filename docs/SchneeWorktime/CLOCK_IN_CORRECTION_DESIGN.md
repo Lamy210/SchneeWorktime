@@ -11,4 +11,4 @@
 - 集計は既存仕様どおり選択tzと訂正済みstart Instantで再算定する。捕捉日は同じでも別tzで集計日が変わる可能性をUIで明記する。
 
 ## 検証
-Domain preview 6件（PR #73の5 CI成功後main統合）。追加で予定休憩anchor、DST、旧データ、監査の連続訂正と再生、競合、バックアップ、後続勤務中のcheckpoint、CSV、通知、実機UIを検証する。Store/監査確定とjournal replayを追加し、CSVの14列は維持する。JSONには前後のCapturedReferenceを含む新イベントを保存する。Store回帰試験3件を追加（未実行）。Application/UI・通知・実機QAは後続。新イベント保存後の旧版ダウングレード非対応。
+Domain preview 6件（PR #73の5 CI成功後main統合）。追加で予定休憩anchor、DST、旧データ、監査の連続訂正と再生、競合、バックアップ、後続勤務中のcheckpoint、CSV、通知、実機UIを検証する。Store/監査確定とjournal replayを追加し、CSVの14列は維持する。JSONには前後のCapturedReferenceを含む新イベントを保存する。Store回帰試験3件はHEAD aaee1dcbの全5 CI成功。再生時のtimezone非依存・後続観測の保持を検出する2件を追加（最新CI未確認）。Application/UI・通知・実機QAは後続。新イベント保存後の旧版ダウングレード非対応。
