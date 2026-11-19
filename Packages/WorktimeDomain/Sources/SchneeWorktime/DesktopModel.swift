@@ -451,30 +451,21 @@
     }
 
     extension DesktopModel {
-        func confirmRestBoundaryCorrection(_ proposal: WorktimeRestEndProposal) throws {
+        func confirmBoundaryCorrection(
+            stale: Error, isCurrent: (WorktimeController) -> Bool,
+            commit: (inout WorktimeController) throws -> WorktimeGlance?
+        ) throws {
             guard ready, !choosingBackupDestination, reviewProposal == nil,
-                  var current = controller, current.isCurrent(proposal)
-            else { throw RestEndInteractionError.staleProposal }
+                  var current = controller, isCurrent(current)
+            else { throw stale }
             do {
-                glance = try current.commitRestBoundaryCorrection(proposal, sample: Self.sample())
+                glance = try commit(&current)
                 controller = current
                 queueReminders(force: true)
             } catch let error as RestEndInteractionError {
                 throw error
-            } catch {
-                fail(error)
+            } catch let error as ClockOutInteractionError {
                 throw error
-            }
-        }
-
-        func confirmRetrospectiveStart(_ proposal: RetrospectiveStartProposal) throws {
-            guard ready, !choosingBackupDestination, reviewProposal == nil, var current = controller else {
-                throw RetrospectiveStartError.staleProposal
-            }
-            do {
-                glance = try current.commitRetrospectiveStart(proposal, sample: Self.sample())
-                controller = current
-                queueReminders(force: true)
             } catch let error as RetrospectiveStartError {
                 throw error
             } catch {
