@@ -16,6 +16,24 @@ public struct JournalCapacity: Sendable, Equatable {
     public var canOpenWorkday: Bool {
         remainingEvents > 100
     }
+
+    /// With an active day, reserve the last two slots for observation and clock-out.
+    public var isExitReserve: Bool {
+        remainingEvents <= 2
+    }
+}
+
+extension JournalCapacity {
+    func allowsActiveMutation(_ action: JournalAction) -> Bool {
+        switch action {
+        case .command(.clockOut, at: _):
+            remainingEvents > 0
+        case .observation:
+            remainingEvents > 1
+        default:
+            !isExitReserve
+        }
+    }
 }
 
 public extension CatalogSession {
