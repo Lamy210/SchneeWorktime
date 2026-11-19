@@ -51,34 +51,7 @@
                 Text("開発版 · 正式な勤怠記録ではありません")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                if let glance = model.glance {
-                    summary(glance)
-                    if model.ready {
-                        actions(glance.day).disabled(model.reviewProposal != nil)
-                        reviewSection(glance)
-                        Group {
-                            RestEndCorrectionView(model: model, day: glance.day, boundary: .start)
-                            RestEndCorrectionView(model: model, day: glance.day)
-                            ClockInCorrectionView(model: model, day: glance.day)
-                            ClockOutCorrectionView(model: model, day: glance.day)
-                        }
-                        .id("\(glance.day.id)-\(glance.day.revision)")
-                        if glance.day.state != .ended, model.reviewProposal == nil {
-                            FutureRestSettingsView(model: model, day: glance.day)
-                                .id(glance.day.id)
-                            DesiredDepartureSettingsView(model: model, day: glance.day)
-                                .id(glance.day.id)
-                            DepartureScenarioView(glance: glance)
-                        }
-                    }
-                } else if model.ready {
-                    Text("勤務記録なし")
-                    let context = model.actionContext
-                    Button("勤務開始") { start(expected: context) }
-                        .disabled(!settingsValid || !context.enabled)
-                } else {
-                    unavailableContent
-                }
+                currentWorkdayContent
                 readySettings
                 backupInspectionSettings
                 BackupRollbackView(model: model)
@@ -86,6 +59,41 @@
                 Divider()
                 Button("アプリを終了") { NSApplication.shared.terminate(nil) }
                     .disabled(model.maintenanceInProgress)
+            }
+        }
+
+        @ViewBuilder
+        private var currentWorkdayContent: some View {
+            if let glance = model.glance {
+                summary(glance)
+                if model.ready {
+                    actions(glance.day).disabled(model.reviewProposal != nil)
+                    reviewSection(glance)
+                    Group {
+                        RestEndCorrectionView(model: model, day: glance.day, boundary: .start)
+                        RestEndCorrectionView(model: model, day: glance.day)
+                        ClockInCorrectionView(model: model, day: glance.day)
+                        ClockOutCorrectionView(model: model, day: glance.day)
+                    }
+                    .id("\(glance.day.id)-\(glance.day.revision)")
+                    .disabled(!model.allowsOptionalJournalMutation)
+                    if glance.day.state != .ended, model.reviewProposal == nil {
+                        FutureRestSettingsView(model: model, day: glance.day)
+                            .id(glance.day.id)
+                            .disabled(!model.allowsOptionalJournalMutation)
+                        DesiredDepartureSettingsView(model: model, day: glance.day)
+                            .id(glance.day.id)
+                            .disabled(!model.allowsOptionalJournalMutation)
+                        DepartureScenarioView(glance: glance)
+                    }
+                }
+            } else if model.ready {
+                Text("勤務記録なし")
+                let context = model.actionContext
+                Button("勤務開始") { start(expected: context) }
+                    .disabled(!settingsValid || !context.enabled || !context.canOpenWorkday)
+            } else {
+                unavailableContent
             }
         }
 
@@ -352,10 +360,12 @@
                 HStack {
                     Button("キャンセル") { model.cancelReview() }
                     Button("訂正を保存") { model.acceptReview() }
+                        .disabled(!model.allowsOptionalJournalMutation)
                 }
             } else if !glance.reviewableGaps.isEmpty {
                 Divider()
                 ReviewRangeSettingsView(model: model, glance: glance)
+                    .disabled(!model.allowsOptionalJournalMutation)
             }
         }
 

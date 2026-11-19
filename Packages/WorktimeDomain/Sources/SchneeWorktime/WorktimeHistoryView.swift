@@ -49,7 +49,8 @@
                 rowView(row)
                 if model.glance?.day.id != row.id {
                     Button("この勤務日の訂正") { select(row.id, from: page) }
-                        .disabled(model.reviewProposal != nil || model.choosingBackupDestination)
+                        .disabled(!model.allowsOptionalJournalMutation || model.reviewProposal != nil ||
+                            model.choosingBackupDestination)
                 }
             }
         }
@@ -76,7 +77,9 @@
                 Divider()
                 Text("選択中の過去勤務日：\(time(historical.glance.day.intervals.first?.start ?? 0))")
                     .font(.headline)
-                if model.ready, model.controller?.isCurrent(historical) == true {
+                if !model.allowsOptionalJournalMutation {
+                    Text("履歴の残容量が不足しているため、訂正を保存できません。").font(.caption)
+                } else if model.ready, model.controller?.isCurrent(historical) == true {
                     if historical.glance.reviewableGaps.isEmpty {
                         Text("要確認区間はありません。").font(.caption)
                     } else {
