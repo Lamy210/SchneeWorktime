@@ -37,6 +37,7 @@ public enum CatalogCSV {
             case .recordedRestEnd: "rest_end_correction"
             case .recordedRestStart: "rest_start_correction"
             case .recordedClockOut: "clock_out_correction"
+            case .recordedClockIn: "clock_in_correction"
             }
             let fields = [
                 recordType, audit.dayID.uuidString, "", "", classification(review.classification),
