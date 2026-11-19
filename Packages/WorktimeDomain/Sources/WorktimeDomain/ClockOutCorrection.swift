@@ -23,7 +23,8 @@ public extension WorkdayCatalog {
               last.end == oldEnd, newEnd != oldEnd, last.start < newEnd, newEnd <= now
         else { throw ClockOutCorrectionError.invalidBoundary }
         if index + 1 < days.count,
-           let nextStart = days[index + 1].intervals.first?.start, newEnd > nextStart {
+           let nextStart = days[index + 1].intervals.first?.start, newEnd > nextStart
+        {
             throw ClockOutCorrectionError.overlapsNextDay
         }
         _ = try snapshot(dayID: dayID, now: now)
