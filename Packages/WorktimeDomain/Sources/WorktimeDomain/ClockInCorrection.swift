@@ -37,20 +37,28 @@ public extension WorkdayCatalog {
     func previewClockInCorrection(
         dayID: UUID, oldStart: Int64, newStart: Int64, now: Int64
     ) throws -> ClockInCorrectionPreview {
-        guard let day = days.first(where: { $0.id == dayID }) else { throw CatalogReviewError.unknownDay }
-        let profile = try correctedStartProfile(day.profile, at: newStart)
-        let record = ClockInCorrectionRecord(
-            dayID: dayID, oldStart: oldStart, newStart: newStart,
-            beforeReference: day.profile.reference, afterReference: profile.reference
-        )
-        return try clockInReplayPreview(record, now: now)
+        try makeClockInPreview(dayID: dayID, oldStart: oldStart, newStart: newStart, now: now) { profile in
+            let updated = try correctedStartProfile(profile, at: newStart)
+            return ClockInCorrectionRecord(
+                dayID: dayID, oldStart: oldStart, newStart: newStart,
+                beforeReference: profile.reference, afterReference: updated.reference
+            )
+        }
     }
 
     /// Replay uses captured reference evidence, not the current timezone database.
-    internal func clockInReplayPreview(_ record: ClockInCorrectionRecord, now: Int64) throws -> ClockInCorrectionPreview {
-        let dayID = record.dayID
-        let oldStart = record.oldStart
-        let newStart = record.newStart
+    internal func clockInReplayPreview(
+        _ record: ClockInCorrectionRecord, now: Int64
+    ) throws -> ClockInCorrectionPreview {
+        try makeClockInPreview(
+            dayID: record.dayID, oldStart: record.oldStart, newStart: record.newStart, now: now
+        ) { _ in record }
+    }
+
+    private func makeClockInPreview(
+        dayID: UUID, oldStart: Int64, newStart: Int64, now: Int64,
+        capture: (WorkdayProfile) throws -> ClockInCorrectionRecord
+    ) throws -> ClockInCorrectionPreview {
         guard let index = days.firstIndex(where: { $0.id == dayID }) else { throw CatalogReviewError.unknownDay }
         let day = days[index]
         guard day.state == .ended, let first = day.intervals.first, first.kind == .work,
@@ -71,6 +79,7 @@ public extension WorkdayCatalog {
         guard !gaps.contains(where: { $0.start < selection.end && selection.start < $0.end }) else {
             throw ClockInCorrectionError.overlapsUncertainty
         }
+        let record = try capture(day.profile)
         let profile = try replayStartProfile(day.profile, record: record)
         var intervals = day.intervals
         intervals[0] = .init(start: newStart, end: end, kind: .work)

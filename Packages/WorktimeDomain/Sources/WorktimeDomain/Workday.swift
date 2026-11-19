@@ -227,6 +227,10 @@ public struct ReviewVersion: Sendable, Equatable {
 
 public enum WorkdayCorrectionOrigin: Sendable, Equatable {
     case observation, recordedRestEnd, recordedRestStart, recordedClockOut, recordedClockIn
+
+    var resolvesObservation: Bool {
+        self != .recordedClockOut && self != .recordedClockIn
+    }
 }
 
 public struct WorkdayReviewAudit: Sendable, Equatable {
@@ -281,9 +285,7 @@ public extension WorkdayCatalog {
         guard gap.start < gap.end, gap.end <= now else { throw WorktimeError.invalidInterval }
         guard let day = days.last else { throw CatalogReviewError.unknownDay }
         var pieces = [gap]
-        for audit in reviewAudit where audit.dayID == dayID && audit.origin != .recordedClockOut
-            && audit.origin != .recordedClockIn
-        {
+        for audit in reviewAudit where audit.dayID == dayID && audit.origin.resolvesObservation {
             pieces = pieces.flatMap { Self.subtract(audit.review.selection, from: $0) }
         }
         let existing = observations[dayID] ?? []
