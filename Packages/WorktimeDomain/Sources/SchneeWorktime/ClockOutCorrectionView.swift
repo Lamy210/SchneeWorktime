@@ -100,7 +100,8 @@
         }
 
         private func label(_ instant: Int64) -> String {
-            Date(timeIntervalSince1970: Double(instant)).formatted(.dateTime.year().month().day().hour().minute().second())
+            Date(timeIntervalSince1970: Double(instant))
+                .formatted(.dateTime.year().month().day().hour().minute().second())
         }
     }
 #endif

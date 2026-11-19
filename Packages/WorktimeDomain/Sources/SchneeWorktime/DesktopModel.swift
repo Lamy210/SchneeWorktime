@@ -491,8 +491,8 @@
         }
 
         func confirmRetrospectiveStart(_ proposal: RetrospectiveStartProposal) throws {
-            try confirmBoundaryCorrection(stale: RetrospectiveStartError.staleProposal, isCurrent: { _ in true }) {
-                current in try current.commitRetrospectiveStart(proposal, sample: Self.sample())
+            try confirmBoundaryCorrection(stale: RetrospectiveStartError.staleProposal, isCurrent: { _ in true }) { current in
+                try current.commitRetrospectiveStart(proposal, sample: Self.sample())
             }
         }
     }
