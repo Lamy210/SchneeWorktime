@@ -4,14 +4,20 @@ import WorktimeDomain
 @testable import WorktimeStore
 
 struct ClockInCorrectionStoreTests {
-    private func withRepository(_ body: (CatalogRepository, CatalogSession, UUID) throws -> Void) throws {
+    private func withRepository(
+        captureReference: Bool = true, _ body: (CatalogRepository, CatalogSession, UUID) throws -> Void
+    ) throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
         defer { try? FileManager.default.removeItem(at: root) }
         let repo = try CatalogRepository(url: root.appendingPathComponent("work.sqlite"), createIfMissing: true)
         let id = UUID()
         let initial = try repo.load(now: 3600)
-        let reference = try CapturedReference(startedAt: 3600, timeZoneID: "UTC", wallTime: ReferenceWallTime())
+        let reference: CapturedReference? = if captureReference {
+            try CapturedReference(startedAt: 3600, timeZoneID: "UTC", wallTime: ReferenceWallTime())
+        } else {
+            nil
+        }
         let profile = try WorkdayProfile(reference: reference)
         let started = try repo.apply(.clockIn(id: id, profile: profile), at: 3600, now: 3600,
                                      expected: initial.version)
@@ -115,6 +121,39 @@ struct ClockInCorrectionStoreTests {
             )
             #expect(observed.catalog.observations[id] == [.init(start: 3700, end: 7500)])
             #expect(try repo.load(now: 7500).catalog == observed.catalog)
+        }
+    }
+
+    @Test func `legacy start correction retains unknown reference in audit and backup`() throws {
+        try withRepository(captureReference: false) { repo, ended, id in
+            let preview = try ended.previewClockInCorrection(dayID: id, oldStart: 3600, newStart: 1800, now: 7300)
+            let corrected = try repo.commitClockInCorrection(preview, now: 7301)
+            let restored = try repo.load(now: 7301)
+            let record = try #require(restored.catalog.reviewAudit.last?.clockInRecord)
+            #expect(restored.catalog.days.last?.profile.reference == nil)
+            #expect(record.beforeReference == nil)
+            #expect(record.afterReference == nil)
+            #expect(try restored.catalog.snapshot(dayID: id, now: 7301).bounds.lower == 5400)
+            let backup = try repo.makeBackup(now: 7301, expected: corrected.version)
+            #expect(try CatalogBackup.inspect(backup, now: 7301).catalog == corrected.catalog)
+        }
+    }
+
+    @Test func `same version with different valid source bytes cannot commit start correction`() throws {
+        try withRepository { repo, ended, id in
+            let original = ended.validatedSnapshot
+            let payload = try #require(original.payload)
+            let alternate = StoredSnapshot(version: original.version, payload: payload + Data([0x20]))
+            let session = try CatalogBackup.validateSnapshot(alternate, now: 7300)
+            #expect(session.catalog == ended.catalog)
+            #expect(session.version == ended.version)
+            let proposal = try session.previewClockInCorrection(
+                dayID: id, oldStart: 3600, newStart: 1800, now: 7300
+            )
+            #expect(throws: CatalogPersistenceError.invalidJournal) {
+                try repo.commitClockInCorrection(proposal, now: 7301)
+            }
+            #expect(try repo.load(now: 7301).validatedSnapshot == original)
         }
     }
 }

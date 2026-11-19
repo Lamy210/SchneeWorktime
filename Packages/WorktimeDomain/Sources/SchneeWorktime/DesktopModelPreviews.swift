@@ -22,6 +22,17 @@
             )
         }
 
+        func previewClockOutCorrection(
+            day: Workday, oldEnd: Int64, newEnd: Int64, historical: HistoricalReviewContext? = nil
+        ) throws -> WorktimeClockOutProposal {
+            guard ready, !choosingBackupDestination, reviewProposal == nil, let controller else {
+                throw ClockOutInteractionError.staleProposal
+            }
+            return try controller.previewClockOutCorrection(
+                expectedDay: day, oldEnd: oldEnd, newEnd: newEnd, historical: historical, sample: Self.sample()
+            )
+        }
+
         func previewRestBoundaryCorrection(
             day: Workday, old: Int64, new: Int64, boundary: RestBoundary,
             historical: HistoricalReviewContext? = nil

@@ -211,7 +211,7 @@ The system SHALL associate review proposals with the selected workday, catalog r
 - **THEN** 以前の記録だけを訂正し新しいactive勤務日とその区間を維持する
 
 ### Requirement: Do not resurrect explicitly resolved observation spans
-The system SHALL reject stale observation writes and exclude ranges covered by observation reviews or recorded rest boundary correction audits for the same workday from newly received observations. A recorded clock-out correction alone SHALL NOT resolve future observations. Duplicate covered observations SHALL be no-ops. Review evidence SHALL survive observation updates; only an explicit accepted correction may change the classification.
+The system SHALL reject stale observation writes and exclude ranges covered by observation reviews or recorded rest boundary correction audits for the same workday from newly received observations. A recorded clock-in or clock-out correction alone SHALL NOT resolve future observations. Duplicate covered observations SHALL be no-ops. Review evidence SHALL survive observation updates; only an explicit accepted correction may change the classification.
 
 #### Scenario: Replay an already reviewed range
 - **WHEN** 勤務確定した20〜70秒の観測が再送される
@@ -246,7 +246,7 @@ The system SHALL permit explicit correction of the final closed work interval's 
 - **THEN** 取消時は保存版・通知を変更せず、保存済みの場合はjournal再生とバックアップで訂正結果・監査を保持する
 
 ### Requirement: Audited recorded clock-in correction
-The system SHALL support an explicit non-mutating preview of the first closed work interval's start of an ended workday. It SHALL reject unchanged, future, non-positive, previous-day overlapping or unresolved-observation intersecting boundaries and a start after an existing future-rest anchor. It SHALL preserve the workday UUID, later intervals, state and other workdays. For a captured reference it SHALL use the original timezone and wall-time settings and reject any change to the captured logical date or reference resolution, including a change caused by timezone rule updates. Legacy data without captured context SHALL remain unknown. Active-day correction and logical-date reassignment are outside the first implementation scope. Before durable enablement the system SHALL record the exact before/after reference context and interval evidence atomically with the correction, fence the store version and observation generation, and replay the serialized decision without re-resolving historic wall times with current timezone rules. The application SHALL show the effect on worked time and historical totals before explicit confirmation; notification reconciliation SHALL use committed state only.
+The system SHALL support an explicit non-mutating preview of the first closed work interval's start of an ended workday. It SHALL reject unchanged, future, non-positive, previous-day overlapping or unresolved-observation intersecting boundaries and a start after an existing future-rest anchor. It SHALL preserve the workday UUID, later intervals, state and other workdays. For a captured reference it SHALL use the original timezone and wall-time settings and reject any change to the captured logical date or reference resolution, including a change caused by timezone rule updates. Legacy data without captured context SHALL remain unknown. Active-day correction and logical-date reassignment are outside the first implementation scope. The durable adapter SHALL record the exact before/after reference context and interval evidence atomically with the correction, fence the store version and observation generation, and replay the serialized decision without re-resolving historic wall times with current timezone rules. The application SHALL show the effect on worked time and historical totals before explicit confirmation; notification reconciliation SHALL use committed state only.
 
 #### Scenario: Adjust first recorded start
 - **WHEN** 09:00〜17:00の終了済み勤務の始業を同じ捕捉日の08:30又は09:30へ訂正する
@@ -261,5 +261,17 @@ The system SHALL support an explicit non-mutating preview of the first closed wo
 - **THEN** 保存を拒否する。前勤務日の終了と一致する境界は許容する
 
 #### Scenario: Historical totals and durable replay
-- **WHEN** 将来の永続化対応で訂正を確定し再起動する
+- **WHEN** 始業訂正を保存し再起動する
 - **THEN** 訂正前後の始業と参照contextを監査に保持し、集計は訂正済みの実績開始Instantと選択された集計timezoneで算出する。別timezoneの集計期間を跨ぎ得ることを明示する
+
+#### Scenario: Legacy reference remains unknown
+- **WHEN** 捕捉参考情報を持たない旧勤務日の始業訂正を保存し再起動又はJSONから検証する
+- **THEN** 訂正前後の参照contextは不明のまま維持し、現在timezoneや設定から補完しない
+
+#### Scenario: Reject same-version but different source snapshot
+- **WHEN** 同一epoch/revisionでも訂正案の元Journal bytesが現行DBと一致しない
+- **THEN** 訂正を拒否し、現行の保存済みsnapshotと監査を変更しない
+
+#### Scenario: Observe again after corrected clock-in
+- **WHEN** 始業時刻の訂正後に勤務日を再開し、訂正区間に交差する観測を受信する
+- **THEN** 始業訂正の監査だけを理由に新しい未確認観測を抑制しない

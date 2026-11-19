@@ -162,7 +162,9 @@
 - [ ] 18.1 休憩開始・終了境界の訂正、非破壊preview、明示確定、監査・保存・通知再調整（PR #69は5ワークフロー成功後main統合済み。実機QA未実施）
 - [ ] 18.2 退勤済み勤務日の末尾勤務区間の終了訂正をDomain/Storeに実装。未来・ゼロ長・後続日重複・未確認区間・休憩中退勤を拒否。監査・journal再生・CSV/バックアップと再開後の新観測保持を検証（ClockOutCorrectionTests、PR #70、5ワークフロー成功後main統合済み。実機未確認）
 - [ ] 18.3 退勤訂正のApplication preview/commitを保存epoch/revision・観測世代・時計と照合し、最新/過去勤務日を区別する。過去日訂正でactive日を維持し、観測checkpointと通知を最新確定状態へ再収束させる（検証: 非破壊・取消・競合・時計異常・再開・過去日回帰）
-  - 最新/過去日の非破壊preview、保存版・時計の照合、確定後checkpointを休憩訂正と共通化。ClockOutInteractionTests 3件追加（CI未実行）。DesktopModel/通知再調整UIは18.4で接続する。
+  - 最新/過去日の非破壊preview、保存版・時計の照合、確定後checkpointを休憩訂正と共通化。ClockOutInteractionTests 3件追加（PR #71の5ワークフロー成功後main統合済み）。DesktopModel/通知再調整UIはPR #72で接続済み。
 - [ ] 18.4 退勤訂正の確認UIを最新/過去履歴に接続し、前後の実働・不足/超過を表示する（検証: macOS build、VoiceOver、実機操作、通知）
+  - 最新/過去終了日の退勤訂正画面を追加。±1440分の相対入力、秒を維持した時刻表示、実働上下限・日次不足/超過の比較、明示確定/取消、旧提案拒否、保存後のみ通知再調整。休憩中退勤は対象外と表示。PR #72のHEAD cbd3ca12で5ワークフロー成功後main統合（d4e7311e）。macOS buildはCI成功、VoiceOver/通知配送・実機操作未確認。
 - [ ] 18.5 始業時刻の事後訂正は別途仕様化し、前勤務日、捕捉timezone/論理開始日、参考時刻、観測checkpointの整合を定義してから実装する
+  - PR #73はDomainプレビュー6件・全5 CI成功後main統合済み。PR #74の旧HEAD a6e6c4bdはStore回帰5件・全5 CI成功。旧参照なしと同一保存版/異なるbytesの拒否を検証する試験2件を追加し、main統合後のCIを再確認する。Application/UI、実機QAは未完了。
 - [ ] 18.6 新journalイベント使用後の旧版ダウングレード非対応を配布・復旧手順に記載し、OpenSpec strict validationと受入マトリクスの対応を確認する
