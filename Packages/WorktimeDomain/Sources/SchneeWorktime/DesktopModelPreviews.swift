@@ -22,6 +22,19 @@
             )
         }
 
+        func previewClockInCorrection(
+            day: Workday, oldStart: Int64, newStart: Int64, summary: ClockInSummarySelection,
+            historical: HistoricalReviewContext? = nil
+        ) throws -> WorktimeClockInProposal {
+            guard ready, !choosingBackupDestination, reviewProposal == nil, let controller else {
+                throw ClockInInteractionError.staleProposal
+            }
+            return try controller.previewClockInCorrection(
+                expectedDay: day, oldStart: oldStart, newStart: newStart, summary: summary,
+                historical: historical, sample: Self.sample()
+            )
+        }
+
         func previewClockOutCorrection(
             day: Workday, oldEnd: Int64, newEnd: Int64, historical: HistoricalReviewContext? = nil
         ) throws -> WorktimeClockOutProposal {
