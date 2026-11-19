@@ -211,7 +211,7 @@ The system SHALL associate review proposals with the selected workday, catalog r
 - **THEN** 以前の記録だけを訂正し新しいactive勤務日とその区間を維持する
 
 ### Requirement: Do not resurrect explicitly resolved observation spans
-The system SHALL reject stale observation writes and exclude ranges explicitly resolved as observation reviews for the same workday from newly received observations, subject to the recorded boundary correction rules. A recorded clock-out correction alone SHALL NOT resolve future observations. Duplicate covered observations SHALL be no-ops. Review evidence SHALL survive observation updates; only an explicit accepted correction may change the classification.
+The system SHALL reject stale observation writes and exclude ranges covered by observation reviews or recorded rest boundary correction audits for the same workday from newly received observations. A recorded clock-out correction alone SHALL NOT resolve future observations. Duplicate covered observations SHALL be no-ops. Review evidence SHALL survive observation updates; only an explicit accepted correction may change the classification.
 
 #### Scenario: Replay an already reviewed range
 - **WHEN** 勤務確定した20〜70秒の観測が再送される
