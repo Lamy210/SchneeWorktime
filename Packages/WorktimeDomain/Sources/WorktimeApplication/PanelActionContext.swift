@@ -52,8 +52,12 @@ public struct PanelActionContext: Sendable, Equatable {
     private func activeActions(_ breakAction: PanelWorkAction, afterStart: Bool) -> [PanelWorkAction] {
         guard afterStart else { return [] }
         var actions: [PanelWorkAction] = []
-        if canChangeBreak { actions.append(breakAction) }
-        if canClockOut { actions.append(.clockOut) }
+        if canChangeBreak {
+            actions.append(breakAction)
+        }
+        if canClockOut {
+            actions.append(.clockOut)
+        }
         return actions
     }
 
