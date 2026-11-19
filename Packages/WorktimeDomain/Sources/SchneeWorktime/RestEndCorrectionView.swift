@@ -8,30 +8,41 @@
     struct RestEndCorrectionView: View {
         @ObservedObject var model: DesktopModel
         let day: Workday
+        let boundary: RestBoundary
         let historical: HistoricalReviewContext?
         @State private var selectedEnd: Int64
         @State private var offsetMinutes = "30"
         @State private var proposal: WorktimeRestEndProposal?
         @State private var notice: String?
 
-        init(model: DesktopModel, day: Workday, historical: HistoricalReviewContext? = nil) {
+        init(
+            model: DesktopModel, day: Workday, boundary: RestBoundary = .end,
+            historical: HistoricalReviewContext? = nil
+        ) {
             self.model = model
             self.day = day
+            self.boundary = boundary
             self.historical = historical
-            _selectedEnd = State(initialValue: Self.boundaries(day).first ?? 0)
+            _selectedEnd = State(initialValue: Self.boundaries(day, boundary: boundary).first ?? 0)
         }
 
-        private static func boundaries(_ day: Workday) -> [Int64] {
-            zip(day.intervals, day.intervals.dropFirst()).compactMap { rest, work in
-                guard rest.kind == .rest, work.kind == .work, rest.end == work.start else { return nil }
-                return rest.end
+        private var boundaryLabel: String {
+            boundary == .start ? "休憩開始" : "休憩終了"
+        }
+
+        private static func boundaries(_ day: Workday, boundary: RestBoundary) -> [Int64] {
+            let leftKind: IntervalKind = boundary == .start ? .work : .rest
+            let rightKind: IntervalKind = boundary == .start ? .rest : .work
+            return zip(day.intervals, day.intervals.dropFirst()).compactMap { left, right in
+                guard left.kind == leftKind, right.kind == rightKind, left.end == right.start else { return nil }
+                return left.end
             }
         }
 
         var body: some View {
-            let ends = Self.boundaries(day)
+            let ends = Self.boundaries(day, boundary: boundary)
             if !ends.isEmpty {
-                DisclosureGroup("記録済み休憩終了時刻の訂正") {
+                DisclosureGroup("記録済み\(boundaryLabel)時刻の訂正") {
                     editor(ends)
                     if let proposal {
                         confirmation(proposal)
@@ -46,7 +57,7 @@
 
         private func editor(_ ends: [Int64]) -> some View {
             VStack(alignment: .leading, spacing: 6) {
-                Picker("元の休憩終了", selection: $selectedEnd) {
+                Picker("元の\(boundaryLabel)", selection: $selectedEnd) {
                     ForEach(ends, id: \.self) { end in
                         Text(label(end)).tag(end)
                     }
@@ -60,7 +71,7 @@
 
         private func confirmation(_ value: WorktimeRestEndProposal) -> some View {
             VStack(alignment: .leading, spacing: 6) {
-                Text("休憩終了：\(label(value.oldEnd)) → \(label(value.newEnd))")
+                Text("\(boundaryLabel)：\(label(value.oldEnd)) → \(label(value.newEnd))")
                 Text("実働：\(bounds(value.before)) → \(bounds(value.after))")
                 Text("実績休憩：\(value.before.snapshot.recordedRest)秒 → \(value.after.snapshot.recordedRest)秒")
                 Text("退勤見込み：\(forecast(value.before)) → \(forecast(value.after))")
@@ -85,8 +96,8 @@
             let (newEnd, overflow) = selectedEnd.addingReportingOverflow(minutes * 60)
             guard !overflow else { return }
             do {
-                proposal = try model.previewRestEndCorrection(
-                    day: day, oldEnd: selectedEnd, newEnd: newEnd, historical: historical
+                proposal = try model.previewRestBoundaryCorrection(
+                    day: day, old: selectedEnd, new: newEnd, boundary: boundary, historical: historical
                 )
             } catch {
                 notice = "時刻・区間・要確認記録を確認してください。訂正案は保存されていません。"
@@ -96,8 +107,8 @@
         private func confirm(_ value: WorktimeRestEndProposal) {
             proposal = nil
             do {
-                try model.confirmRestEndCorrection(value)
-                notice = "休憩終了時刻を訂正しました。"
+                try model.confirmRestBoundaryCorrection(value)
+                notice = "\(boundaryLabel)時刻を訂正しました。"
             } catch is CommittedCheckpointError {
                 notice = "訂正は保存済みです。既存データを再読込してください。"
             } catch {

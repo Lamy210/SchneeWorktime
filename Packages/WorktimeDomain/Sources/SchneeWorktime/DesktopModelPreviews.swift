@@ -22,14 +22,16 @@
             )
         }
 
-        func previewRestEndCorrection(
-            day: Workday, oldEnd: Int64, newEnd: Int64, historical: HistoricalReviewContext? = nil
+        func previewRestBoundaryCorrection(
+            day: Workday, old: Int64, new: Int64, boundary: RestBoundary,
+            historical: HistoricalReviewContext? = nil
         ) throws -> WorktimeRestEndProposal {
             guard ready, !choosingBackupDestination, reviewProposal == nil, let controller else {
                 throw RestEndInteractionError.staleProposal
             }
-            return try controller.previewRestEndCorrection(
-                expectedDay: day, oldEnd: oldEnd, newEnd: newEnd, historical: historical, sample: Self.sample()
+            return try controller.previewRestBoundaryCorrection(
+                expectedDay: day, old: old, new: new, boundary: boundary,
+                historical: historical, sample: Self.sample()
             )
         }
     }

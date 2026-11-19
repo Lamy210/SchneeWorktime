@@ -83,6 +83,10 @@
                         ReviewRangeSettingsView(model: model, glance: historical.glance, historical: historical)
                             .id(historical.glance.day.id)
                     }
+                    RestEndCorrectionView(
+                        model: model, day: historical.glance.day, boundary: .start, historical: historical
+                    )
+                    .id(historical.glance.day.id)
                     RestEndCorrectionView(model: model, day: historical.glance.day, historical: historical)
                         .id(historical.glance.day.id)
                 } else {
