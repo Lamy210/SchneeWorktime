@@ -451,12 +451,12 @@
     }
 
     extension DesktopModel {
-        func confirmRestEndCorrection(_ proposal: WorktimeRestEndProposal) throws {
+        func confirmRestBoundaryCorrection(_ proposal: WorktimeRestEndProposal) throws {
             guard ready, !choosingBackupDestination, reviewProposal == nil,
                   var current = controller, current.isCurrent(proposal)
             else { throw RestEndInteractionError.staleProposal }
             do {
-                glance = try current.commitRestEndCorrection(proposal, sample: Self.sample())
+                glance = try current.commitRestBoundaryCorrection(proposal, sample: Self.sample())
                 controller = current
                 queueReminders(force: true)
             } catch let error as RestEndInteractionError {
