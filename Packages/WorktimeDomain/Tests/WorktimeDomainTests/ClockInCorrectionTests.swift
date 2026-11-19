@@ -71,4 +71,39 @@ struct ClockInCorrectionTests {
             try catalog.previewClockInCorrection(dayID: id, oldStart: 100, newStart: 120, now: 201)
         }
     }
+
+    @Test func `rest anchor is retained and a later start cannot cross it`() throws {
+        var catalog = WorkdayCatalog()
+        let id = UUID()
+        try catalog.apply(.clockIn(id: id, profile: WorkdayProfile()), at: 100, now: 100, expectedRevision: 0)
+        try catalog.setFutureRest(dayID: id, remainingSeconds: 60, now: 150, expectedRevision: 1)
+        try catalog.apply(.clockOut(confirmBreak: false), at: 300, now: 300, expectedRevision: 2)
+        let original = catalog
+        #expect(throws: ClockInCorrectionError.crossesRestAnchor) {
+            try catalog.previewClockInCorrection(dayID: id, oldStart: 100, newStart: 151, now: 301)
+        }
+        let proposal = try catalog.previewClockInCorrection(dayID: id, oldStart: 100, newStart: 150, now: 301)
+        #expect(proposal.after.futureRestPlan == proposal.before.futureRestPlan)
+        #expect(try proposal.after.snapshot(now: 301).remainingRest == 60)
+        #expect(proposal.version == original.reviewVersion)
+        #expect(catalog == original)
+    }
+
+    @Test func `historical start preview preserves breaks and a subsequent active workday`() throws {
+        var catalog = WorkdayCatalog()
+        let id = UUID()
+        let activeID = UUID()
+        try catalog.apply(.clockIn(id: id, profile: WorkdayProfile()), at: 100, now: 100, expectedRevision: 0)
+        try catalog.apply(.startBreak, at: 200, now: 200, expectedRevision: 1)
+        try catalog.apply(.endBreak, at: 250, now: 250, expectedRevision: 2)
+        try catalog.apply(.clockOut(confirmBreak: false), at: 400, now: 400, expectedRevision: 3)
+        try catalog.apply(.clockIn(id: activeID, profile: WorkdayProfile()), at: 500, now: 500, expectedRevision: 4)
+        let original = catalog
+        let proposal = try catalog.previewClockInCorrection(dayID: id, oldStart: 100, newStart: 80, now: 600)
+        #expect(proposal.after.intervals.dropFirst() == proposal.before.intervals.dropFirst())
+        #expect(try proposal.after.snapshot(now: 600).bounds.lower == 270)
+        #expect(try proposal.after.snapshot(now: 600).recordedRest == 50)
+        #expect(catalog.activeID == activeID)
+        #expect(catalog == original)
+    }
 }
