@@ -108,7 +108,7 @@ struct CorrectionTransactionTests {
                 .clockIn(id: activeID, profile: WorkdayProfile()), at: 7400, now: 7400, expected: ended.version
             )
             try repo.saveObservationCheckpoint(dayID: activeID, observedAt: 7500, expected: active.version)
-            let marker = try #require(repo.loadObservationCheckpoint(expected: active.version))
+            let marker = try #require(try repo.loadObservationCheckpoint(expected: active.version))
             let proposal = try active.previewClockInCorrection(dayID: id, oldStart: 3600, newStart: 1800, now: 7500)
             try rejectWrites(at: url)
             #expect(throws: SnapshotStoreError.sqlite(SQLITE_CONSTRAINT)) {
