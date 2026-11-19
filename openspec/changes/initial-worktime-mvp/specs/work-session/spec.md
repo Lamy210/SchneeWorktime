@@ -211,7 +211,7 @@ The system SHALL associate review proposals with the selected workday, catalog r
 - **THEN** 以前の記録だけを訂正し新しいactive勤務日とその区間を維持する
 
 ### Requirement: Do not resurrect explicitly resolved observation spans
-The system SHALL reject stale observation writes and exclude already reviewed ranges for the same workday from newly received observations. Duplicate covered observations SHALL be no-ops. Review evidence SHALL survive observation updates; only an explicit accepted correction may change the classification.
+The system SHALL reject stale observation writes and exclude ranges explicitly resolved as observation reviews for the same workday from newly received observations, subject to the recorded boundary correction rules. A recorded clock-out correction alone SHALL NOT resolve future observations. Duplicate covered observations SHALL be no-ops. Review evidence SHALL survive observation updates; only an explicit accepted correction may change the classification.
 
 #### Scenario: Replay an already reviewed range
 - **WHEN** 勤務確定した20〜70秒の観測が再送される
@@ -220,3 +220,27 @@ The system SHALL reject stale observation writes and exclude already reviewed ra
 #### Scenario: Newly received range partially overlaps reviewed range
 - **WHEN** 20〜70秒を解決済みの勤務日へ10〜80秒の観測が追加される
 - **THEN** 10〜20秒と70〜80秒だけを未確認の候補として保持する
+
+
+### Requirement: Audited recorded clock-out correction
+The system SHALL permit explicit correction of the final closed work interval's end of an ended workday through a non-mutating preview and an atomic, version-fenced commit. It SHALL reject a future end, a non-positive interval, unchanged boundary, overlap with the next workday or intersecting unresolved observations. Clock-out from a rest interval SHALL remain outside this correction scope. The correction SHALL preserve identity, captured profile, earlier intervals, other workdays and active identity, and persist before/after audit evidence. The application SHALL require confirmation before saving and recompute reminders only from committed state.
+
+#### Scenario: Shorten or extend recorded clock-out
+- **WHEN** 09:00〜17:00の終了済み勤務について17:00を16:30又は17:30に訂正し、現在時刻が訂正後の時刻以降である
+- **THEN** プレビューは原本を変更せず、明示確定で末尾の勤務区間のみ更新し、監査とjournalを原子的に保存する
+
+#### Scenario: Respect subsequent workday
+- **WHEN** 以前の退勤を後続勤務日の開始より後へ訂正する
+- **THEN** 保存を拒否し、後続勤務日と全体の保存版を維持する。後続開始と一致する訂正は半開区間として許容する
+
+#### Scenario: Reject unsupported or stale correction
+- **WHEN** 末尾が休憩、未終了、未来、ゼロ長、未確認区間との交差、又は保存版が旧い訂正を確定する
+- **THEN** 記録と監査を変更せず拒否する
+
+#### Scenario: Observe again after corrected clock-out
+- **WHEN** 退勤を前倒しした勤務日を明示的に再開し、その後に前倒し範囲と交差する未確認観測が発生する
+- **THEN** 退勤訂正の監査だけを理由に新しい未確認観測を抑制しない
+
+#### Scenario: Cancel or reopen correction
+- **WHEN** 訂正案を取り消す、又は保存後にアプリを再起動する
+- **THEN** 取消時は保存版・通知を変更せず、保存済みの場合はjournal再生とバックアップで訂正結果・監査を保持する
