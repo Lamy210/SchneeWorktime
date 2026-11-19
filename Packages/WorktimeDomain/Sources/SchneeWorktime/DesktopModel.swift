@@ -466,6 +466,8 @@
                 throw error
             } catch let error as ClockOutInteractionError {
                 throw error
+            } catch let error as ClockInInteractionError {
+                throw error
             } catch let error as RetrospectiveStartError {
                 throw error
             } catch {

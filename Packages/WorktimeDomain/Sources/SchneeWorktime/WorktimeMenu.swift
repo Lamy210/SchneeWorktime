@@ -59,6 +59,7 @@
                         Group {
                             RestEndCorrectionView(model: model, day: glance.day, boundary: .start)
                             RestEndCorrectionView(model: model, day: glance.day)
+                            ClockInCorrectionView(model: model, day: glance.day)
                             ClockOutCorrectionView(model: model, day: glance.day)
                         }
                         .id("\(glance.day.id)-\(glance.day.revision)")
