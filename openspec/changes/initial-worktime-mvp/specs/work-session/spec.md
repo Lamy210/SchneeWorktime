@@ -244,3 +244,22 @@ The system SHALL permit explicit correction of the final closed work interval's 
 #### Scenario: Cancel or reopen correction
 - **WHEN** 訂正案を取り消す、又は保存後にアプリを再起動する
 - **THEN** 取消時は保存版・通知を変更せず、保存済みの場合はjournal再生とバックアップで訂正結果・監査を保持する
+
+### Requirement: Audited recorded clock-in correction
+The system SHALL support an explicit non-mutating preview of the first closed work interval's start of an ended workday. It SHALL reject unchanged, future, non-positive, previous-day overlapping or unresolved-observation intersecting boundaries and a start after an existing future-rest anchor. It SHALL preserve the workday UUID, later intervals, state and other workdays. For a captured reference it SHALL use the original timezone and wall-time settings and reject any change to the captured logical date or reference resolution, including a change caused by timezone rule updates. Legacy data without captured context SHALL remain unknown. Active-day correction and logical-date reassignment are outside the first implementation scope. Before durable enablement the system SHALL record the exact before/after reference context and interval evidence atomically with the correction, fence the store version and observation generation, and replay the serialized decision without re-resolving historic wall times with current timezone rules. The application SHALL show the effect on worked time and historical totals before explicit confirmation; notification reconciliation SHALL use committed state only.
+
+#### Scenario: Adjust first recorded start
+- **WHEN** 09:00〜17:00の終了済み勤務の始業を同じ捕捉日の08:30又は09:30へ訂正する
+- **THEN** 最初の勤務区間の開始のみを変更する案を提示し、後続の休憩・退勤・勤務日ID・目標を維持する
+
+#### Scenario: Preserve captured reference
+- **WHEN** 訂正が捕捉日を跨ぐ、参考終業の解決状態又はInstantを変える、又は捕捉timezoneの規則更新で異なる結果を生む
+- **THEN** 初期対応範囲外として拒否し、参照情報を無断で再計算しない
+
+#### Scenario: Protect previous workday and uncertainty
+- **WHEN** 訂正が前勤務日の終了より前、未確認区間との交差、ゼロ長、又は保存版の変更に該当する
+- **THEN** 保存を拒否する。前勤務日の終了と一致する境界は許容する
+
+#### Scenario: Historical totals and durable replay
+- **WHEN** 将来の永続化対応で訂正を確定し再起動する
+- **THEN** 訂正前後の始業と参照contextを監査に保持し、集計は訂正済みの実績開始Instantと選択された集計timezoneで算出する。別timezoneの集計期間を跨ぎ得ることを明示する
