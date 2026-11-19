@@ -78,6 +78,7 @@ enum JournalAction: Codable, Equatable {
     case correctRestEnd(dayID: UUID, oldEnd: Int64, newEnd: Int64)
     case correctRestStart(dayID: UUID, oldStart: Int64, newStart: Int64)
     case correctClockOut(dayID: UUID, oldEnd: Int64, newEnd: Int64)
+    case correctClockIn(ClockInCorrectionRecord)
 }
 
 struct JournalEvent: Codable, Equatable {
@@ -116,6 +117,8 @@ struct JournalEvent: Codable, Equatable {
                 dayID: dayID, oldEnd: oldEnd, newEnd: newEnd, now: now
             )
             try catalog.commitClockOutCorrection(preview, now: now)
+        case let .correctClockIn(record):
+            try catalog.replayClockInCorrection(record, now: now)
         }
     }
 }

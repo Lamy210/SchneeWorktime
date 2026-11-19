@@ -27,6 +27,23 @@ public struct CatalogSession: Sendable {
     }
 }
 
+public struct StoredClockInCorrection: Sendable {
+    public let version: StoreVersion
+    public let preview: ClockInCorrectionPreview
+    fileprivate let source: StoredSnapshot
+}
+
+public extension CatalogSession {
+    func previewClockInCorrection(
+        dayID: UUID, oldStart: Int64, newStart: Int64, now: Int64
+    ) throws -> StoredClockInCorrection {
+        let preview = try catalog.previewClockInCorrection(
+            dayID: dayID, oldStart: oldStart, newStart: newStart, now: now
+        )
+        return StoredClockInCorrection(version: version, preview: preview, source: validatedSnapshot)
+    }
+}
+
 public struct StoredClockOutCorrection: Sendable {
     public let version: StoreVersion
     public let preview: ClockOutCorrectionPreview
@@ -199,6 +216,18 @@ public struct CatalogRepository: Sendable {
         let preview = proposal.preview
         try catalog.commitClockOutCorrection(preview, now: now)
         let action = JournalAction.correctClockOut(dayID: preview.dayID, oldEnd: preview.oldEnd, newEnd: preview.newEnd)
+        return try commit(JournalEvent(action: action, now: now), catalog: catalog, loaded: &loaded)
+    }
+
+    public func commitClockInCorrection(
+        _ proposal: StoredClockInCorrection, now: Int64
+    ) throws -> CatalogSession {
+        var loaded = try read(now: now)
+        guard loaded.session.version == proposal.version else { throw SnapshotStoreError.staleVersion }
+        guard loaded.session.validatedSnapshot == proposal.source else { throw CatalogPersistenceError.invalidJournal }
+        var catalog = loaded.session.catalog
+        try catalog.commitClockInCorrection(proposal.preview, now: now)
+        let action = JournalAction.correctClockIn(proposal.preview.record)
         return try commit(JournalEvent(action: action, now: now), catalog: catalog, loaded: &loaded)
     }
 
