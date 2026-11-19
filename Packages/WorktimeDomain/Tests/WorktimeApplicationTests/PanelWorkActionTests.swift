@@ -85,4 +85,31 @@ struct PanelWorkActionTests {
         #expect(current.command(for: .startBreak, matching: current, at: 100) == nil)
         #expect(current.command(for: .startBreak, matching: current, at: 101) == .startBreak)
     }
+
+    @Test func `exit reserve leaves only confirmed clock out and invalidates earlier actions`() throws {
+        var catalog = WorkdayCatalog()
+        let profile = try WorkdayProfile()
+        try catalog.apply(.clockIn(id: UUID(), profile: profile), at: 100, now: 100, expectedRevision: 0)
+        let normal = PanelActionContext(day: catalog.days.last, enabled: true)
+        let reserved = PanelActionContext(
+            day: catalog.days.last, enabled: true, canOpenWorkday: false, canChangeBreak: false
+        )
+        #expect(reserved.available(at: 101) == [.clockOut])
+        #expect(reserved.command(for: .startBreak, at: 101) == nil)
+        #expect(reserved.command(for: .clockOut, matching: normal, at: 101, confirmed: true) == nil)
+        #expect(reserved.command(for: .clockOut, at: 101) == nil)
+        #expect(reserved.command(for: .clockOut, at: 101, confirmed: true) == .clockOut(confirmBreak: false))
+        try catalog.apply(.startBreak, at: 110, now: 110, expectedRevision: catalog.revision)
+        let onBreak = PanelActionContext(
+            day: catalog.days.last, enabled: true, canOpenWorkday: false, canChangeBreak: false
+        )
+        #expect(onBreak.available(at: 111) == [.clockOut])
+        #expect(onBreak.command(for: .endBreak, at: 111) == nil)
+        #expect(onBreak.command(for: .clockOut, at: 111, confirmed: true) == .clockOut(confirmBreak: true))
+        let full = PanelActionContext(
+            day: catalog.days.last, enabled: true, canOpenWorkday: false, canChangeBreak: false, canClockOut: false
+        )
+        #expect(full.available(at: 111).isEmpty)
+        #expect(full.command(for: .clockOut, at: 111, confirmed: true) == nil)
+    }
 }

@@ -122,7 +122,9 @@
             PanelActionContext(
                 day: glance?.day,
                 enabled: ready && reviewProposal == nil && !choosingBackupDestination,
-                canOpenWorkday: controller?.journalCapacity.canOpenWorkday == true
+                canOpenWorkday: controller?.journalCapacity.canOpenWorkday == true,
+                canChangeBreak: allowsOptionalJournalMutation,
+                canClockOut: (controller?.journalCapacity.remainingEvents ?? 0) > 0
             )
         }
 

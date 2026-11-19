@@ -20,11 +20,18 @@ public struct PanelActionContext: Sendable, Equatable {
     public let day: Workday?
     public let enabled: Bool
     public let canOpenWorkday: Bool
+    public let canChangeBreak: Bool
+    public let canClockOut: Bool
 
-    public init(day: Workday?, enabled: Bool, canOpenWorkday: Bool = true) {
+    public init(
+        day: Workday?, enabled: Bool, canOpenWorkday: Bool = true,
+        canChangeBreak: Bool = true, canClockOut: Bool = true
+    ) {
         self.day = day
         self.enabled = enabled
         self.canOpenWorkday = canOpenWorkday
+        self.canChangeBreak = canChangeBreak
+        self.canClockOut = canClockOut
     }
 
     public func available(at instant: Int64) -> [PanelWorkAction] {
@@ -33,13 +40,25 @@ public struct PanelActionContext: Sendable, Equatable {
         guard let last = day.intervals.last else { return [] }
         switch day.state {
         case .working:
-            return instant > last.start ? [.startBreak, .clockOut] : []
+            return activeActions(.startBreak, afterStart: instant > last.start)
         case .onBreak:
-            return instant > last.start ? [.endBreak, .clockOut] : []
+            return activeActions(.endBreak, afterStart: instant > last.start)
         case .ended:
             guard let end = last.end, instant >= end else { return [] }
             return canOpenWorkday ? [.start, .resume] : []
         }
+    }
+
+    private func activeActions(_ breakAction: PanelWorkAction, afterStart: Bool) -> [PanelWorkAction] {
+        guard afterStart else { return [] }
+        var actions: [PanelWorkAction] = []
+        if canChangeBreak {
+            actions.append(breakAction)
+        }
+        if canClockOut {
+            actions.append(.clockOut)
+        }
+        return actions
     }
 
     /// Reject commands captured from an older view or confirmation.
