@@ -46,10 +46,19 @@ enum JournalStagingDatabase {
         return JournalStagingCandidate(url: url, draft: draft)
     }
 
-    /// Reopen independently, compare exact metadata and event bytes, then compare the decoded catalog.
+    /// Reopen independently and require exact agreement with the original in-memory draft.
     static func verify(_ url: URL, draft: JournalMigrationDraft, now: Int64) throws {
+        let inspected = try inspect(url, now: now)
+        guard inspected.source == draft.source, inspected.version == draft.candidateVersion,
+              inspected.rows == draft.rows
+        else { throw JournalMigrationError.verificationFailed }
+    }
+
+    /// Inspect an offline candidate without an in-memory draft. This does not authorize adoption.
+    static func inspect(_ source: URL, now: Int64) throws -> JournalStagingInspection {
+        let url = try DatabaseFileGuard.canonicalURL(source)
         let identity = try DatabaseFileGuard.preservationIdentity(url)
-        let rows = try connect(url, flags: SQLITE_OPEN_READONLY) { db in
+        let result = try connect(url, flags: SQLITE_OPEN_READONLY) { db in
             try execute(db, "PRAGMA query_only = ON")
             try execute(db, "BEGIN")
             try statement(db, "PRAGMA user_version") { stmt in
@@ -58,17 +67,18 @@ enum JournalStagingDatabase {
                     throw SnapshotStoreError.unsupportedSchema
                 }
             }
-            try verifyMetadata(db, draft: draft)
-            let rows = try readRows(db, expected: draft.rows)
+            let metadata = try readMetadata(db)
+            let rows = try readRows(db, revision: metadata.source.version.revision)
+            let inspected = try JournalStagingInspection(
+                source: metadata.source, version: metadata.version, rows: rows, now: now
+            )
             try execute(db, "COMMIT")
-            return rows
+            return inspected
         }
         guard try DatabaseFileGuard.preservationIdentity(url) == identity else {
             throw DatabaseFileError.unsafeFile
         }
-        let original = try CatalogBackup.validateSnapshot(draft.source, now: now)
-        let replay = try JournalRowCodec.replay(rows, revision: draft.candidateVersion.revision, now: now)
-        guard replay == original.catalog else { throw JournalMigrationError.verificationFailed }
+        return result
     }
 
     private static func createSchema(_ db: OpaquePointer) throws {
@@ -114,52 +124,62 @@ enum JournalStagingDatabase {
         }
     }
 
-    private static func verifyMetadata(_ db: OpaquePointer, draft: JournalMigrationDraft) throws {
+    private static func readMetadata(_ db: OpaquePointer) throws -> (source: StoredSnapshot, version: StoreVersion) {
         let sql = "SELECT id, source_epoch, candidate_epoch, revision, payload FROM migration_source ORDER BY id"
-        try statement(db, sql) { stmt in
+        return try statement(db, sql) { stmt in
             try check(sqlite3_step(stmt), expected: SQLITE_ROW)
             guard sqlite3_column_type(stmt, 0) == SQLITE_INTEGER, sqlite3_column_int64(stmt, 0) == 1,
+                  sqlite3_column_type(stmt, 1) == SQLITE_TEXT, sqlite3_column_type(stmt, 2) == SQLITE_TEXT,
+                  sqlite3_column_bytes(stmt, 1) == 36, sqlite3_column_bytes(stmt, 2) == 36,
                   let source = sqlite3_column_text(stmt, 1), let candidate = sqlite3_column_text(stmt, 2),
-                  String(cString: source) == draft.source.version.epoch.uuidString,
-                  String(cString: candidate) == draft.candidateVersion.epoch.uuidString,
-                  sqlite3_column_type(stmt, 3) == SQLITE_INTEGER,
-                  sqlite3_column_int64(stmt, 3) == draft.source.version.revision
+                  let sourceEpoch = UUID(uuidString: String(cString: source)),
+                  let candidateEpoch = UUID(uuidString: String(cString: candidate)),
+                  String(cString: source) == sourceEpoch.uuidString,
+                  String(cString: candidate) == candidateEpoch.uuidString, sourceEpoch != candidateEpoch,
+                  sqlite3_column_type(stmt, 3) == SQLITE_INTEGER
             else { throw JournalMigrationError.verificationFailed }
-            if let payload = draft.source.payload {
-                guard matchesPayload(stmt, index: 4, expected: payload) else {
-                    throw JournalMigrationError.verificationFailed
-                }
+            let revision = sqlite3_column_int64(stmt, 3)
+            guard (0 ... Int64(CatalogJournal.maxEvents)).contains(revision) else {
+                throw JournalMigrationError.invalidSequence
+            }
+            let payload: Data? = if revision == 0, sqlite3_column_type(stmt, 4) == SQLITE_NULL {
+                nil
             } else {
-                guard sqlite3_column_type(stmt, 4) == SQLITE_NULL else {
-                    throw JournalMigrationError.verificationFailed
-                }
+                try readPayload(stmt, index: 4, limit: 16 * 1024 * 1024)
             }
             try check(sqlite3_step(stmt), expected: SQLITE_DONE)
+            return (
+                StoredSnapshot(version: .init(epoch: sourceEpoch, revision: revision), payload: payload),
+                StoreVersion(epoch: candidateEpoch, revision: revision)
+            )
         }
     }
 
-    private static func readRows(_ db: OpaquePointer, expected: [JournalEventRow]) throws -> [JournalEventRow] {
+    private static func readRows(_ db: OpaquePointer, revision: Int64) throws -> [JournalEventRow] {
         try statement(db, "SELECT sequence, payload FROM journal_event ORDER BY sequence") { stmt in
             var rows: [JournalEventRow] = []
-            for row in expected {
+            var remainingBytes = JournalRowCodec.maxTotalBytes
+            while Int64(rows.count) < revision {
                 try check(sqlite3_step(stmt), expected: SQLITE_ROW)
+                let sequence = Int64(rows.count + 1)
                 guard sqlite3_column_type(stmt, 0) == SQLITE_INTEGER,
-                      sqlite3_column_int64(stmt, 0) == row.sequence,
-                      matchesPayload(stmt, index: 1, expected: row.payload)
-                else { throw JournalMigrationError.verificationFailed }
-                rows.append(row)
+                      sqlite3_column_int64(stmt, 0) == sequence
+                else { throw JournalMigrationError.invalidSequence }
+                let payload = try readPayload(stmt, index: 1, limit: min(JournalRowCodec.maxRowBytes, remainingBytes))
+                remainingBytes -= payload.count
+                rows.append(JournalEventRow(sequence: sequence, payload: payload))
             }
             try check(sqlite3_step(stmt), expected: SQLITE_DONE)
             return rows
         }
     }
 
-    private static func matchesPayload(_ stmt: OpaquePointer, index: Int32, expected: Data) -> Bool {
-        guard sqlite3_column_type(stmt, index) == SQLITE_BLOB,
-              Int(sqlite3_column_bytes(stmt, index)) == expected.count,
+    private static func readPayload(_ stmt: OpaquePointer, index: Int32, limit: Int) throws -> Data {
+        let count = Int(sqlite3_column_bytes(stmt, index))
+        guard sqlite3_column_type(stmt, index) == SQLITE_BLOB, count > 0, count <= limit,
               let bytes = sqlite3_column_blob(stmt, index)
-        else { return false }
-        return Data(bytes: bytes, count: expected.count) == expected
+        else { throw JournalMigrationError.byteLimit }
+        return Data(bytes: bytes, count: count)
     }
 
     private static var transient: sqlite3_destructor_type {
