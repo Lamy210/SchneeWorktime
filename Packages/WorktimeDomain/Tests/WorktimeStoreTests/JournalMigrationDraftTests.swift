@@ -30,9 +30,11 @@ struct JournalMigrationDraftTests {
         #expect(try JournalRowCodec.replay(draft.rows, revision: 10000, now: 10300) == before.catalog)
         var rows = draft.rows
         let gap = JournalEvent(action: .observation(dayID: id, start: 10300, end: 10320), now: 10320)
-        rows.append(try JournalRowCodec.encode(gap, sequence: 10001))
+        let gapRow = try JournalRowCodec.encode(gap, sequence: 10001)
+        rows.append(gapRow)
         let exit = JournalEvent(action: .command(.clockOut(confirmBreak: false), at: 10321), now: 10321)
-        rows.append(try JournalRowCodec.encode(exit, sequence: 10002))
+        let exitRow = try JournalRowCodec.encode(exit, sequence: 10002)
+        rows.append(exitRow)
         let ended = try JournalRowCodec.replay(rows, revision: 10002, now: 10321)
         #expect(ended.activeID == nil)
         #expect(ended.reviewAudit == before.catalog.reviewAudit)

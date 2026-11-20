@@ -15,7 +15,7 @@ enum JournalMigrationError: Error, Equatable {
 /// The current schema-1 repository cannot adopt these rows.
 enum JournalRowCodec {
     static let maxRows = 100_000
-    static let maxRowBytes = 65_536
+    static let maxRowBytes = 65536
     static let maxTotalBytes = 64 * 1024 * 1024
 
     static func encode(_ event: JournalEvent, sequence: Int64) throws -> JournalEventRow {
@@ -37,7 +37,8 @@ enum JournalRowCodec {
                   row.payload.count <= maxTotalBytes - total else { throw JournalMigrationError.byteLimit }
             total += row.payload.count
             do {
-                events.append(try JSONDecoder().decode(JournalEvent.self, from: row.payload))
+                let event = try JSONDecoder().decode(JournalEvent.self, from: row.payload)
+                events.append(event)
             } catch {
                 throw JournalMigrationError.invalidEvent
             }
@@ -67,11 +68,10 @@ struct JournalMigrationDraft {
 
     init(source: StoredSnapshot, now: Int64) throws {
         let original = try CatalogBackup.validateSnapshot(source, now: now)
-        let journal: CatalogJournal
-        if let payload = source.payload {
-            journal = try JSONDecoder().decode(CatalogJournal.self, from: payload)
+        let journal = if let payload = source.payload {
+            try JSONDecoder().decode(CatalogJournal.self, from: payload)
         } else {
-            journal = CatalogJournal()
+            CatalogJournal()
         }
         let staged = try journal.events.enumerated().map { index, event in
             try JournalRowCodec.encode(event, sequence: Int64(index + 1))
