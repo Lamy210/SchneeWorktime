@@ -63,4 +63,18 @@ struct JournalStagingInspectionTests {
         #expect(inspected.rows.isEmpty)
         #expect(inspected.catalog == WorkdayCatalog())
     }
+
+    @Test func `embedded null in source epoch is rejected before UUID parsing`() throws {
+        try withCandidate { candidate in
+            var db: OpaquePointer?
+            let status = sqlite3_open_v2(candidate.url.path, &db, SQLITE_OPEN_READWRITE, nil)
+            defer { sqlite3_close(db) }
+            try #require(status == SQLITE_OK)
+            let sql = "UPDATE migration_source SET source_epoch = source_epoch || char(0) || 'suffix'"
+            try #require(sqlite3_exec(db, sql, nil, nil, nil) == SQLITE_OK)
+            #expect(throws: JournalMigrationError.verificationFailed) {
+                try JournalStagingDatabase.inspect(candidate.url, now: 140)
+            }
+        }
+    }
 }
