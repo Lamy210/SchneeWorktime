@@ -69,7 +69,8 @@ struct JournalStagingDatabaseTests {
             #expect(throws: CatalogPersistenceError.invalidJournal) {
                 try JournalStagingDatabase.create(source: invalid, in: root, now: 130)
             }
-            #expect(try FileManager.default.contentsOfDirectory(atPath: root.path).isEmpty)
+            let entries = try FileManager.default.contentsOfDirectory(atPath: root.path)
+            #expect(entries.isEmpty)
         }
     }
 }
