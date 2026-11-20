@@ -130,9 +130,12 @@ enum JournalStagingDatabase {
             try check(sqlite3_step(stmt), expected: SQLITE_ROW)
             guard sqlite3_column_type(stmt, 0) == SQLITE_INTEGER, sqlite3_column_int64(stmt, 0) == 1,
                   sqlite3_column_type(stmt, 1) == SQLITE_TEXT, sqlite3_column_type(stmt, 2) == SQLITE_TEXT,
+                  sqlite3_column_bytes(stmt, 1) == 36, sqlite3_column_bytes(stmt, 2) == 36,
                   let source = sqlite3_column_text(stmt, 1), let candidate = sqlite3_column_text(stmt, 2),
                   let sourceEpoch = UUID(uuidString: String(cString: source)),
-                  let candidateEpoch = UUID(uuidString: String(cString: candidate)), sourceEpoch != candidateEpoch,
+                  let candidateEpoch = UUID(uuidString: String(cString: candidate)),
+                  String(cString: source) == sourceEpoch.uuidString,
+                  String(cString: candidate) == candidateEpoch.uuidString, sourceEpoch != candidateEpoch,
                   sqlite3_column_type(stmt, 3) == SQLITE_INTEGER
             else { throw JournalMigrationError.verificationFailed }
             let revision = sqlite3_column_int64(stmt, 3)
