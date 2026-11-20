@@ -50,6 +50,30 @@ public struct SnapshotStore: Sendable {
         }
     }
 
+    /// The caller must hold the private directory/session lock and exclude other writers.
+    /// No normal initialization, recovery write, checkpoint update or database creation is attempted.
+    static func readForPreservation(at source: URL) throws -> StoredSnapshot {
+        let url = try DatabaseFileGuard.canonicalURL(source)
+        let identity = try DatabaseFileGuard.preservationIdentity(url)
+        var handle: OpaquePointer?
+        let flags = SQLITE_OPEN_READONLY | SQLITE_OPEN_FULLMUTEX
+        let status = sqlite3_open_v2(url.path, &handle, flags, nil)
+        defer { sqlite3_close(handle) }
+        guard status == SQLITE_OK, let db = handle else { throw SnapshotStoreError.sqlite(status) }
+        guard sqlite3_db_readonly(db, "main") == 1,
+              try DatabaseFileGuard.preservationIdentity(url) == identity
+        else { throw DatabaseFileError.unsafeFile }
+        try check(sqlite3_busy_timeout(db, 5000))
+        try execute(db, "PRAGMA trusted_schema = OFF")
+        try execute(db, "PRAGMA query_only = ON")
+        try execute(db, "BEGIN")
+        guard try scalar(db, "PRAGMA user_version") == 1 else { throw SnapshotStoreError.unsupportedSchema }
+        let snapshot = try read(db)
+        try execute(db, "COMMIT")
+        guard try DatabaseFileGuard.preservationIdentity(url) == identity else { throw DatabaseFileError.unsafeFile }
+        return snapshot
+    }
+
     public func load() throws -> StoredSnapshot {
         try connection { db in try Self.read(db) }
     }

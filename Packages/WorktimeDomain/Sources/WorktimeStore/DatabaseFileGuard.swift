@@ -46,6 +46,22 @@ enum DatabaseFileGuard {
         return Identity(device: UInt64(truncatingIfNeeded: info.st_dev), inode: UInt64(info.st_ino))
     }
 
+    /// Do not let SQLite recover a hot journal or initialize WAL sidecars during preservation.
+    static func preservationIdentity(_ url: URL) throws -> Identity {
+        let original = try identity(url)
+        for suffix in ["-journal", "-wal", "-shm"] {
+            guard try !existsAndValidate(url.path + suffix) else { throw DatabaseFileError.unsafeFile }
+        }
+        let handle = try FileHandle(forReadingFrom: url)
+        defer { try? handle.close() }
+        let header = try handle.read(upToCount: 20) ?? Data()
+        // SQLite format header offsets 18/19: write/read version 1 = rollback journal.
+        guard header.count == 20, header[18] == 1, header[19] == 1,
+              try identity(url) == original
+        else { throw DatabaseFileError.unsafeFile }
+        return original
+    }
+
     private static func validateSidecars(_ url: URL) throws {
         for suffix in ["-journal", "-wal", "-shm"] {
             _ = try existsAndValidate(url.path + suffix)
