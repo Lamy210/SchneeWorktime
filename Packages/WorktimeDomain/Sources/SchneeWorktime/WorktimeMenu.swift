@@ -122,6 +122,9 @@
                     .font(.caption)
                 Text("以前の記録がある場合は新規作成せず、アプリ終了後に保存フォルダ全体を保全してください。")
                     .font(.caption)
+                if model.sessionLock != nil {
+                    PreservationBackupView(model: model)
+                }
                 Button("既存データを再読込") { model.open(create: false) }
                     .disabled(model.choosingBackupDestination)
                 Button("新規データベースを作成") { confirmCreate = true }

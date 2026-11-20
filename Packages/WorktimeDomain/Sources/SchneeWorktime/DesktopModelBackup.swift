@@ -26,6 +26,28 @@
             }
         }
 
+        var canPreserveUnavailableDatabase: Bool {
+            !ready && controller == nil && sessionLock != nil && !maintenanceInProgress && !choosingBackupDestination
+        }
+
+        func choosePreservationDestination() {
+            guard canPreserveUnavailableDatabase else { return }
+            backupNotice = nil
+            choosingBackupDestination = true
+            defer { choosingBackupDestination = false }
+            guard let directory = WorktimeExportFormat.backup.chooseDirectory(initialDirectory: nil) else { return }
+            guard !ready, controller == nil, sessionLock != nil, !maintenanceInProgress else { return }
+            let name = "SchneeWorktime-preserved-\(UUID().uuidString).json"
+            do {
+                try PreservationBackup.write(
+                    from: databaseURL(), to: directory.appendingPathComponent(name), now: Self.sample().wall
+                )
+                backupNotice = "保存済み履歴を保全しました：\(name)。退勤や復旧は行っていません。"
+            } catch {
+                backupNotice = "保全を確認できません。保存先・原本・時刻を確認し、アプリ終了後に保存フォルダ全体を保全してください。"
+            }
+        }
+
         func chooseBackupForInspection() {
             guard !maintenanceInProgress, !choosingBackupDestination else { return }
             choosingBackupDestination = true
