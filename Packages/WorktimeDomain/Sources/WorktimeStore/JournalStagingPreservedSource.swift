@@ -8,12 +8,11 @@ extension JournalStagingDatabase {
     static func createFromPreservedSource(
         at sourceURL: URL, in directory: URL, now: Int64
     ) throws -> JournalStagingCandidate {
-        let original = try SnapshotStore.readForPreservation(at: sourceURL)
-        let candidate = try create(source: original, in: directory, now: now)
-        // A source change during staging must not return a candidate as if it were current.
-        // This second read does not replace the external lock or the future atomic adoption fence.
-        let current = try SnapshotStore.readForPreservation(at: sourceURL)
-        guard current == original else { throw JournalMigrationError.verificationFailed }
+        let source = try JournalPreservedSourceCapture.read(at: sourceURL)
+        let candidate = try create(source: source.snapshot, in: directory, now: now)
+        // Reject a replaced file even when the new file contains identical snapshot bytes.
+        // This does not replace the external lock or the future atomic adoption fence.
+        try source.verifyUnchanged(at: sourceURL)
         return candidate
     }
 }
