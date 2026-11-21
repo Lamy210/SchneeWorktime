@@ -155,6 +155,7 @@ jobs:
             if grep -Fxq "${ARTIFACT_ID}" <<<"${visible}"; then
               exit 0
             fi
+            echo "Artifact ID not yet visible (attempt ${attempt}/12)" >&2
             sleep 3
           done
           echo "::error::Exact uploaded artifact ID remained unavailable after bounded retries" >&2
