@@ -41,10 +41,11 @@ struct JournalStagingTamperTests {
 
     @Test func `surplus event row is rejected without silent truncation`() throws {
         try withCandidate { candidate in
-            try mutate(
-                candidate.url,
-                sql: "INSERT INTO journal_event (sequence, payload) SELECT 2, payload FROM journal_event WHERE sequence = 1"
-            )
+            let sql = """
+                INSERT INTO journal_event (sequence, payload)
+                SELECT 2, payload FROM journal_event WHERE sequence = 1
+                """
+            try mutate(candidate.url, sql: sql)
             let before = try Data(contentsOf: candidate.url)
             #expect(throws: SnapshotStoreError.self) {
                 try JournalStagingDatabase.inspect(candidate.url, now: 140)
