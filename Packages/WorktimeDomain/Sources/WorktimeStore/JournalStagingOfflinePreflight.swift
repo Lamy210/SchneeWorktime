@@ -6,13 +6,12 @@ extension JournalStagingDatabase {
     static func preflightPreservedSource(
         at sourceURL: URL, candidateURL: URL, now: Int64
     ) throws -> JournalStagingInspection {
-        let before = try SnapshotStore.readForPreservation(at: sourceURL)
+        let source = try JournalPreservedSourceCapture.read(at: sourceURL)
         let inspected = try inspect(candidateURL, now: now)
-        guard inspected.source == before else { throw JournalMigrationError.verificationFailed }
-        // Detect an intervening source update while verifying the candidate.
+        guard inspected.source == source.snapshot else { throw JournalMigrationError.verificationFailed }
+        // Detect replacement by an identical copy, as well as updates to the stored snapshot.
         // A future adoption must still validate the source under an atomic CAS fence.
-        let after = try SnapshotStore.readForPreservation(at: sourceURL)
-        guard after == before else { throw JournalMigrationError.verificationFailed }
+        try source.verifyUnchanged(at: sourceURL)
         return inspected
     }
 }
