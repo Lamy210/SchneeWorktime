@@ -12,21 +12,10 @@ extension JournalStagingDatabase {
         guard let preserved = candidate.capturedSource else {
             throw JournalMigrationError.verificationFailed
         }
-        // The original inode must match the one captured when staging was created.
-        // A byte-identical replacement between creation and append is unsafe.
-        try preserved.verifyUnchanged(at: sourceURL)
-        guard try DatabaseFileGuard.preservationIdentity(candidate.url) == candidate.fileIdentity else {
-            throw DatabaseFileError.unsafeFile
-        }
-        let inspected = try inspect(candidate.url, now: now)
-        guard inspected.source == preserved.snapshot,
-              candidate.draft.source == preserved.snapshot,
-              inspected.version.epoch == candidate.draft.candidateVersion.epoch,
-              inspected.checkpointAnchor != .unbound,
-              inspected.checkpointAnchor == .captured(preserved.checkpoint)
-        else { throw JournalMigrationError.verificationFailed }
+        let inspected = try preflightPinnedCandidate(
+            sourceURL: sourceURL, candidate: candidate, now: now
+        )
         guard inspected.version == expected else { throw SnapshotStoreError.staleVersion }
-        try preserved.verifyUnchanged(at: sourceURL)
         let committed = try appendOffline(
             event, to: candidate.url, anchoredTo: preserved.snapshot, expected: expected, now: now
         )
