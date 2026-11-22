@@ -84,7 +84,7 @@ enum JournalCheckpointAnchor: Equatable {
     ) throws -> JournalCheckpointAnchor {
         let missingDay = sqlite3_column_type(stmt, 2) == SQLITE_NULL
         let missingTime = sqlite3_column_type(stmt, 3) == SQLITE_NULL
-        if missingDay && missingTime {
+        if missingDay, missingTime {
             return .absent
         }
         guard sqlite3_column_type(stmt, 2) == SQLITE_TEXT,
