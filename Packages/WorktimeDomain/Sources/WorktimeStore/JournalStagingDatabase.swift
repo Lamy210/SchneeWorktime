@@ -12,6 +12,7 @@ import WorktimeDomain
 struct JournalStagingCandidate {
     let url: URL
     let draft: JournalMigrationDraft
+    let fileIdentity: DatabaseFileGuard.Identity
     /// Ephemeral identity proof; never reconstructed from a snapshot after restart.
     let capturedSource: JournalPreservedSourceCapture?
 }
@@ -53,7 +54,10 @@ enum JournalStagingDatabase {
         guard try inspect(url, now: now).checkpointAnchor == checkpointAnchor else {
             throw JournalMigrationError.verificationFailed
         }
-        return JournalStagingCandidate(url: url, draft: draft, capturedSource: nil)
+        let fileIdentity = try DatabaseFileGuard.preservationIdentity(url)
+        return JournalStagingCandidate(
+            url: url, draft: draft, fileIdentity: fileIdentity, capturedSource: nil
+        )
     }
 
     /// Reopen independently and require exact agreement with the original in-memory draft.
