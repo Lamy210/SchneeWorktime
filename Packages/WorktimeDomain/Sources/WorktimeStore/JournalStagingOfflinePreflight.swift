@@ -11,7 +11,7 @@ extension JournalStagingDatabase {
         guard inspected.source == source.snapshot else { throw JournalMigrationError.verificationFailed }
         let bound = inspected.checkpointAnchor != .unbound
         let changed = inspected.checkpointAnchor != .captured(source.checkpoint)
-        if bound && changed {
+        if bound, changed {
             throw JournalMigrationError.verificationFailed
         }
         // Detect replacement by an identical copy, as well as updates to the stored snapshot.
