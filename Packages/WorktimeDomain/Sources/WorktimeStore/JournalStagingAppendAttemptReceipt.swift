@@ -17,22 +17,19 @@ struct JournalStagingAppendAttemptReceipt {
     fileprivate let eventTime: Int64
 
     fileprivate init(
-        sourceURL: URL, candidateURL: URL,
-        sourceIdentity: DatabaseFileGuard.Identity,
-        candidateIdentity: DatabaseFileGuard.Identity,
-        sourceSnapshot: StoredSnapshot,
-        checkpointAnchor: JournalCheckpointAnchor,
-        expected: StoreVersion, prefixRows: [JournalEventRow],
+        sourceURL: URL, candidate: JournalStagingCandidate,
+        preserved: JournalPreservedSourceCapture,
+        inspected: JournalStagingInspection,
         attemptedRow: JournalEventRow, eventTime: Int64
-    ) {
-        self.sourceURL = sourceURL
-        self.candidateURL = candidateURL
-        self.sourceIdentity = sourceIdentity
-        self.candidateIdentity = candidateIdentity
-        self.sourceSnapshot = sourceSnapshot
-        self.checkpointAnchor = checkpointAnchor
-        self.expected = expected
-        self.prefixRows = prefixRows
+    ) throws {
+        self.sourceURL = try DatabaseFileGuard.canonicalURL(sourceURL)
+        candidateURL = try DatabaseFileGuard.canonicalURL(candidate.url)
+        sourceIdentity = preserved.identity
+        candidateIdentity = candidate.fileIdentity
+        sourceSnapshot = preserved.snapshot
+        checkpointAnchor = .captured(preserved.checkpoint)
+        expected = inspected.version
+        prefixRows = inspected.rows
         self.attemptedRow = attemptedRow
         self.eventTime = eventTime
     }
@@ -57,13 +54,9 @@ extension JournalStagingDatabase {
         )
         guard inspected.version == expected else { throw SnapshotStoreError.staleVersion }
         let row = try JournalRowCodec.encode(event, sequence: expected.revision + 1)
-        return JournalStagingAppendAttemptReceipt(
-            sourceURL: try DatabaseFileGuard.canonicalURL(sourceURL),
-            candidateURL: try DatabaseFileGuard.canonicalURL(candidate.url),
-            sourceIdentity: preserved.identity, candidateIdentity: candidate.fileIdentity,
-            sourceSnapshot: preserved.snapshot,
-            checkpointAnchor: .captured(preserved.checkpoint),
-            expected: expected, prefixRows: inspected.rows,
+        return try JournalStagingAppendAttemptReceipt(
+            sourceURL: sourceURL, candidate: candidate,
+            preserved: preserved, inspected: inspected,
             attemptedRow: row, eventTime: event.now
         )
     }
