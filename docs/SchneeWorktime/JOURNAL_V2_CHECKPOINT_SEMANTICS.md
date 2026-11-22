@@ -1,0 +1,7 @@
+# Journal v2のCheckpoint内容整合性（オフライン保全）
+
+Checkpointがschema-1 snapshotと同じepoch/revisionであっても、store層の低レベルAPIは任意のdayIDや時刻を保存できる。原本保全とv2候補の生成前に、checkpointの観測時刻でJournalを再生し、その時点でcheckpoint.dayIDが実際のactiveIDに一致することを追加検証する。
+
+検証失敗（別の勤務ID、出勤時刻より前の観測、未来イベントを含むなど）はObservationCheckpointError.invalidとして拒否し、原本の補修・削除・時刻推定はしない。有効なCheckpointは従来どおり取得し、原本のバイト列が変化しないことを確認する。これは観測可能だったことのマーカーであり、勤務確定の証拠でも新epochへの再束縛でもない。
+
+本実装は既存の#94・#95の読取専用移行候補処理にだけ作用し、一般の時刻追記やライブ移行/採用を有効にしない。候補採用時には排他ロックと世代フェンス、checkpoint移行ポリシーが別途必要。v1.0はNO-GO。
