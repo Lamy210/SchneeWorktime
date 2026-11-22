@@ -35,7 +35,7 @@ struct JournalStagingAppendTests {
         try body(candidate, source, id)
     }
 
-    @Test func offlineAppendPreservesSourceAndReplaysObservationAndExit() throws {
+    @Test func `offline append preserves source and replays observation and exit`() throws {
         try fixture { candidate, source, id in
             let gap = JournalEvent(action: .observation(dayID: id, start: 110, end: 120), now: 120)
             let first = try JournalStagingDatabase.appendOffline(
@@ -66,7 +66,7 @@ struct JournalStagingAppendTests {
         }
     }
 
-    @Test func invalidOfflineEventLeavesCandidateUntouched() throws {
+    @Test func `invalid offline event leaves candidate untouched`() throws {
         try fixture { candidate, source, id in
             let before = try Data(contentsOf: candidate.url)
             let invalid = JournalEvent(action: .command(.endBreak, at: 110), now: 110)
@@ -84,7 +84,7 @@ struct JournalStagingAppendTests {
         }
     }
 
-    @Test func competingOfflineWritersCommitOnlyOnce() async throws {
+    @Test func `competing offline writers commit only once`() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(
             at: root, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700]
@@ -94,10 +94,8 @@ struct JournalStagingAppendTests {
         let event = JournalEvent(
             action: .command(.clockIn(id: id, target: 25200, expectedRest: 3600), at: 100), now: 100
         )
-        let source = StoredSnapshot(
-            version: .init(epoch: UUID(), revision: 1),
-            payload: try JSONEncoder().encode(CatalogJournal(events: [event]))
-        )
+        let payload = try JSONEncoder().encode(CatalogJournal(events: [event]))
+        let source = StoredSnapshot(version: .init(epoch: UUID(), revision: 1), payload: payload)
         let candidate = try JournalStagingDatabase.create(source: source, in: root, now: 200)
         let gate = StagingAppendGate()
         let url = candidate.url

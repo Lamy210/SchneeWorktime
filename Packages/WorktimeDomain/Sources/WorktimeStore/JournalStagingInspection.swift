@@ -9,8 +9,10 @@ struct JournalStagingInspection {
     let catalog: WorkdayCatalog
 
     init(source: StoredSnapshot, version: StoreVersion, rows: [JournalEventRow], now: Int64) throws {
-        guard source.version.epoch != version.epoch, source.version.revision <= version.revision,
-              version.revision <= Int64(JournalRowCodec.maxRows) else {
+        guard source.version.epoch != version.epoch,
+              source.version.revision <= version.revision,
+              version.revision <= Int64(JournalRowCodec.maxRows)
+        else {
             throw JournalMigrationError.verificationFailed
         }
         let original = try CatalogBackup.validateSnapshot(source, now: now)

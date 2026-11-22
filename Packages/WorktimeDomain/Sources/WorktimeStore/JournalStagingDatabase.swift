@@ -71,7 +71,6 @@ enum JournalStagingDatabase {
         return result
     }
 
-
     /// Add exactly one validated event to an isolated candidate, never to a live schema-1 database.
     /// The source snapshot must have been captured independently of the candidate file.
     static func appendOffline(
