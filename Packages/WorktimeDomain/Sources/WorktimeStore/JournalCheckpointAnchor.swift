@@ -8,7 +8,9 @@ enum JournalCheckpointAnchor: Equatable {
     case recorded(ObservationCheckpoint)
 
     static func captured(_ marker: ObservationCheckpoint?) -> JournalCheckpointAnchor {
-        if let marker { return .recorded(marker) }
+        if let marker {
+            return .recorded(marker)
+        }
         return .absent
     }
 
@@ -80,8 +82,9 @@ enum JournalCheckpointAnchor: Equatable {
     private static func parseMarker(
         _ stmt: OpaquePointer, expected: StoreVersion, now: Int64
     ) throws -> JournalCheckpointAnchor {
-        if sqlite3_column_type(stmt, 2) == SQLITE_NULL,
-           sqlite3_column_type(stmt, 3) == SQLITE_NULL {
+        let missingDay = sqlite3_column_type(stmt, 2) == SQLITE_NULL
+        let missingTime = sqlite3_column_type(stmt, 3) == SQLITE_NULL
+        if missingDay && missingTime {
             return .absent
         }
         guard sqlite3_column_type(stmt, 2) == SQLITE_TEXT,
