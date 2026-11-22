@@ -16,6 +16,8 @@ extension JournalStagingDatabase {
         // Reject a replaced file even when the new file contains identical snapshot bytes.
         // This does not replace the external lock or the future atomic adoption fence.
         try source.verifyUnchanged(at: sourceURL)
-        return candidate
+        return JournalStagingCandidate(
+            url: candidate.url, draft: candidate.draft, capturedSource: source
+        )
     }
 }

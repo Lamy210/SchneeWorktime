@@ -6,19 +6,26 @@ extension JournalStagingDatabase {
     /// Caller MUST hold the original directory/session lock until this operation returns.
     /// This is not an atomic live migration or an authorization to adopt the candidate.
     static func appendOfflineFromPreservedSource(
-        _ event: JournalEvent, sourceURL: URL, candidateURL: URL,
+        _ event: JournalEvent, sourceURL: URL, candidate: JournalStagingCandidate,
         expected: StoreVersion, now: Int64
     ) throws -> JournalStagingInspection {
-        let preserved = try JournalPreservedSourceCapture.read(at: sourceURL)
-        let candidate = try inspect(candidateURL, now: now)
-        guard candidate.source == preserved.snapshot,
-              candidate.checkpointAnchor != .unbound,
-              candidate.checkpointAnchor == .captured(preserved.checkpoint)
+        guard let preserved = candidate.capturedSource else {
+            throw JournalMigrationError.verificationFailed
+        }
+        // The original inode must match the one captured when staging was created.
+        // A byte-identical replacement between creation and append is unsafe.
+        try preserved.verifyUnchanged(at: sourceURL)
+        let inspected = try inspect(candidate.url, now: now)
+        guard inspected.source == preserved.snapshot,
+              candidate.draft.source == preserved.snapshot,
+              inspected.version.epoch == candidate.draft.candidateVersion.epoch,
+              inspected.checkpointAnchor != .unbound,
+              inspected.checkpointAnchor == .captured(preserved.checkpoint)
         else { throw JournalMigrationError.verificationFailed }
-        guard candidate.version == expected else { throw SnapshotStoreError.staleVersion }
+        guard inspected.version == expected else { throw SnapshotStoreError.staleVersion }
         try preserved.verifyUnchanged(at: sourceURL)
         let committed = try appendOffline(
-            event, to: candidateURL, anchoredTo: preserved.snapshot, expected: expected, now: now
+            event, to: candidate.url, anchoredTo: preserved.snapshot, expected: expected, now: now
         )
         // Writes to the original must remain locked out. A post-COMMIT error is ambiguous:
         // the event may already be durable, so an automatic retry is unsafe.
