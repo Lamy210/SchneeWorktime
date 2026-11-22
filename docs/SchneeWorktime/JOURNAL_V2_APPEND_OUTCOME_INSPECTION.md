@@ -13,8 +13,10 @@ SQLiteへの追記は、COMMIT後の再読込や原本の照合に失敗する�
 
 どの結果でもイベントの自動再実行・候補採用・原本変更は行わない。未来時刻（`event.now > now`）の試行イベントは、追記が見えない場合でも `appendNotObserved` にせず `indeterminate` にする。呼出側は排他ロックを保持し、時点の異なる観測を混同しない。クラッシュ後にcaptureを失った場合の自動再開も提供しない。
 
+候補へ新規追記する `JournalRowCodec.encode` は、同じイベントから同じ行BLOBを再現できるよう `JSONEncoder` の `.sortedKeys` を指定する。SwiftのデフォルトJSONキー順序を前提としたバイト比較は不安定で、追記済みを誤って `indeterminate` とする可能性がある。既存schema-1の原本BLOB自体は変更しない。候補作成・再検査時の内部エンコード方式のみを固定する。
+
 ## テスト
-追記なし、完全一致した追記、別イベントへの分岐、Checkpoint更新、unbound候補・別epochに加え、未来時刻の試行イベント、同一bytesの原本/候補inode置換、試行後の追加イベントを回帰検証する。CIでmacOS Worktime Domainテスト・Swift Quality・その他必須ゲートを検証する。
+追記なし、完全一致した追記、別イベントへの分岐、Checkpoint更新、unbound候補・別epochに加え、未来時刻の試行イベント、同一bytesの原本/候補inode置換、試行後の追加イベント、および同一イベントの繰り返しエンコードのバイト一致を回帰検証する。CIでmacOS Worktime Domainテスト・Swift Quality・その他必須ゲートを検証する。
 
 ## リリース制約
 このAPIは運用判断材料であり、障害復旧の完全実装ではない。原子的live切替、CAS世代フェンス、バックアップ・DR、Checkpointの新epochポリシーは未解決。v1.0はNO-GO。
