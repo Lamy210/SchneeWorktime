@@ -15,6 +15,9 @@ extension JournalStagingDatabase {
         // The original inode must match the one captured when staging was created.
         // A byte-identical replacement between creation and append is unsafe.
         try preserved.verifyUnchanged(at: sourceURL)
+        guard try DatabaseFileGuard.preservationIdentity(candidate.url) == candidate.fileIdentity else {
+            throw DatabaseFileError.unsafeFile
+        }
         let inspected = try inspect(candidate.url, now: now)
         guard inspected.source == preserved.snapshot,
               candidate.draft.source == preserved.snapshot,
@@ -30,6 +33,9 @@ extension JournalStagingDatabase {
         // Writes to the original must remain locked out. A post-COMMIT error is ambiguous:
         // the event may already be durable, so an automatic retry is unsafe.
         do {
+            guard try DatabaseFileGuard.preservationIdentity(candidate.url) == candidate.fileIdentity else {
+                throw DatabaseFileError.unsafeFile
+            }
             try preserved.verifyUnchanged(at: sourceURL)
         } catch {
             throw JournalStagingAppendError.committedButUnverified(committed.version)

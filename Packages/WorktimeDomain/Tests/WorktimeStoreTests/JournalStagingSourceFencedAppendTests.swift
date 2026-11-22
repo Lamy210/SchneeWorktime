@@ -128,4 +128,31 @@ struct JournalStagingSourceFencedAppendTests {
             #expect(active.version == candidate.draft.source.version)
         }
     }
+
+    @Test func `identical candidate bytes with replaced inode cannot accept new events`() throws {
+        try withSource { _, sourceURL, active, id, _ in
+            let root = sourceURL.deletingLastPathComponent()
+            let candidate = try JournalStagingDatabase.createFromPreservedSource(
+                at: sourceURL, in: root, now: 110
+            )
+            let previous = try Data(contentsOf: candidate.url)
+            let sourceBefore = try Data(contentsOf: sourceURL)
+            let copied = candidate.url.deletingLastPathComponent()
+                .appendingPathComponent("candidate-copy.sqlite")
+            try FileManager.default.copyItem(at: candidate.url, to: copied)
+            try FileManager.default.removeItem(at: candidate.url)
+            try FileManager.default.moveItem(at: copied, to: candidate.url)
+            #expect(try Data(contentsOf: candidate.url) == previous)
+            let event = JournalEvent(action: .observation(dayID: id, start: 110, end: 120), now: 120)
+            #expect(throws: DatabaseFileError.unsafeFile) {
+                try JournalStagingDatabase.appendOfflineFromPreservedSource(
+                    event, sourceURL: sourceURL, candidate: candidate,
+                    expected: candidate.draft.candidateVersion, now: 130
+                )
+            }
+            #expect(try Data(contentsOf: candidate.url) == previous)
+            #expect(try Data(contentsOf: sourceURL) == sourceBefore)
+            #expect(active.version == candidate.draft.source.version)
+        }
+    }
 }

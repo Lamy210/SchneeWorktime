@@ -17,7 +17,8 @@ extension JournalStagingDatabase {
         // This does not replace the external lock or the future atomic adoption fence.
         try source.verifyUnchanged(at: sourceURL)
         return JournalStagingCandidate(
-            url: candidate.url, draft: candidate.draft, capturedSource: source
+            url: candidate.url, draft: candidate.draft,
+            fileIdentity: candidate.fileIdentity, capturedSource: source
         )
     }
 }
