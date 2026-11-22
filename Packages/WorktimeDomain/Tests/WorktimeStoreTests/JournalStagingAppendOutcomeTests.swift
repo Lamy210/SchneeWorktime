@@ -30,8 +30,7 @@ struct JournalStagingAppendOutcomeTests {
     }
 
     private func replaceWithIdenticalCopy(_ url: URL) throws {
-        let replacement = url.deletingLastPathComponent()
-            .appendingPathComponent("replacement-" + UUID().uuidString + ".sqlite")
+        let replacement = url.deletingLastPathComponent().appendingPathComponent(UUID().uuidString)
         try FileManager.default.copyItem(at: url, to: replacement)
         try FileManager.default.removeItem(at: url)
         try FileManager.default.moveItem(at: replacement, to: url)
@@ -118,7 +117,7 @@ struct JournalStagingAppendOutcomeTests {
         }
     }
 
-    @Test func futureAttemptedEventIsNotClassifiedAsAbsent() throws {
+    @Test func futureEventIsIndeterminate() throws {
         try fixture { sourceURL, candidate, id, _ in
             let expected = candidate.draft.candidateVersion
             let futureEvent = JournalEvent(
@@ -136,7 +135,7 @@ struct JournalStagingAppendOutcomeTests {
         }
     }
 
-    @Test func sameBytesDifferentCandidateInodeIsIndeterminate() throws {
+    @Test func candidateInodeSwapIsIndeterminate() throws {
         try fixture { sourceURL, candidate, id, _ in
             let candidateBytes = try Data(contentsOf: candidate.url)
             try replaceWithIdenticalCopy(candidate.url)
@@ -150,7 +149,7 @@ struct JournalStagingAppendOutcomeTests {
         }
     }
 
-    @Test func sameBytesDifferentPreservedSourceInodeIsIndeterminate() throws {
+    @Test func sourceInodeSwapIsIndeterminate() throws {
         try fixture { sourceURL, candidate, id, _ in
             let sourceBytes = try Data(contentsOf: sourceURL)
             let candidateBytes = try Data(contentsOf: candidate.url)
@@ -166,7 +165,7 @@ struct JournalStagingAppendOutcomeTests {
         }
     }
 
-    @Test func laterAppendAfterMatchingEventIsIndeterminate() throws {
+    @Test func laterAppendIsIndeterminate() throws {
         try fixture { sourceURL, candidate, id, _ in
             let expected = candidate.draft.candidateVersion
             let first = observation(id)
