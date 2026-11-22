@@ -9,7 +9,10 @@ extension JournalStagingDatabase {
         at sourceURL: URL, in directory: URL, now: Int64
     ) throws -> JournalStagingCandidate {
         let source = try JournalPreservedSourceCapture.read(at: sourceURL)
-        let candidate = try create(source: source.snapshot, in: directory, now: now)
+        let candidate = try create(
+            source: source.snapshot, in: directory, now: now,
+            checkpointAnchor: .captured(source.checkpoint)
+        )
         // Reject a replaced file even when the new file contains identical snapshot bytes.
         // This does not replace the external lock or the future atomic adoption fence.
         try source.verifyUnchanged(at: sourceURL)

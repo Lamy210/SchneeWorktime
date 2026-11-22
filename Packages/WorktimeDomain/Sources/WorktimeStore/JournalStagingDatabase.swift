@@ -15,7 +15,11 @@ struct JournalStagingCandidate {
 }
 
 enum JournalStagingDatabase {
-    static func create(source: StoredSnapshot, in directory: URL, now: Int64) throws -> JournalStagingCandidate {
+    static func create(
+        source: StoredSnapshot, in directory: URL, now: Int64,
+        checkpointAnchor: JournalCheckpointAnchor = .unbound
+    ) throws -> JournalStagingCandidate {
+        try checkpointAnchor.validate(expected: source.version, now: now)
         let draft = try JournalMigrationDraft(source: source, now: now)
         var info = stat()
         guard directory.isFileURL, lstat(directory.path, &info) == 0,
@@ -34,6 +38,7 @@ enum JournalStagingDatabase {
             do {
                 try createSchema(db)
                 try insertMetadata(db, draft: draft)
+                try JournalCheckpointAnchor.write(checkpointAnchor, expected: draft.source.version, into: db)
                 try insertRows(db, rows: draft.rows)
                 try execute(db, "PRAGMA user_version = 2")
                 try execute(db, "COMMIT")
@@ -43,6 +48,9 @@ enum JournalStagingDatabase {
             }
         }
         try verify(url, draft: draft, now: now)
+        guard try inspect(url, now: now).checkpointAnchor == checkpointAnchor else {
+            throw JournalMigrationError.verificationFailed
+        }
         return JournalStagingCandidate(url: url, draft: draft)
     }
 
@@ -180,7 +188,10 @@ extension JournalStagingDatabase {
         let revision = try currentRevision(db, sourceRevision: metadata.source.version.revision)
         let rows = try readRows(db, revision: revision)
         let version = StoreVersion(epoch: metadata.version.epoch, revision: revision)
-        return try JournalStagingInspection(source: metadata.source, version: version, rows: rows, now: now)
+        let anchor = try JournalCheckpointAnchor.read(from: db, expected: metadata.source.version, now: now)
+        return try JournalStagingInspection(
+            source: metadata.source, version: version, rows: rows, checkpointAnchor: anchor, now: now
+        )
     }
 
     private static func hasProgressTable(_ db: OpaquePointer) throws -> Bool {

@@ -6,9 +6,13 @@ struct JournalStagingInspection {
     let source: StoredSnapshot
     let version: StoreVersion
     let rows: [JournalEventRow]
+    let checkpointAnchor: JournalCheckpointAnchor
     let catalog: WorkdayCatalog
 
-    init(source: StoredSnapshot, version: StoreVersion, rows: [JournalEventRow], now: Int64) throws {
+    init(
+        source: StoredSnapshot, version: StoreVersion, rows: [JournalEventRow],
+        checkpointAnchor: JournalCheckpointAnchor = .unbound, now: Int64
+    ) throws {
         guard source.version.epoch != version.epoch,
               source.version.revision <= version.revision,
               version.revision <= Int64(JournalRowCodec.maxRows)
@@ -32,6 +36,7 @@ struct JournalStagingInspection {
         self.source = source
         self.version = version
         self.rows = rows
+        self.checkpointAnchor = checkpointAnchor
         catalog = replay
     }
 }

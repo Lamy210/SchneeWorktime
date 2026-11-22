@@ -9,6 +9,10 @@ extension JournalStagingDatabase {
         let source = try JournalPreservedSourceCapture.read(at: sourceURL)
         let inspected = try inspect(candidateURL, now: now)
         guard inspected.source == source.snapshot else { throw JournalMigrationError.verificationFailed }
+        if inspected.checkpointAnchor != .unbound,
+           inspected.checkpointAnchor != .captured(source.checkpoint) {
+            throw JournalMigrationError.verificationFailed
+        }
         // Detect replacement by an identical copy, as well as updates to the stored snapshot.
         // A future adoption must still validate the source under an atomic CAS fence.
         try source.verifyUnchanged(at: sourceURL)

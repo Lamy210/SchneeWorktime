@@ -1,0 +1,13 @@
+# Journal v2候補の観測Checkpointアンカー
+
+## 変更点
+オフラインのschema-1原本からschema-2候補を作成する際、旧snapshotと同じREADONLYトランザクションで取得した観測Checkpointの有無と内容を候補DBにも**非アクティブな移行アンカー**として保存する。元DBは変更しない。
+
+- source_checkpointテーブルを候補生成時の同一BEGIN IMMEDIATE内で保存し、source epoch/revision、day_id/observed_atを原本と一致させる。
+- Checkpointが存在しない場合もabsentを記録し、候補作成後にCheckpointが追加された場合は事前照合で拒否する。
+- 過去に生成した候補やsnapshot単体からの候補はunboundとし、この項目について事前照合の保証はない（既存候補互換）。
+- 候補のREADONLY独立検査はアンカーの型・旧世代・時刻の整合性を確認。候補のsource_revision/epochと矛盾した記録を拒否する。
+- 本番DBへの自動採用や候補へのCheckpoint再束縛はしない。元Checkpointは勤務実績や退勤確定の証拠ではない。
+
+## 残る障害モード
+検査と実際の採用とのTOCTOUはまだ残る。採用を認めるには排他ロックとライブ世代・ファイルidentityを同じ境界で検査する仕組み、Checkpointの新世代への安全な移行ルール、異常終了時の復旧設計が必要。本PRはオフライン候補の発生時点への固定と変化検出まで。v1.0 NO-GO。
