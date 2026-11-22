@@ -36,6 +36,16 @@ struct JournalStagingAppendOutcomeTests {
         try FileManager.default.moveItem(at: replacement, to: url)
     }
 
+    @Test func `identical journal events produce identical encoded row bytes`() throws {
+        let id = UUID()
+        let event = observation(id)
+        let first = try JournalRowCodec.encode(event, sequence: 2)
+        for _ in 0 ..< 32 {
+            let again = try JournalRowCodec.encode(event, sequence: 2)
+            #expect(again == first)
+        }
+    }
+
     @Test func `no event appears when append was never attempted`() throws {
         try fixture { sourceURL, candidate, id, _ in
             let sourceBytes = try Data(contentsOf: sourceURL)
@@ -117,7 +127,7 @@ struct JournalStagingAppendOutcomeTests {
         }
     }
 
-    @Test func futureEventIsIndeterminate() throws {
+    @Test func `future event is indeterminate`() throws {
         try fixture { sourceURL, candidate, id, _ in
             let expected = candidate.draft.candidateVersion
             let futureEvent = JournalEvent(
@@ -135,7 +145,7 @@ struct JournalStagingAppendOutcomeTests {
         }
     }
 
-    @Test func candidateInodeSwapIsIndeterminate() throws {
+    @Test func `candidate inode swap is indeterminate`() throws {
         try fixture { sourceURL, candidate, id, _ in
             let candidateBytes = try Data(contentsOf: candidate.url)
             try replaceWithIdenticalCopy(candidate.url)
@@ -149,7 +159,7 @@ struct JournalStagingAppendOutcomeTests {
         }
     }
 
-    @Test func sourceInodeSwapIsIndeterminate() throws {
+    @Test func `source inode swap is indeterminate`() throws {
         try fixture { sourceURL, candidate, id, _ in
             let sourceBytes = try Data(contentsOf: sourceURL)
             let candidateBytes = try Data(contentsOf: candidate.url)
@@ -165,7 +175,7 @@ struct JournalStagingAppendOutcomeTests {
         }
     }
 
-    @Test func laterAppendIsIndeterminate() throws {
+    @Test func `later append is indeterminate`() throws {
         try fixture { sourceURL, candidate, id, _ in
             let expected = candidate.draft.candidateVersion
             let first = observation(id)
