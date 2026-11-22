@@ -1,0 +1,13 @@
+# Journal v2 移行前の観測Checkpoint変化検出
+
+## 問題と原因
+現行schema-1の観測CheckpointはJournalとは別のSQLiteメタデータで、同じepoch/revisionのまま `observed_at` を更新できる。旧オフライン移行前検査ではJournal snapshotのepoch/revision/payloadとファイルidentityだけを比較していたため、Snapshotが同じでもCheckpointの更新を検出できなかった。移行後の不確実時間を誤認する潜在的なTOCTOUを排除する必要がある。
+
+## 今回の対策
+- `SnapshotStore.readPreservationState` はSQLite READONLY/query_onlyでBEGINし、1つの読取トランザクションから snapshot と observation_checkpoint を取得する。DB作成やCheckpoint書込みは行わない。
+- 現行snapshotと同じepoch/revisionのCheckpointだけを有効なマーカーとして保持。古い世代のマーカーは無効とし、新世代へ継承しない。
+- `JournalPreservedSourceCapture` にCheckpointを含めて取得し、`verifyUnchanged` でファイルidentity・snapshot完全一致・Checkpoint一致を全て確認。オフライン候補の生成前後確認と読取専用事前検証はこの処理を再利用する。
+- 無Checkpoint、同RevisionでのCheckpoint時刻更新、旧Revisionマーカーの非継承を回帰試験として追加。
+
+## 明示的な非保証
+これは移行前の変化検出であり、候補SQLiteへのCheckpoint保存、観測の再帰属、新Epochへの再束縛、あるいは稼働DB採用ではない。Checkpointは勤務実績や退勤を証明しない。呼出側の排他ロック、原本保全、候補採用直前の原子的CASフェンスが必要。今回もschema-1とschema-2の自動切替、品質基準、リリース判定NO-GOは変更しない。
