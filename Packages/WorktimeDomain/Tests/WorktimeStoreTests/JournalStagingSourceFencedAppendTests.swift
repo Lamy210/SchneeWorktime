@@ -30,14 +30,14 @@ struct JournalStagingSourceFencedAppendTests {
             )
             let observed = JournalEvent(action: .observation(dayID: id, start: 110, end: 120), now: 120)
             let saved = try JournalStagingDatabase.appendOfflineFromPreservedSource(
-                observed, sourceURL: sourceURL, candidateURL: candidate.url,
+                observed, sourceURL: sourceURL, candidate: candidate,
                 expected: candidate.draft.candidateVersion, now: 125
             )
             #expect(saved.version.revision == active.version.revision + 1)
             #expect(saved.checkpointAnchor == .absent)
             let exit = JournalEvent(action: .command(.clockOut(confirmBreak: false), at: 130), now: 130)
             let ended = try JournalStagingDatabase.appendOfflineFromPreservedSource(
-                exit, sourceURL: sourceURL, candidateURL: candidate.url, expected: saved.version, now: 135
+                exit, sourceURL: sourceURL, candidate: candidate, expected: saved.version, now: 135
             )
             #expect(ended.catalog.activeID == nil)
             #expect(ended.catalog.observations[id] == [.init(start: 110, end: 120)])
@@ -61,7 +61,7 @@ struct JournalStagingSourceFencedAppendTests {
             let event = JournalEvent(action: .observation(dayID: id, start: 110, end: 120), now: 120)
             #expect(throws: JournalMigrationError.verificationFailed) {
                 try JournalStagingDatabase.appendOfflineFromPreservedSource(
-                    event, sourceURL: sourceURL, candidateURL: candidate.url,
+                    event, sourceURL: sourceURL, candidate: candidate,
                     expected: candidate.draft.candidateVersion, now: 130
                 )
             }
@@ -78,7 +78,7 @@ struct JournalStagingSourceFencedAppendTests {
             let event = JournalEvent(action: .observation(dayID: id, start: 110, end: 120), now: 120)
             #expect(throws: JournalMigrationError.verificationFailed) {
                 try JournalStagingDatabase.appendOfflineFromPreservedSource(
-                    event, sourceURL: sourceURL, candidateURL: candidate.url,
+                    event, sourceURL: sourceURL, candidate: candidate,
                     expected: candidate.draft.candidateVersion, now: 130
                 )
             }
@@ -96,11 +96,37 @@ struct JournalStagingSourceFencedAppendTests {
             let event = JournalEvent(action: .observation(dayID: id, start: 110, end: 120), now: 120)
             #expect(throws: JournalMigrationError.verificationFailed) {
                 try JournalStagingDatabase.appendOfflineFromPreservedSource(
-                    event, sourceURL: sourceURL, candidateURL: candidate.url,
+                    event, sourceURL: sourceURL, candidate: candidate,
                     expected: candidate.draft.candidateVersion, now: 140
                 )
             }
             #expect(try Data(contentsOf: candidate.url) == before)
         }
     }
+
+    @Test func `identical source bytes with replaced inode cannot append to old staging`() throws {
+        try withSource { root, sourceURL, active, id, _ in
+            let candidate = try JournalStagingDatabase.createFromPreservedSource(
+                at: sourceURL, in: root, now: 110
+            )
+            let candidateBytes = try Data(contentsOf: candidate.url)
+            let originalBytes = try Data(contentsOf: sourceURL)
+            let copy = root.appendingPathComponent("replacement.sqlite")
+            try FileManager.default.copyItem(at: sourceURL, to: copy)
+            try FileManager.default.removeItem(at: sourceURL)
+            try FileManager.default.moveItem(at: copy, to: sourceURL)
+            let newBytes = try Data(contentsOf: sourceURL)
+            #expect(newBytes == originalBytes)
+            let event = JournalEvent(action: .observation(dayID: id, start: 110, end: 120), now: 120)
+            #expect(throws: DatabaseFileError.unsafeFile) {
+                try JournalStagingDatabase.appendOfflineFromPreservedSource(
+                    event, sourceURL: sourceURL, candidate: candidate,
+                    expected: candidate.draft.candidateVersion, now: 130
+                )
+            }
+            #expect(try Data(contentsOf: candidate.url) == candidateBytes)
+            #expect(active.version == candidate.draft.source.version)
+        }
+    }
+
 }
