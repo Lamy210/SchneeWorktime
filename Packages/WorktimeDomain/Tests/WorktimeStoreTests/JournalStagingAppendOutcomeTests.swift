@@ -199,4 +199,50 @@ struct JournalStagingAppendOutcomeTests {
             #expect(try Data(contentsOf: candidate.url) == candidateBytes)
         }
     }
+
+    @Test func `second append cannot match without a pinned pre-append prefix`() throws {
+        try fixture { sourceURL, candidate, id, _ in
+            let first = try JournalStagingDatabase.appendOfflineFromPreservedSource(
+                observation(id), sourceURL: sourceURL, candidate: candidate,
+                expected: candidate.draft.candidateVersion, now: 130
+            )
+            let second = JournalEvent(
+                action: .futureRest(dayID: id, remainingSeconds: 60), now: 130
+            )
+            _ = try JournalStagingDatabase.appendOfflineFromPreservedSource(
+                second, sourceURL: sourceURL, candidate: candidate,
+                expected: first.version, now: 140
+            )
+            let sourceBytes = try Data(contentsOf: sourceURL)
+            let candidateBytes = try Data(contentsOf: candidate.url)
+            let result = JournalStagingDatabase.inspectUncertainOfflineAppend(
+                second, sourceURL: sourceURL, candidate: candidate,
+                expected: first.version, now: 140
+            )
+            #expect(result == .indeterminate)
+            #expect(try Data(contentsOf: sourceURL) == sourceBytes)
+            #expect(try Data(contentsOf: candidate.url) == candidateBytes)
+        }
+    }
+
+    @Test func `second append cannot report absent without a pinned pre-append prefix`() throws {
+        try fixture { sourceURL, candidate, id, _ in
+            let first = try JournalStagingDatabase.appendOfflineFromPreservedSource(
+                observation(id), sourceURL: sourceURL, candidate: candidate,
+                expected: candidate.draft.candidateVersion, now: 130
+            )
+            let second = JournalEvent(
+                action: .futureRest(dayID: id, remainingSeconds: 60), now: 130
+            )
+            let sourceBytes = try Data(contentsOf: sourceURL)
+            let candidateBytes = try Data(contentsOf: candidate.url)
+            let result = JournalStagingDatabase.inspectUncertainOfflineAppend(
+                second, sourceURL: sourceURL, candidate: candidate,
+                expected: first.version, now: 140
+            )
+            #expect(result == .indeterminate)
+            #expect(try Data(contentsOf: sourceURL) == sourceBytes)
+            #expect(try Data(contentsOf: candidate.url) == candidateBytes)
+        }
+    }
 }
