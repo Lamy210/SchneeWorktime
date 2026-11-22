@@ -100,48 +100,7 @@ enum JournalStagingDatabase {
         guard try JournalRowCodec.replay(rows, revision: nextVersion.revision, now: now) == nextCatalog
         else { throw JournalMigrationError.verificationFailed }
 
-        try connect(url, flags: SQLITE_OPEN_READWRITE) { db in
-            try execute(db, "PRAGMA synchronous = FULL")
-            try execute(db, "BEGIN IMMEDIATE")
-            do {
-                let locked = try inspectConnection(db, now: now)
-                guard locked.version == expected else { throw SnapshotStoreError.staleVersion }
-                guard locked.source == original, locked.rows == current.rows else {
-                    throw JournalMigrationError.verificationFailed
-                }
-                try statement(db, "INSERT INTO journal_event (sequence, payload) VALUES (?, ?)") { stmt in
-                    try check(sqlite3_bind_int64(stmt, 1, row.sequence))
-                    try bind(row.payload, to: stmt, index: 2)
-                    try check(sqlite3_step(stmt), expected: SQLITE_DONE)
-                }
-                if try hasProgressTable(db) {
-                    try statement(db, """
-                    UPDATE candidate_progress SET revision = ?
-                    WHERE id = 1 AND revision = ?
-                    """) { stmt in
-                        try check(sqlite3_bind_int64(stmt, 1, nextVersion.revision))
-                        try check(sqlite3_bind_int64(stmt, 2, expected.revision))
-                        try check(sqlite3_step(stmt), expected: SQLITE_DONE)
-                        guard sqlite3_changes(db) == 1 else { throw SnapshotStoreError.staleVersion }
-                    }
-                } else {
-                    try execute(db, """
-                    CREATE TABLE candidate_progress (
-                        id INTEGER PRIMARY KEY CHECK (id = 1),
-                        revision INTEGER NOT NULL CHECK (revision BETWEEN 0 AND 100000)
-                    ) STRICT
-                    """)
-                    try statement(db, "INSERT INTO candidate_progress VALUES (1, ?)") { stmt in
-                        try check(sqlite3_bind_int64(stmt, 1, nextVersion.revision))
-                        try check(sqlite3_step(stmt), expected: SQLITE_DONE)
-                    }
-                }
-                try execute(db, "COMMIT")
-            } catch {
-                try? execute(db, "ROLLBACK")
-                throw error
-            }
-        }
+        try persistOfflineAppend(row, to: url, current: current, now: now)
         // A post-COMMIT error has an ambiguous outcome. Do not retry without reinspection.
         do {
             guard try DatabaseFileGuard.preservationIdentity(url) == identity else {
@@ -154,6 +113,57 @@ enum JournalStagingDatabase {
             return committed
         } catch {
             throw JournalStagingAppendError.committedButUnverified(nextVersion)
+        }
+    }
+
+    private static func persistOfflineAppend(
+        _ row: JournalEventRow, to url: URL, current: JournalStagingInspection, now: Int64
+    ) throws {
+        try connect(url, flags: SQLITE_OPEN_READWRITE) { db in
+            try execute(db, "PRAGMA synchronous = FULL")
+            try execute(db, "BEGIN IMMEDIATE")
+            do {
+                let locked = try inspectConnection(db, now: now)
+                guard locked.version == current.version else { throw SnapshotStoreError.staleVersion }
+                guard locked.source == current.source, locked.rows == current.rows else {
+                    throw JournalMigrationError.verificationFailed
+                }
+                try statement(db, "INSERT INTO journal_event (sequence, payload) VALUES (?, ?)") { stmt in
+                    try check(sqlite3_bind_int64(stmt, 1, row.sequence))
+                    try bind(row.payload, to: stmt, index: 2)
+                    try check(sqlite3_step(stmt), expected: SQLITE_DONE)
+                }
+                try advanceProgress(db, expected: current.version.revision, next: row.sequence)
+                try execute(db, "COMMIT")
+            } catch {
+                try? execute(db, "ROLLBACK")
+                throw error
+            }
+        }
+    }
+
+    private static func advanceProgress(_ db: OpaquePointer, expected: Int64, next: Int64) throws {
+        if try hasProgressTable(db) {
+            try statement(db, """
+            UPDATE candidate_progress SET revision = ?
+            WHERE id = 1 AND revision = ?
+            """) { stmt in
+                try check(sqlite3_bind_int64(stmt, 1, next))
+                try check(sqlite3_bind_int64(stmt, 2, expected))
+                try check(sqlite3_step(stmt), expected: SQLITE_DONE)
+                guard sqlite3_changes(db) == 1 else { throw SnapshotStoreError.staleVersion }
+            }
+        } else {
+            try execute(db, """
+            CREATE TABLE candidate_progress (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                revision INTEGER NOT NULL CHECK (revision BETWEEN 0 AND 100000)
+            ) STRICT
+            """)
+            try statement(db, "INSERT INTO candidate_progress VALUES (1, ?)") { stmt in
+                try check(sqlite3_bind_int64(stmt, 1, next))
+                try check(sqlite3_step(stmt), expected: SQLITE_DONE)
+            }
         }
     }
 
