@@ -167,6 +167,4 @@ struct JournalStagingAppendTests {
         #expect(reopened.catalog == ended.catalog)
         #expect(reopened.catalog.reviewAudit == ended.catalog.reviewAudit)
     }
-
-
 }

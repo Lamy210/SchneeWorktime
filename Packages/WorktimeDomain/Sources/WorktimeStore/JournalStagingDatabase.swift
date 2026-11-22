@@ -70,7 +70,6 @@ enum JournalStagingDatabase {
         }
         return result
     }
-
 }
 
 extension JournalStagingDatabase {
