@@ -16,7 +16,8 @@ extension JournalStagingDatabase {
         _ event: JournalEvent, sourceURL: URL, candidate: JournalStagingCandidate,
         expected: StoreVersion, now: Int64
     ) -> JournalStagingAppendOutcome {
-        guard expected.epoch == candidate.draft.candidateVersion.epoch,
+        guard event.now <= now,
+              expected.epoch == candidate.draft.candidateVersion.epoch,
               expected.revision >= candidate.draft.candidateVersion.revision,
               expected.revision < Int64(JournalRowCodec.maxRows)
         else { return .indeterminate }
