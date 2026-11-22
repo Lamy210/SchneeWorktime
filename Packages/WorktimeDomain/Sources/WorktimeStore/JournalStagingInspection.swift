@@ -20,6 +20,7 @@ struct JournalStagingInspection {
             throw JournalMigrationError.verificationFailed
         }
         let original = try CatalogBackup.validateSnapshot(source, now: now)
+        try checkpointAnchor.validate(source: source, now: now)
         let journal = if let payload = source.payload {
             try JSONDecoder().decode(CatalogJournal.self, from: payload)
         } else {
