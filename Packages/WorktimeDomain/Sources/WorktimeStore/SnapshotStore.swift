@@ -15,6 +15,12 @@ public struct StoredSnapshot: Sendable, Equatable {
     public let payload: Data?
 }
 
+/// Read-only capture of one committed Journal generation and its matching observation marker.
+struct PreservedSnapshotState {
+    let snapshot: StoredSnapshot
+    let checkpoint: ObservationCheckpoint?
+}
+
 /// A single SQLite row, not a catalog codec or backup/restore system.
 /// Only a trusted application coordinator may encode and submit canonical data.
 public struct SnapshotStore: Sendable {
@@ -53,6 +59,12 @@ public struct SnapshotStore: Sendable {
     /// The caller must hold the private directory/session lock and exclude other writers.
     /// No normal initialization, recovery write, checkpoint update or database creation is attempted.
     static func readForPreservation(at source: URL) throws -> StoredSnapshot {
+        try readPreservationState(at: source).snapshot
+    }
+
+    /// Capture Journal and the matching checkpoint in one read transaction.
+    /// A marker for an older revision is stale and must never be rebound to the current Journal.
+    static func readPreservationState(at source: URL) throws -> PreservedSnapshotState {
         let url = try DatabaseFileGuard.canonicalURL(source)
         let identity = try DatabaseFileGuard.preservationIdentity(url)
         var handle: OpaquePointer?
@@ -69,9 +81,11 @@ public struct SnapshotStore: Sendable {
         try execute(db, "BEGIN")
         guard try scalar(db, "PRAGMA user_version") == 1 else { throw SnapshotStoreError.unsupportedSchema }
         let snapshot = try read(db)
+        let marker = try readCheckpoint(db)
+        let matching = marker?.version == snapshot.version ? marker : nil
         try execute(db, "COMMIT")
         guard try DatabaseFileGuard.preservationIdentity(url) == identity else { throw DatabaseFileError.unsafeFile }
-        return snapshot
+        return PreservedSnapshotState(snapshot: snapshot, checkpoint: matching)
     }
 
     public func load() throws -> StoredSnapshot {
