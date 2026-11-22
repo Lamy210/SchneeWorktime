@@ -20,7 +20,10 @@ enum JournalRowCodec {
 
     static func encode(_ event: JournalEvent, sequence: Int64) throws -> JournalEventRow {
         guard sequence > 0 else { throw JournalMigrationError.invalidSequence }
-        let data = try JSONEncoder().encode(event)
+        // Stable bytes are required when an uncertain append is inspected again.
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        let data = try encoder.encode(event)
         guard !data.isEmpty, data.count <= maxRowBytes else { throw JournalMigrationError.byteLimit }
         return JournalEventRow(sequence: sequence, payload: data)
     }
