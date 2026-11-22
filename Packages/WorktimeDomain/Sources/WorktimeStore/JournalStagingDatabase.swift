@@ -61,17 +61,7 @@ enum JournalStagingDatabase {
         let result = try connect(url, flags: SQLITE_OPEN_READONLY) { db in
             try execute(db, "PRAGMA query_only = ON")
             try execute(db, "BEGIN")
-            try statement(db, "PRAGMA user_version") { stmt in
-                try check(sqlite3_step(stmt), expected: SQLITE_ROW)
-                guard sqlite3_column_int64(stmt, 0) == 2 else {
-                    throw SnapshotStoreError.unsupportedSchema
-                }
-            }
-            let metadata = try readMetadata(db)
-            let rows = try readRows(db, revision: metadata.source.version.revision)
-            let inspected = try JournalStagingInspection(
-                source: metadata.source, version: metadata.version, rows: rows, now: now
-            )
+            let inspected = try inspectConnection(db, now: now)
             try execute(db, "COMMIT")
             return inspected
         }
@@ -79,6 +69,142 @@ enum JournalStagingDatabase {
             throw DatabaseFileError.unsafeFile
         }
         return result
+    }
+}
+
+extension JournalStagingDatabase {
+    /// Add exactly one validated event to an isolated candidate, never to a live schema-1 database.
+    /// The source snapshot must have been captured independently of the candidate file.
+    static func appendOffline(
+        _ event: JournalEvent, to source: URL, anchoredTo original: StoredSnapshot,
+        expected: StoreVersion, now: Int64
+    ) throws -> JournalStagingInspection {
+        let url = try DatabaseFileGuard.canonicalURL(source)
+        let identity = try DatabaseFileGuard.preservationIdentity(url)
+        guard event.now <= now else { throw CatalogPersistenceError.futureEvent }
+        guard expected.revision < Int64(JournalRowCodec.maxRows) else { throw JournalMigrationError.rowLimit }
+        let current = try inspect(url, now: now)
+        guard current.source == original else { throw JournalMigrationError.verificationFailed }
+        guard current.version == expected else { throw SnapshotStoreError.staleVersion }
+        if let last = current.rows.last {
+            let previous = try JSONDecoder().decode(JournalEvent.self, from: last.payload)
+            guard event.now >= previous.now else { throw JournalMigrationError.invalidEvent }
+        }
+        let nextVersion = StoreVersion(epoch: expected.epoch, revision: expected.revision + 1)
+        let row = try JournalRowCodec.encode(event, sequence: nextVersion.revision)
+        let rows = current.rows + [row]
+        var nextCatalog = current.catalog
+        let priorReviewVersion = nextCatalog.reviewVersion
+        try event.apply(to: &nextCatalog)
+        guard nextCatalog.reviewVersion != priorReviewVersion else {
+            throw JournalMigrationError.invalidEvent
+        }
+        guard try JournalRowCodec.replay(rows, revision: nextVersion.revision, now: now) == nextCatalog
+        else { throw JournalMigrationError.verificationFailed }
+
+        try persistOfflineAppend(row, to: url, current: current, now: now)
+        // A post-COMMIT error has an ambiguous outcome. Do not retry without reinspection.
+        do {
+            guard try DatabaseFileGuard.preservationIdentity(url) == identity else {
+                throw DatabaseFileError.unsafeFile
+            }
+            let committed = try inspect(url, now: now)
+            guard committed.version == nextVersion, committed.source == original,
+                  committed.rows == rows, committed.catalog == nextCatalog
+            else { throw JournalMigrationError.verificationFailed }
+            return committed
+        } catch {
+            throw JournalStagingAppendError.committedButUnverified(nextVersion)
+        }
+    }
+
+    private static func persistOfflineAppend(
+        _ row: JournalEventRow, to url: URL, current: JournalStagingInspection, now: Int64
+    ) throws {
+        try connect(url, flags: SQLITE_OPEN_READWRITE) { db in
+            try execute(db, "PRAGMA synchronous = FULL")
+            try execute(db, "BEGIN IMMEDIATE")
+            do {
+                let locked = try inspectConnection(db, now: now)
+                guard locked.version == current.version else { throw SnapshotStoreError.staleVersion }
+                guard locked.source == current.source, locked.rows == current.rows else {
+                    throw JournalMigrationError.verificationFailed
+                }
+                try statement(db, "INSERT INTO journal_event (sequence, payload) VALUES (?, ?)") { stmt in
+                    try check(sqlite3_bind_int64(stmt, 1, row.sequence))
+                    try bind(row.payload, to: stmt, index: 2)
+                    try check(sqlite3_step(stmt), expected: SQLITE_DONE)
+                }
+                try advanceProgress(db, expected: current.version.revision, next: row.sequence)
+                try execute(db, "COMMIT")
+            } catch {
+                try? execute(db, "ROLLBACK")
+                throw error
+            }
+        }
+    }
+
+    private static func advanceProgress(_ db: OpaquePointer, expected: Int64, next: Int64) throws {
+        if try hasProgressTable(db) {
+            try statement(db, """
+            UPDATE candidate_progress SET revision = ?
+            WHERE id = 1 AND revision = ?
+            """) { stmt in
+                try check(sqlite3_bind_int64(stmt, 1, next))
+                try check(sqlite3_bind_int64(stmt, 2, expected))
+                try check(sqlite3_step(stmt), expected: SQLITE_DONE)
+                guard sqlite3_changes(db) == 1 else { throw SnapshotStoreError.staleVersion }
+            }
+        } else {
+            try execute(db, """
+            CREATE TABLE candidate_progress (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                revision INTEGER NOT NULL CHECK (revision BETWEEN 0 AND 100000)
+            ) STRICT
+            """)
+            try statement(db, "INSERT INTO candidate_progress VALUES (1, ?)") { stmt in
+                try check(sqlite3_bind_int64(stmt, 1, next))
+                try check(sqlite3_step(stmt), expected: SQLITE_DONE)
+            }
+        }
+    }
+
+    private static func inspectConnection(_ db: OpaquePointer, now: Int64) throws -> JournalStagingInspection {
+        try statement(db, "PRAGMA user_version") { stmt in
+            try check(sqlite3_step(stmt), expected: SQLITE_ROW)
+            guard sqlite3_column_int64(stmt, 0) == 2 else {
+                throw SnapshotStoreError.unsupportedSchema
+            }
+        }
+        let metadata = try readMetadata(db)
+        let revision = try currentRevision(db, sourceRevision: metadata.source.version.revision)
+        let rows = try readRows(db, revision: revision)
+        let version = StoreVersion(epoch: metadata.version.epoch, revision: revision)
+        return try JournalStagingInspection(source: metadata.source, version: version, rows: rows, now: now)
+    }
+
+    private static func hasProgressTable(_ db: OpaquePointer) throws -> Bool {
+        let sql = "SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name = 'candidate_progress'"
+        return try statement(db, sql) { stmt in
+            try check(sqlite3_step(stmt), expected: SQLITE_ROW)
+            return sqlite3_column_int64(stmt, 0) == 1
+        }
+    }
+
+    private static func currentRevision(_ db: OpaquePointer, sourceRevision: Int64) throws -> Int64 {
+        guard try hasProgressTable(db) else { return sourceRevision }
+        return try statement(db, "SELECT revision FROM candidate_progress WHERE id = 1") { stmt in
+            try check(sqlite3_step(stmt), expected: SQLITE_ROW)
+            guard sqlite3_column_type(stmt, 0) == SQLITE_INTEGER else {
+                throw JournalMigrationError.invalidSequence
+            }
+            let revision = sqlite3_column_int64(stmt, 0)
+            guard revision >= sourceRevision, revision <= Int64(JournalRowCodec.maxRows) else {
+                throw JournalMigrationError.invalidSequence
+            }
+            try check(sqlite3_step(stmt), expected: SQLITE_DONE)
+            return revision
+        }
     }
 
     private static func createSchema(_ db: OpaquePointer) throws {
