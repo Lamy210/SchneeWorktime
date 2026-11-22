@@ -128,5 +128,4 @@ struct JournalStagingSourceFencedAppendTests {
             #expect(active.version == candidate.draft.source.version)
         }
     }
-
 }
