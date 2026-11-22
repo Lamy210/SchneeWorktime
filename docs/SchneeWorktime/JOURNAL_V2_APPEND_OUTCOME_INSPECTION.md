@@ -17,8 +17,16 @@ SQLiteへの追記は、COMMIT後の再読込や原本の照合に失敗する�
 
 候補へ新規追記する `JournalRowCodec.encode` は、同じイベントから同じ行BLOBを再現できるよう `JSONEncoder` の `.sortedKeys` を指定する。SwiftのデフォルトJSONキー順序を前提としたバイト比較は不安定で、追記済みを誤って `indeterminate` とする可能性がある。既存schema-1の原本BLOB自体は変更しない。候補作成・再検査時の内部エンコード方式のみを固定する。
 
+## メモリ内Attempt Receiptによる複数追記の読取専用判定
+
+`JournalStagingDatabase.captureOfflineAppendAttempt` は、試行**前**に、保持中の原本session/directoryロックのもとで候補の行BLOB全体を読み取り、原本と候補のidentity、元snapshot、元Checkpoint、候補epoch、試行前Revision、イベントの次行BLOBを`JournalStagingAppendAttemptReceipt`に固定する。候補がすでに1回以上追記された状態でも記録できるが、`expected`が最新Revisionでなければ失敗する。
+
+`JournalStagingDatabase.inspectUncertainOfflineAppend(receipt, sourceURL: candidate: now:)` は、固定した行prefixと候補の現行行をバイト単位で比較し、原本・候補identityと元Checkpointも再確認する。指定イベントの行が直後の1件だけ増えていれば `matchingAppendObserved`、未変化なら `appendNotObserved`、異なるイベント・後続追記・inode置換・prefix改変等は `indeterminate`。
+
+**制約:** Receiptは呼び出し側プロセスのメモリ内でだけ保持し、ディスクへ保存しない。プロセス障害や再起動で失えば復旧しない。最大64MiBの行prefixを一時的に保持し得るため、メモリ上限と性能の実測が必要。これは追記の成功確定・自動再試行許可・live DB採用・CAS世代切替を提供しない。captureからappend、inspectまで外部排他ロックを継続すること。Receiptなしの従来APIは引き続き初回の追記のみ判定する。
+
 ## テスト
-追記なし、完全一致した追記、別イベントへの分岐、Checkpoint更新、unbound候補・別epochに加え、未来時刻の試行イベント、同一bytesの原本/候補inode置換、試行後の追加イベント、および同一イベントの繰り返しエンコードのバイト一致、および2回目の追記の成功済み・未試行をどちらも `indeterminate` とする境界を回帰検証する。CIでmacOS Worktime Domainテスト・Swift Quality・その他必須ゲートを検証する。
+追記なし、完全一致した追記、別イベントへの分岐、Checkpoint更新、unbound候補・別epochに加え、未来時刻の試行イベント、同一bytesの原本/候補inode置換、試行後の追加イベント、および同一イベントの繰り返しエンコードのバイト一致、および2回目の追記の成功済み・未試行をどちらも `indeterminate` とする境界を回帰検証する。メモリ内Receiptを使った初回/2回目の成功と未追記、別イベント、後続追加、inode置換も検証する。CIでmacOS Worktime Domainテスト・Swift Quality・その他必須ゲートを検証する。
 
 ## リリース制約
 このAPIは運用判断材料であり、障害復旧の完全実装ではない。原子的live切替、CAS世代フェンス、バックアップ・DR、Checkpointの新epochポリシーは未解決。v1.0はNO-GO。
