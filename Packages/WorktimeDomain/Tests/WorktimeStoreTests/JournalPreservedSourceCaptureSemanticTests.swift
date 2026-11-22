@@ -3,7 +3,7 @@ import Testing
 import WorktimeDomain
 @testable import WorktimeStore
 
-struct JournalPreservedSourceCaptureSemanticTests {
+struct PreservedCheckpointSemanticTests {
     private func withActiveDay(_ body: (URL, StoreVersion, UUID) throws -> Void) throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(
