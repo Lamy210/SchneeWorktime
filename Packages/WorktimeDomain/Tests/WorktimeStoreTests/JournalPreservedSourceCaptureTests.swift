@@ -122,5 +122,4 @@ struct JournalPreservedSourceCaptureTests {
             #expect(after == bytes)
         }
     }
-
 }
