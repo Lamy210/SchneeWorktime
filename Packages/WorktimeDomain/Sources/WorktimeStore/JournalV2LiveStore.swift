@@ -179,7 +179,7 @@ struct JournalV2LiveStore {
                 let lastEvent = try current.rows.last.map {
                     try JSONDecoder().decode(JournalEvent.self, from: $0.payload).now
                 }
-                try Self.validateCheckpoint(
+                try JournalV2CheckpointCodec.validate(
                     marker, catalog: current.catalog, lastEvent: lastEvent, now: now
                 )
                 if let previous = current.checkpoint {
@@ -188,7 +188,7 @@ struct JournalV2LiveStore {
                         throw ObservationCheckpointError.regressed
                     }
                 }
-                try Self.writeCheckpoint(db, marker: marker)
+                try JournalV2CheckpointCodec.write(db, marker: marker)
             }
         }
         // The transaction may have committed; do not retry blindly on a failed readback.
@@ -255,8 +255,8 @@ struct JournalV2LiveStore {
         if let observedAt {
             guard let dayID = result.catalog.activeID else { throw ObservationCheckpointError.invalid }
             let marker = ObservationCheckpoint(version: next, dayID: dayID, observedAt: observedAt)
-            try validateCheckpoint(marker, catalog: result.catalog, lastEvent: event.now, now: now)
-            try writeCheckpoint(db, marker: marker)
+            try JournalV2CheckpointCodec.validate(marker, catalog: result.catalog, lastEvent: event.now, now: now)
+            try JournalV2CheckpointCodec.write(db, marker: marker)
         }
         return result
     }
@@ -307,73 +307,12 @@ struct JournalV2LiveStore {
         }
         let catalog = try JournalRowCodec.replay(rows, revision: version.revision, now: now)
         let lastEvent = try rows.last.map { try JSONDecoder().decode(JournalEvent.self, from: $0.payload).now }
-        let checkpoint = try readCheckpoint(
+        let checkpoint = try JournalV2CheckpointCodec.read(
             db, version: version, catalog: catalog, lastEvent: lastEvent, now: now
         )
         return JournalV2LiveState(
             version: version, rows: rows, catalog: catalog, checkpoint: checkpoint
         )
-    }
-
-    private static func validateCheckpoint(
-        _ marker: ObservationCheckpoint, catalog: WorkdayCatalog,
-        lastEvent: Int64?, now: Int64
-    ) throws {
-        guard marker.version.revision > 0, catalog.activeID == marker.dayID,
-              let lastEvent, marker.observedAt >= lastEvent,
-              (-2_208_988_800 ... 253_402_300_799).contains(marker.observedAt),
-              marker.observedAt <= now
-        else { throw ObservationCheckpointError.invalid }
-    }
-
-    private static func readCheckpoint(
-        _ db: OpaquePointer, version: StoreVersion, catalog: WorkdayCatalog,
-        lastEvent: Int64?, now: Int64
-    ) throws -> ObservationCheckpoint? {
-        try statement(db, """
-        SELECT epoch, revision, day_id, observed_at
-        FROM observation_checkpoint ORDER BY id
-        """) { stmt in
-            let status = sqlite3_step(stmt)
-            guard status != SQLITE_DONE else { return nil }
-            try check(status, expected: SQLITE_ROW)
-            guard sqlite3_column_type(stmt, 0) == SQLITE_TEXT,
-                  sqlite3_column_type(stmt, 1) == SQLITE_INTEGER,
-                  sqlite3_column_type(stmt, 2) == SQLITE_TEXT,
-                  sqlite3_column_type(stmt, 3) == SQLITE_INTEGER,
-                  let epochRaw = sqlite3_column_text(stmt, 0),
-                  let dayRaw = sqlite3_column_text(stmt, 2),
-                  let epoch = UUID(uuidString: String(cString: epochRaw)),
-                  let dayID = UUID(uuidString: String(cString: dayRaw)),
-                  String(cString: epochRaw) == epoch.uuidString,
-                  String(cString: dayRaw) == dayID.uuidString
-            else { throw ObservationCheckpointError.invalid }
-            let marker = ObservationCheckpoint(
-                version: StoreVersion(epoch: epoch, revision: sqlite3_column_int64(stmt, 1)),
-                dayID: dayID, observedAt: sqlite3_column_int64(stmt, 3)
-            )
-            guard marker.version == version else { throw ObservationCheckpointError.invalid }
-            try validateCheckpoint(marker, catalog: catalog, lastEvent: lastEvent, now: now)
-            try check(sqlite3_step(stmt), expected: SQLITE_DONE)
-            return marker
-        }
-    }
-
-    private static func writeCheckpoint(_ db: OpaquePointer, marker: ObservationCheckpoint) throws {
-        try statement(db, """
-        INSERT INTO observation_checkpoint (id, epoch, revision, day_id, observed_at)
-        VALUES (1, ?, ?, ?, ?)
-        ON CONFLICT(id) DO UPDATE SET
-            epoch = excluded.epoch, revision = excluded.revision,
-            day_id = excluded.day_id, observed_at = excluded.observed_at
-        """) { stmt in
-            try check(sqlite3_bind_text(stmt, 1, marker.version.epoch.uuidString, -1, transient))
-            try check(sqlite3_bind_int64(stmt, 2, marker.version.revision))
-            try check(sqlite3_bind_text(stmt, 3, marker.dayID.uuidString, -1, transient))
-            try check(sqlite3_bind_int64(stmt, 4, marker.observedAt))
-            try check(sqlite3_step(stmt), expected: SQLITE_DONE)
-            guard sqlite3_changes(db) == 1 else { throw SnapshotStoreError.invalidSnapshot }
-        }
     }
 
     private static func connect<T>(
