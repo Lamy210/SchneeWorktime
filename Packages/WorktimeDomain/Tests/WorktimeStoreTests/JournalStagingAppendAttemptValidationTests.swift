@@ -3,7 +3,7 @@ import Testing
 import WorktimeDomain
 @testable import WorktimeStore
 
-struct JournalStagingAppendAttemptValidationTests {
+struct JournalAppendReceiptValidationTests {
     private func withCandidate(
         _ body: (URL, JournalStagingCandidate, UUID, StoreVersion) throws -> Void
     ) throws {
