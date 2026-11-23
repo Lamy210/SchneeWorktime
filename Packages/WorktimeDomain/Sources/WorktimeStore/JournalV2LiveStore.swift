@@ -120,9 +120,9 @@ struct JournalV2LiveStore {
                 UPDATE live_generation SET epoch = ?, revision = 0
                 WHERE id = 1 AND epoch = ? AND revision = ?
                 """) { stmt in
-                    try Self.check(sqlite3_bind_text(stmt, 1, next.epoch.uuidString, -1, transient))
+                    try Self.check(sqlite3_bind_text(stmt, 1, next.epoch.uuidString, -1, Self.transient))
                     try Self.check(sqlite3_bind_text(
-                        stmt, 2, current.version.epoch.uuidString, -1, transient
+                        stmt, 2, current.version.epoch.uuidString, -1, Self.transient
                     ))
                     try Self.check(sqlite3_bind_int64(stmt, 3, current.version.revision))
                     try Self.check(sqlite3_step(stmt), expected: SQLITE_DONE)
