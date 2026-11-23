@@ -32,6 +32,23 @@ struct JournalV2LiveStoreTests {
         try #require(sqlite3_exec(pointer, sql, nil, nil, nil) == SQLITE_OK)
     }
 
+    @Test func `schema two capacity keeps space for safe exit`() {
+        let maxRows = Int64(JournalRowCodec.maxRows)
+        let canStart = JournalCapacity(revision: maxRows - 101, limit: maxRows)
+        #expect(canStart.canOpenWorkday)
+        let cannotStart = JournalCapacity(revision: maxRows - 100, limit: maxRows)
+        #expect(!cannotStart.canOpenWorkday)
+        let two = JournalCapacity(revision: maxRows - 2, limit: maxRows)
+        #expect(two.isExitReserve)
+        #expect(two.allowsActiveMutation(.observation(dayID: UUID(), start: 10, end: 11)))
+        #expect(!two.allowsActiveMutation(.futureRest(dayID: UUID(), remainingSeconds: 60)))
+        let one = JournalCapacity(revision: maxRows - 1, limit: maxRows)
+        #expect(!one.allowsActiveMutation(.observation(dayID: UUID(), start: 10, end: 11)))
+        #expect(one.allowsActiveMutation(.command(.clockOut(confirmBreak: false), at: 12)))
+        let exhausted = JournalCapacity(revision: maxRows, limit: maxRows)
+        #expect(!exhausted.allowsActiveMutation(.command(.clockOut(confirmBreak: false), at: 12)))
+    }
+
     @Test func `fresh schema two stores journal and replays on reopening`() throws {
         try fixture { url, store in
             let initial = try store.load(now: 99)
