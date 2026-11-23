@@ -33,7 +33,7 @@ struct JournalStagingTimeOrderTests {
         try #require(opened == SQLITE_OK)
         defer { sqlite3_close(handle) }
         let hex = row.payload.map { String(format: "%02X", $0) }.joined()
-        let statement = "UPDATE journal_event SET payload = X'\\(hex)' WHERE sequence = \\(row.sequence)"
+        let statement = "UPDATE journal_event SET payload = X'\(hex)' WHERE sequence = \(row.sequence)"
         try #require(sqlite3_exec(handle, statement, nil, nil, nil) == SQLITE_OK)
     }
 
