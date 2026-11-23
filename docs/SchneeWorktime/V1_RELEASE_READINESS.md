@@ -25,6 +25,7 @@
 
 - [P0_RELEASE_EVIDENCE.json](P0_RELEASE_EVIDENCE.json) は148件を一意に列挙し、8つの横断ゲートを同じ形式で管理する。初期状態は `unverified`、資料から欠落が確認された項目だけ `blocked` とし、CI成功やコード存在をもって `passed` に自動昇格しない。
 - `python3 scripts/release/audit_worktime_release.py` は受入ID重複・増減・証跡の形式を確認する。通常モードの成功は **台帳整合性のみ** の成功であり、リリースGOではない。
+- Quality/Repository hygieneでOpenSpec CLI `@fission-ai/openspec@1.14.3`を厳密にバージョン固定し、`openspec validate initial-worktime-mvp --strict`を実行する。仕様エラーではQualityを失敗させる。CIの実行結果を確認するまではOpenSpecタスク1.3を未チェックにする。
 - `python3 scripts/release/audit_worktime_release.py --require-complete --source-sha <40桁コミットSHA>` は全148件および8ゲートの `passed`、検証対象SHAと一致する証跡を要求する。将来これが成功しても、実際のOS操作や提供されたログの正しさは独立の承認者が確認する。
 - 候補生成workflowは現行のまま維持する。RCは実機QAに必要なため、未完了のP0がある間も**候補生成そのものを禁止しない**。本番公開・GO判定は別ゲート。
 - 特に既知のP0は容量枯渇、削除の対象範囲/中断、破損DBの保全・復旧。個々のテスト成功が横断P0の解消を意味しない。
