@@ -1,0 +1,1099 @@
+{
+  "schema_version": 1,
+  "p0": {
+    "AC-01": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-02": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-03": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-04": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-05": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-06": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-07": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-08": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-09": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-10": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-11": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-12": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-13": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-14": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-15": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-16": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-17": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-18": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-19": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-20": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-21": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-22": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-23": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-24": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-25": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-26": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-27": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-28": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-29": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-30": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-31": {
+      "status": "blocked",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": "破損DBからの自動置換を行わず、隔離保全と復旧試験の受入が未完了。"
+    },
+    "AC-32": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-41": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-42": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-43": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-44": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-45": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-46": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-47": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-48": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-49": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-50": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-51": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-52": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-53": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-57": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-58": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-59": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-60": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-61": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-62": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-63": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-64": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-65": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-66": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-67": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-68": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-69": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-70": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-71": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-72": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-73": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-74": {
+      "status": "blocked",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": "DB内の論理削除はあるが、管理下のbackup・診断データと中断時の削除再開が未完了。"
+    },
+    "AC-75": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-85": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-86": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-87": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-88": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-90": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-91": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-92": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-93": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-94": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-95": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-96": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-97": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-98": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-99": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-101": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-102": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-103": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-104": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-105": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-106": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-107": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-108": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-109": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-110": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-111": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-112": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-113": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-114": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-115": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-116": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-118": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-119": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-120": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-121": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-122": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-123": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-124": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-125": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-126": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-127": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-128": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-129": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-130": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-131": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-132": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-133": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-134": {
+      "status": "blocked",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": "全削除中断後に旧世代を復元しない保証について端末・障害注入の受入が未完了。"
+    },
+    "AC-135": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-136": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-137": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-139": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-140": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-141": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-142": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-143": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-144": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-145": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-146": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-147": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-148": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-149": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-150": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-151": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-152": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-153": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-154": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-155": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-156": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-157": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-158": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-159": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-160": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-161": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-162": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-163": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-164": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-165": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-166": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-167": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-168": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-169": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-170": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-171": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    },
+    "AC-172": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": ""
+    }
+  },
+  "release_gates": {
+    "openspec_strict": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": "最新HEADでCLI strict validationの終了コードとログ未収集。"
+    },
+    "main_required_ci": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": "PR #109の5/5成功とmain push SHAの成功を混同しない。"
+    },
+    "macos_real_device_qa": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": "通知・起床・多画面・VoiceOver・更新・復元の実機受入記録がない。"
+    },
+    "recovery_fault_injection": {
+      "status": "blocked",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": "DB破損・電源断・容量不足・CAS競合・復元中断の受入が未完了。"
+    },
+    "data_erasure": {
+      "status": "blocked",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": "内部バックアップ・診断データの削除範囲と中断後の安全な再開が未完了。"
+    },
+    "journal_capacity": {
+      "status": "blocked",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": "上限到達時のactive勤務の安全な継続・終了を保証できず、schema-2ライブ採用は未実装。"
+    },
+    "release_candidate": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": "現行main SHAで実RC artifact・SHA256・インストールの証跡がない。"
+    },
+    "performance_qa": {
+      "status": "unverified",
+      "test_ids": [],
+      "evidence_urls": [],
+      "source_sha": null,
+      "note": "10/100/500勤務日・CPU/RAM・省電力・起動時間の実測がない。"
+    }
+  }
+}
