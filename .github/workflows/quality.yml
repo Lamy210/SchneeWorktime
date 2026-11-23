@@ -18,7 +18,7 @@ jobs:
   repository-hygiene:
     name: Repository hygiene
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
 
     steps:
       - name: Checkout
@@ -63,6 +63,18 @@ jobs:
       - name: CI tool download policy
         shell: bash
         run: python3 -m unittest scripts.ci.test_tool_installer_retry_policy -v
+
+      - name: Worktime OpenSpec strict validation
+        shell: bash
+        env:
+          OPENSPEC_TELEMETRY: "0"
+          DO_NOT_TRACK: "1"
+        run: |
+          set -euo pipefail
+          test -f openspec/changes/initial-worktime-mvp/proposal.md
+          node --version
+          npm exec --yes --package=@fission-ai/openspec@1.14.3 -- \
+            openspec validate initial-worktime-mvp --strict
 
       - name: Worktime P0 release evidence inventory
         shell: bash

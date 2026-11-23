@@ -223,7 +223,7 @@ The system SHALL reject stale observation writes and exclude ranges covered by o
 
 
 ### Requirement: Audited recorded clock-out correction
-The system SHALL permit explicit correction of the final closed work interval's end of an ended workday through a non-mutating preview and an atomic, version-fenced commit. It SHALL reject a future end, a non-positive interval, unchanged boundary, overlap with the next workday or intersecting unresolved observations. Clock-out from a rest interval SHALL remain outside this correction scope. The correction SHALL preserve identity, captured profile, earlier intervals, other workdays and active identity, and persist before/after audit evidence. The application SHALL require confirmation before saving and recompute reminders only from committed state.
+The system SHALL provide a non-mutating preview and explicit, version-fenced atomic commit for correcting an ended workday's final closed work interval. Invalid or stale corrections SHALL leave durable state unchanged. Accepted corrections SHALL preserve unrelated workday state and persist before/after audit evidence. Reminders SHALL be recomputed only from committed state.
 
 #### Scenario: Shorten or extend recorded clock-out
 - **WHEN** 09:00〜17:00の終了済み勤務について17:00を16:30又は17:30に訂正し、現在時刻が訂正後の時刻以降である
@@ -237,6 +237,10 @@ The system SHALL permit explicit correction of the final closed work interval's 
 - **WHEN** 末尾が休憩、未終了、未来、ゼロ長、未確認区間との交差、又は保存版が旧い訂正を確定する
 - **THEN** 記録と監査を変更せず拒否する
 
+#### Scenario: Preserve unrelated state during clock-out correction
+- **WHEN** 終了済み勤務日の末尾勤務終了を明示確定する
+- **THEN** 勤務日ID、捕捉profile、先行勤務・休憩区間、他勤務日、最新active IDは変更せず、訂正前後の監査を記録する
+
 #### Scenario: Observe again after corrected clock-out
 - **WHEN** 退勤を前倒しした勤務日を明示的に再開し、その後に前倒し範囲と交差する未確認観測が発生する
 - **THEN** 退勤訂正の監査だけを理由に新しい未確認観測を抑制しない
@@ -246,7 +250,7 @@ The system SHALL permit explicit correction of the final closed work interval's 
 - **THEN** 取消時は保存版・通知を変更せず、保存済みの場合はjournal再生とバックアップで訂正結果・監査を保持する
 
 ### Requirement: Audited recorded clock-in correction
-The system SHALL support an explicit non-mutating preview of the first closed work interval's start of an ended workday. It SHALL reject unchanged, future, non-positive, previous-day overlapping or unresolved-observation intersecting boundaries and a start after an existing future-rest anchor. It SHALL preserve the workday UUID, later intervals, state and other workdays. For a captured reference it SHALL use the original timezone and wall-time settings and reject any change to the captured logical date or reference resolution, including a change caused by timezone rule updates. Legacy data without captured context SHALL remain unknown. Active-day correction and logical-date reassignment are outside the first implementation scope. The durable adapter SHALL record the exact before/after reference context and interval evidence atomically with the correction, fence the store version and observation generation, and replay the serialized decision without re-resolving historic wall times with current timezone rules. The application SHALL show the effect on worked time and historical totals before explicit confirmation; notification reconciliation SHALL use committed state only.
+The system SHALL offer non-mutating preview and an explicitly confirmed, version-fenced atomic commit for correcting an ended workday's first closed work interval. It SHALL preserve unrelated workday state, reject invalid boundaries and store before/after interval and reference audit evidence. Captured timezone/reference values SHALL NOT be silently re-resolved using current rules; legacy unknown context remains unknown. Notifications SHALL reconcile only from committed state.
 
 #### Scenario: Adjust first recorded start
 - **WHEN** 09:00〜17:00の終了済み勤務の始業を同じ捕捉日の08:30又は09:30へ訂正する
@@ -257,8 +261,16 @@ The system SHALL support an explicit non-mutating preview of the first closed wo
 - **THEN** 初期対応範囲外として拒否し、参照情報を無断で再計算しない
 
 #### Scenario: Protect previous workday and uncertainty
-- **WHEN** 訂正が前勤務日の終了より前、未確認区間との交差、ゼロ長、又は保存版の変更に該当する
+- **WHEN** 訂正が前勤務日の終了より前、未確認区間との交差、ゼロ長、未来、変更なし、既存の将来休憩anchorより後の始業、又は保存版・観測世代の変更に該当する
 - **THEN** 保存を拒否する。前勤務日の終了と一致する境界は許容する
+
+#### Scenario: Reject unsupported active-day or logical-date correction
+- **WHEN** 現在activeの勤務日を始業訂正する、又は訂正によって勤務日の捕捉logical dateを再割当する
+- **THEN** 初期対応範囲外として拒否し、他勤務日と捕捉参考時刻を維持する
+
+#### Scenario: Preview history before explicit confirmation
+- **WHEN** 始業訂正のプレビューを開く又はキャンセルする
+- **THEN** 前後の実働と日・週・月の集計差を表示し、確定するまでjournal・監査・通知を変更しない
 
 #### Scenario: Historical totals and durable replay
 - **WHEN** 始業訂正を保存し再起動する
