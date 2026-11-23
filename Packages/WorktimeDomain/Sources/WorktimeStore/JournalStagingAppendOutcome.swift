@@ -29,6 +29,16 @@ extension JournalStagingDatabase {
                 sourceURL: sourceURL, candidate: candidate, now: now
             )
             guard inspection.version.epoch == expected.epoch else { return .indeterminate }
+            // The pinned candidate draft represents the state before the only attempt
+            // this legacy API can classify. Invalid attempts must not look "not observed".
+            let prefixRows = candidate.draft.rows
+            let prefixCatalog = try JournalRowCodec.replay(
+                prefixRows, revision: expected.revision, now: now
+            )
+            let attemptedRow = try JournalStagingAppendValidation.row(
+                for: event, rows: prefixRows, catalog: prefixCatalog,
+                expected: expected, now: now
+            )
             if inspection.version == expected {
                 // At this instant the expected append has not appeared. No automatic retry.
                 return .appendNotObserved(inspection.version)
@@ -36,9 +46,6 @@ extension JournalStagingDatabase {
             guard inspection.version.revision == expected.revision + 1,
                   inspection.rows.count == Int(inspection.version.revision)
             else { return .indeterminate }
-            let attemptedRow = try JournalRowCodec.encode(
-                event, sequence: inspection.version.revision
-            )
             guard inspection.rows.last == attemptedRow else { return .indeterminate }
             // Identity and source/anchor/row-prefix checks are performed by pinned preflight.
             return .matchingAppendObserved(inspection.version)

@@ -53,22 +53,11 @@ extension JournalStagingDatabase {
             sourceURL: sourceURL, candidate: candidate, now: now
         )
         guard inspected.version == expected else { throw SnapshotStoreError.staleVersion }
-        // Match appendOffline's read-only validation before issuing a receipt.
-        // A receipt must not describe an event that could never be appended.
-        if let last = inspected.rows.last {
-            let previous = try JSONDecoder().decode(JournalEvent.self, from: last.payload)
-            guard event.now >= previous.now else { throw JournalMigrationError.invalidEvent }
-        }
-        let row = try JournalRowCodec.encode(event, sequence: expected.revision + 1)
-        var nextCatalog = inspected.catalog
-        let priorReviewVersion = nextCatalog.reviewVersion
-        try event.apply(to: &nextCatalog)
-        guard nextCatalog.reviewVersion != priorReviewVersion else {
-            throw JournalMigrationError.invalidEvent
-        }
-        guard try JournalRowCodec.replay(
-            inspected.rows + [row], revision: expected.revision + 1, now: now
-        ) == nextCatalog else { throw JournalMigrationError.verificationFailed }
+        // Keep the receipt path and the unreceipted inspection path on the same rules.
+        let row = try JournalStagingAppendValidation.row(
+            for: event, rows: inspected.rows, catalog: inspected.catalog,
+            expected: expected, now: now
+        )
         return try JournalStagingAppendAttemptReceipt(
             sourceURL: sourceURL, candidate: candidate,
             preserved: preserved, inspected: inspected,
