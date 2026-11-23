@@ -17,6 +17,7 @@ enum JournalV2LiveWriteError: Error, Equatable {
 /// A caller must own the directory/session lock; no automatic schema migration or deletion occurs.
 struct JournalV2LiveStore {
     private let url: URL
+    private let fileIdentity: DatabaseFileGuard.Identity
 
     init(url: URL, createIfMissing: Bool = false) throws {
         self.url = try DatabaseFileGuard.canonicalURL(url)
@@ -52,16 +53,24 @@ struct JournalV2LiveStore {
             }
             _ = try Self.read(db, now: Int64.max)
         }
+        fileIdentity = try DatabaseFileGuard.preservationIdentity(self.url)
     }
 
     /// Reopens and replays only a schema-2 live database; does not repair an invalid file.
     func load(now: Int64) throws -> JournalV2LiveState {
-        try Self.connect(url, flags: SQLITE_OPEN_READONLY) { db in
+        guard try DatabaseFileGuard.preservationIdentity(url) == fileIdentity else {
+            throw DatabaseFileError.unsafeFile
+        }
+        let result = try Self.connect(url, flags: SQLITE_OPEN_READONLY) { db in
             try Self.execute(db, "PRAGMA query_only = ON")
             return try Self.transactionRead(db) {
                 try Self.read(db, now: now)
             }
         }
+        guard try DatabaseFileGuard.preservationIdentity(url) == fileIdentity else {
+            throw DatabaseFileError.unsafeFile
+        }
+        return result
     }
 
     /// One transaction, exact pre-state fence, and no blind retry after ambiguous COMMIT.
@@ -71,6 +80,9 @@ struct JournalV2LiveStore {
         let nextVersion = StoreVersion(
             epoch: expected.version.epoch, revision: expected.version.revision + 1
         )
+        guard try DatabaseFileGuard.preservationIdentity(url) == fileIdentity else {
+            throw DatabaseFileError.unsafeFile
+        }
         let validated = try Self.connect(url, flags: SQLITE_OPEN_READWRITE) { db in
             try Self.transaction(db) {
                 let current = try Self.read(db, now: now)
@@ -121,6 +133,9 @@ struct JournalV2LiveStore {
     /// A logical reset, not secure erasure. Exact journal bytes and epoch are CAS-fenced.
     func reset(matching expected: JournalV2LiveState, now: Int64) throws -> JournalV2LiveState {
         let next = StoreVersion(epoch: UUID(), revision: 0)
+        guard try DatabaseFileGuard.preservationIdentity(url) == fileIdentity else {
+            throw DatabaseFileError.unsafeFile
+        }
         try Self.connect(url, flags: SQLITE_OPEN_READWRITE) { db in
             try Self.transaction(db) {
                 let current = try Self.read(db, now: now)
