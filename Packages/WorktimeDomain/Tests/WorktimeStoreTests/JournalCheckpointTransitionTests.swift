@@ -11,6 +11,7 @@ struct JournalCheckpointTransitionTests {
             try plan.validateReplacement(marker, now: now)
         }
     }
+
     private func withCandidate(
         _ body: (URL, URL, JournalStagingCandidate, CatalogRepository, UUID) throws -> Void
     ) throws {
