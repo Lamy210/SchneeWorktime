@@ -162,7 +162,7 @@ The repository SHALL return changed canonical state only after the durable store
 - **THEN** payloadの追加保存・store revisionの更新を行わない
 
 ### Requirement: Preserve final journal slots for active workday exit
-The storage coordinator SHALL reserve the final two available event slots while a workday is active for a necessary observation and clock-out. It SHALL refuse other mutations that would consume either slot, and refuse a new observation that would consume the final slot. Already-covered duplicate observations SHALL remain no-ops. The coordinator SHALL still validate actual clock-out and retain the existing hard limits. Capacity refusal SHALL preserve the previous durable state; the application SHALL NOT bypass necessary observation or invent attendance. This is a bounded mitigation, not a guarantee that all active workdays can close, and does not migrate a full journal or reserve physical disk space.
+The storage coordinator SHALL reserve the final two event slots of an active workday for necessary observation and clock-out. It SHALL reject competing mutations without changing durable state. It SHALL NOT skip required observations, invent attendance, bypass clock-out validation or exceed hard limits. The reservation is a bounded mitigation, not a guarantee of closure or physical disk capacity.
 
 #### Scenario: Enter exit reserve
 - **WHEN** active勤務の残枠が2件となり、休憩・予定変更・訂正を新規保存しようとする
