@@ -244,6 +244,4 @@ struct JournalStagingAppendOutcomeTests {
             #expect(try Data(contentsOf: sourceURL) == sourceBytes)
             #expect(try Data(contentsOf: candidate.url) == candidateBytes)
         }
-    }
-
-}
+    }}
