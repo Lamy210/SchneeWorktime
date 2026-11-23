@@ -156,6 +156,54 @@ struct JournalV2LiveStore {
         }
     }
 
+    /// Saves a fresh observation against the exact current epoch/revision without adding attendance.
+    /// This metadata is not independent evidence of actual work. Caller must validate the OS clock.
+    func saveObservationCheckpoint(
+        dayID: UUID, observedAt: Int64, matching expected: JournalV2LiveState, now: Int64
+    ) throws -> JournalV2LiveState {
+        guard try DatabaseFileGuard.preservationIdentity(url) == fileIdentity else {
+            throw DatabaseFileError.unsafeFile
+        }
+        try Self.connect(url, flags: SQLITE_OPEN_READWRITE) { db in
+            try Self.transaction(db) {
+                let current = try Self.read(db, now: now)
+                guard current.version == expected.version else { throw SnapshotStoreError.staleVersion }
+                guard current.rows == expected.rows, current.catalog == expected.catalog,
+                      current.checkpoint == expected.checkpoint
+                else { throw JournalMigrationError.verificationFailed }
+                let marker = ObservationCheckpoint(
+                    version: current.version, dayID: dayID, observedAt: observedAt
+                )
+                let lastEvent = try current.rows.last.map {
+                    try JSONDecoder().decode(JournalEvent.self, from: $0.payload).now
+                }
+                try Self.validateCheckpoint(
+                    marker, catalog: current.catalog, lastEvent: lastEvent, now: now
+                )
+                if let previous = current.checkpoint {
+                    guard previous.dayID == dayID else { throw ObservationCheckpointError.conflictingDay }
+                    guard observedAt >= previous.observedAt else {
+                        throw ObservationCheckpointError.regressed
+                    }
+                }
+                try Self.writeCheckpoint(db, marker: marker)
+            }
+        }
+        // The transaction may have committed; do not retry blindly on a failed readback.
+        do {
+            let committed = try load(now: now)
+            guard committed.version == expected.version, committed.rows == expected.rows,
+                  committed.catalog == expected.catalog,
+                  committed.checkpoint == ObservationCheckpoint(
+                      version: expected.version, dayID: dayID, observedAt: observedAt
+                  )
+            else { throw JournalMigrationError.verificationFailed }
+            return committed
+        } catch {
+            throw JournalV2LiveWriteError.committedButUnverified(expected.version)
+        }
+    }
+
     /// Only runs inside BEGIN IMMEDIATE; validation and CAS are committed together.
     private static func insertAppend(
         _ event: JournalEvent, matching expected: JournalV2LiveState,
