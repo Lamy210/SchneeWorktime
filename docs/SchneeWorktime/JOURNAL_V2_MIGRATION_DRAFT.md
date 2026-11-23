@@ -17,6 +17,16 @@ v1.0未リリースのため、schema-1の後方互換および旧DBからの自
 - 新epochの候補と連続sequenceを作る。候補の確定・採用・切戻しは未実装。オフライン候補の比較に旧checkpointを直接信用して実働を加算しない。
 - 暫定のcodec検証境界は100,000行、1行64KiB、総64MiB。これは本番容量値の決定ではなく、巨大/破損入力への限界を持つための仮定。DB読込時の事前制限、計測、退勤枠、実容量、バックアップ形式は別途設計する。
 
+## v1.0専用schema-2の新Checkpoint契約（追加実装）
+
+初回リリースは旧schema-1との自動移行を要求しない。新規schema-2の`observation_checkpoint`はライブ世代のepoch/revision/dayIDと観測時刻を持ち、独立した勤怠実績とはみなさない。
+
+- `JournalV2LiveStore.append(..., observedAt:)` はJournal行・世代revision更新・Checkpointの書込（または消去）を**同じBEGIN IMMEDIATEのトランザクション**にまとめる。引数`observedAt`がない場合、以前のCheckpointを次revisionに流用せず消去する。
+- `saveObservationCheckpoint(... matching:now:)` は新たなJournalイベントを作らず、最新epoch/revision、全行bytes、catalog、既存Checkpointを一致照合した後、時刻が逆行せず勤務日IDが一致するマーカーだけを更新する。
+- 読込時、マーカーのepoch/revision、UUID、active勤務日、最終Journalイベント時刻との順序、時刻上限を検証し、不正なマーカーを黙って無視しない。論理resetはJournalとCheckpoint削除・新epochを同時確定する。
+- Checkpointの`observedAt`はOSの単調時計で裏付けされた値である必要がある。DBの構造チェックは実機の信頼済み時刻や業務上の観測成功を証明しない。
+- **現状の`WorktimeController`は依然schema-1を使用する。** この保存層APIの追加だけでアプリのschema-2移行・既存バックアップ/復元・クラッシュ注入・受入QAは完了しない。NO-GOを維持する。
+
 ## 新epochのCheckpoint引継ぎ条件（読取専用の一部を実装）
 
 原本の `source_checkpoint` は移行の**参照アンカー**であり、候補epochの有効な勤務観測Checkpointではない。`JournalStagingDatabase.inspectCheckpointTransition` は、原本の物理identity・snapshot/Checkpoint・候補identity・Journal行prefixを再照合した上で、候補の現在状態に必要な次世代Checkpoint条件を返す。これは観測の実施・保存を行わない。
