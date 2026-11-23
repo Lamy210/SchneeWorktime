@@ -98,7 +98,8 @@ struct JournalV2LiveStore {
                     revision: current.version.revision, limit: Int64(JournalRowCodec.maxRows)
                 )
                 if case let .command(command, _) = event.action,
-                   command.opensWorkday, !capacity.canOpenWorkday {
+                   command.opensWorkday, !capacity.canOpenWorkday
+                {
                     throw CatalogPersistenceError.insufficientStartCapacity
                 }
                 if current.catalog.activeID != nil, !capacity.allowsActiveMutation(event.action) {
