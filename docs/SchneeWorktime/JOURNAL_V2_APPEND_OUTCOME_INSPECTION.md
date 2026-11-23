@@ -11,7 +11,7 @@ SQLiteへの追記は、COMMIT後の再読込や原本の照合に失敗する�
 - `appendNotObserved(version)`: 候補のRevisionが追記前と同じだったという観測。過去に一度も書かれなかった証明ではない。
 - `indeterminate`: Revision飛び、異なるイベント、未来時刻の試行イベント、元DB/候補の置換・改竄・Checkpoint変化、読み込み失敗等を含む。安全側へ倒す。
 
-**ReceiptなしAPIの制約:** `expected.revision` は候補作成時の `candidate.draft.candidateVersion.revision` と等しい場合だけ観測結果を返せる。候補生成後に一度でも追記済みの場合、その追記を含む直前prefixを固定した不変証拠が存在しないため、2回目以降の追記に関する照合は `indeterminate` とする。複数回追記の結果を判定する場合は、後述のメモリ内Attempt Receiptを試行**前**に取得し、外部排他を維持して照合する。Revision番号だけでは過去の行BLOBの同一性を証明できない。どちらのAPIも自動再試行は許可しない。
+**ReceiptなしAPIの制約:** `expected.revision` は候補作成時の `candidate.draft.candidateVersion.revision` と等しい場合だけ観測結果を返せる。追加で、試行したイベントの時刻順序・ドメイン上の操作妥当性・追記後のJournal再生整合性を固定済みの原本行prefixに対して読取専用で確認し、無効な試行を `appendNotObserved` と誤分類せず `indeterminate` にする。候補生成後に一度でも追記済みの場合、その追記を含む直前prefixを固定した不変証拠が存在しないため、2回目以降の追記に関する照合は `indeterminate` とする。複数回追記の結果を判定する場合は、後述のメモリ内Attempt Receiptを試行**前**に取得し、外部排他を維持して照合する。Revision番号だけでは過去の行BLOBの同一性を証明できない。どちらのAPIも自動再試行は許可しない。
 
 どの結果でもイベントの自動再実行・候補採用・原本変更は行わない。未来時刻（`event.now > now`）の試行イベントは、追記が見えない場合でも `appendNotObserved` にせず `indeterminate` にする。呼出側は排他ロックを保持し、時点の異なる観測を混同しない。クラッシュ後にcaptureを失った場合の自動再開も提供しない。
 
@@ -28,7 +28,7 @@ Receipt取得は時刻上限・直前のイベントとの時系列順序だけ�
 **制約:** Receiptは呼び出し側プロセスのメモリ内でだけ保持し、ディスクへ保存しない。プロセス障害や再起動で失えば復旧しない。最大64MiBの行prefixを一時的に保持し得るため、メモリ上限と性能の実測が必要。これは追記の成功確定・自動再試行許可・live DB採用・CAS世代切替を提供しない。captureからappend、inspectまで外部排他ロックを継続すること。Receiptなしの従来APIは引き続き初回の追記のみ判定する。
 
 ## テスト
-追記なし、完全一致した追記、別イベントへの分岐、Checkpoint更新、unbound候補・別epochに加え、未来時刻の試行イベント、同一bytesの原本/候補inode置換、試行後の追加イベント、および同一イベントの繰り返しエンコードのバイト一致、および2回目の追記の成功済み・未試行をどちらも `indeterminate` とする境界を回帰検証する。メモリ内Receiptを使った初回/2回目の成功と未追記、別イベント、後続追加、inode置換も検証する。CIでmacOS Worktime Domainテスト・Swift Quality・その他必須ゲートを検証する。
+追記なし、完全一致した追記、別イベントへの分岐、Checkpoint更新、unbound候補・別epochに加え、未来時刻の試行イベント、同一bytesの原本/候補inode置換、試行後の追加イベント、および同一イベントの繰り返しエンコードのバイト一致、および2回目の追記の成功済み・未試行をどちらも `indeterminate` とする境界を回帰検証する。メモリ内Receiptを使った初回/2回目の成功と未追記、別イベント、後続追加、inode置換、およびReceiptなしAPIが時刻逆行・無効操作を判定不能として拒否する境界も検証する。CIでmacOS Worktime Domainテスト・Swift Quality・その他必須ゲートを検証する。
 
 ## リリース制約
 このAPIは運用判断材料であり、障害復旧の完全実装ではない。原子的live切替、CAS世代フェンス、バックアップ・DR、Checkpointの新epochポリシーは未解決。v1.0はNO-GO。
