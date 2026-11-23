@@ -100,21 +100,16 @@ extension JournalStagingDatabase {
         let current = try inspect(url, now: now)
         guard current.source == original else { throw JournalMigrationError.verificationFailed }
         guard current.version == expected else { throw SnapshotStoreError.staleVersion }
-        if let last = current.rows.last {
-            let previous = try JSONDecoder().decode(JournalEvent.self, from: last.payload)
-            guard event.now >= previous.now else { throw JournalMigrationError.invalidEvent }
-        }
+        // Use the same pre-append checks as both uncertain-outcome inspectors.
+        // The validated catalog avoids a second full journal replay on the write path.
+        let validated = try JournalStagingAppendValidation.validate(
+            event, rows: current.rows, catalog: current.catalog,
+            expected: expected, now: now
+        )
         let nextVersion = StoreVersion(epoch: expected.epoch, revision: expected.revision + 1)
-        let row = try JournalRowCodec.encode(event, sequence: nextVersion.revision)
+        let row = validated.row
         let rows = current.rows + [row]
-        var nextCatalog = current.catalog
-        let priorReviewVersion = nextCatalog.reviewVersion
-        try event.apply(to: &nextCatalog)
-        guard nextCatalog.reviewVersion != priorReviewVersion else {
-            throw JournalMigrationError.invalidEvent
-        }
-        guard try JournalRowCodec.replay(rows, revision: nextVersion.revision, now: now) == nextCatalog
-        else { throw JournalMigrationError.verificationFailed }
+        let nextCatalog = validated.catalog
 
         try persistOfflineAppend(row, to: url, current: current, now: now)
         // A post-COMMIT error has an ambiguous outcome. Do not retry without reinspection.
