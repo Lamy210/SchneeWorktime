@@ -33,6 +33,15 @@ struct JournalStagingInspection {
         let sourceRows = Array(rows.prefix(journal.events.count))
         let sourceReplay = try JournalRowCodec.replay(sourceRows, revision: source.version.revision, now: now)
         guard sourceReplay == original.catalog else { throw JournalMigrationError.verificationFailed }
+        // Preserve legacy event ordering, but reject candidate-only rows that could
+        // never have been appended by the guarded writer (retrograde event time).
+        if events.count > journal.events.count {
+            for index in journal.events.count ..< events.count {
+                guard index == 0 || events[index].now >= events[index - 1].now else {
+                    throw JournalMigrationError.invalidEvent
+                }
+            }
+        }
         let replay = try JournalRowCodec.replay(rows, revision: version.revision, now: now)
         self.source = source
         self.version = version
