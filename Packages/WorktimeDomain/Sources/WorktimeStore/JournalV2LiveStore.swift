@@ -126,7 +126,9 @@ struct JournalV2LiveStore {
             try Self.transaction(db) {
                 let current = try Self.read(db, now: now)
                 guard current.version == expected.version else { throw SnapshotStoreError.staleVersion }
-                guard current.rows == expected.rows, current.catalog == expected.catalog else {
+                guard current.rows == expected.rows, current.catalog == expected.catalog,
+                      current.checkpoint == expected.checkpoint
+                else {
                     throw JournalMigrationError.verificationFailed
                 }
                 try Self.execute(db, "DELETE FROM journal_event")
@@ -211,7 +213,9 @@ struct JournalV2LiveStore {
     ) throws -> JournalStagingValidatedAppend {
         let current = try read(db, now: now)
         guard current.version == expected.version else { throw SnapshotStoreError.staleVersion }
-        guard current.rows == expected.rows, current.catalog == expected.catalog else {
+        guard current.rows == expected.rows, current.catalog == expected.catalog,
+              current.checkpoint == expected.checkpoint
+        else {
             throw JournalMigrationError.verificationFailed
         }
         guard current.version.revision < Int64(JournalRowCodec.maxRows) else {
