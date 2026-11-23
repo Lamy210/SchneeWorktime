@@ -26,26 +26,7 @@ struct JournalV2LiveStore {
         try Self.connect(canonical, flags: SQLITE_OPEN_READWRITE) { db in
             if created {
                 try Self.transaction(db) {
-                    guard try Self.scalar(db, "PRAGMA user_version") == 0,
-                          try Self.scalar(
-                              db, "SELECT count(*) FROM sqlite_master WHERE name NOT LIKE 'sqlite_%'"
-                          ) == 0
-                    else { throw SnapshotStoreError.unsupportedSchema }
-                    try Self.execute(db, """
-                    CREATE TABLE live_generation (
-                        id INTEGER PRIMARY KEY CHECK (id = 1),
-                        epoch TEXT NOT NULL,
-                        revision INTEGER NOT NULL CHECK (revision BETWEEN 0 AND 100000)
-                    ) STRICT;
-                    CREATE TABLE journal_event (
-                        sequence INTEGER PRIMARY KEY CHECK (sequence BETWEEN 1 AND 100000),
-                        payload BLOB NOT NULL CHECK (length(payload) BETWEEN 1 AND 65536)
-                    ) STRICT;
-                    """)
-                    try Self.execute(
-                        db, "INSERT INTO live_generation VALUES (1, '\(UUID().uuidString)', 0)"
-                    )
-                    try Self.execute(db, "PRAGMA user_version = 2")
+                    try Self.bootstrap(db)
                 }
             } else {
                 guard try Self.scalar(db, "PRAGMA user_version") == 2 else {
@@ -55,6 +36,25 @@ struct JournalV2LiveStore {
             _ = try Self.read(db, now: Int64.max)
         }
         fileIdentity = try DatabaseFileGuard.preservationIdentity(canonical)
+    }
+
+    private static func bootstrap(_ db: OpaquePointer) throws {
+        guard try scalar(db, "PRAGMA user_version") == 0,
+              try scalar(db, "SELECT count(*) FROM sqlite_master WHERE name NOT LIKE 'sqlite_%'") == 0
+        else { throw SnapshotStoreError.unsupportedSchema }
+        try execute(db, """
+        CREATE TABLE live_generation (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            epoch TEXT NOT NULL,
+            revision INTEGER NOT NULL CHECK (revision BETWEEN 0 AND 100000)
+        ) STRICT;
+        CREATE TABLE journal_event (
+            sequence INTEGER PRIMARY KEY CHECK (sequence BETWEEN 1 AND 100000),
+            payload BLOB NOT NULL CHECK (length(payload) BETWEEN 1 AND 65536)
+        ) STRICT;
+        """)
+        try execute(db, "INSERT INTO live_generation VALUES (1, '\(UUID().uuidString)', 0)")
+        try execute(db, "PRAGMA user_version = 2")
     }
 
     /// Reopens and replays only a schema-2 live database; does not repair an invalid file.
