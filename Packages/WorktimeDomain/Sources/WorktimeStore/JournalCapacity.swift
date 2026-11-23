@@ -4,9 +4,8 @@ import Foundation
 public struct JournalCapacity: Sendable, Equatable {
     public let remainingEvents: Int64
 
-    public init(revision: Int64) {
-        let limit = Int64(CatalogJournal.maxEvents)
-        remainingEvents = limit - min(max(revision, 0), limit)
+    public init(revision: Int64, limit: Int64 = Int64(CatalogJournal.maxEvents)) {
+        remainingEvents = max(0, limit - min(max(revision, 0), limit))
     }
 
     public var shouldWarn: Bool {
