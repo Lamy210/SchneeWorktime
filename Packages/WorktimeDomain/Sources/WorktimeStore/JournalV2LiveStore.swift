@@ -7,6 +7,8 @@ struct JournalV2LiveState {
     let version: StoreVersion
     let rows: [JournalEventRow]
     let catalog: WorkdayCatalog
+    /// Absence of a marker is unknown observation status, never proof of worked time.
+    let checkpoint: ObservationCheckpoint?
 }
 
 enum JournalV2LiveWriteError: Error, Equatable {
@@ -52,6 +54,13 @@ struct JournalV2LiveStore {
             sequence INTEGER PRIMARY KEY CHECK (sequence BETWEEN 1 AND 100000),
             payload BLOB NOT NULL CHECK (length(payload) BETWEEN 1 AND 65536)
         ) STRICT;
+        CREATE TABLE observation_checkpoint (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            epoch TEXT NOT NULL,
+            revision INTEGER NOT NULL CHECK (revision > 0),
+            day_id TEXT NOT NULL,
+            observed_at INTEGER NOT NULL
+        ) STRICT;
         """)
         try execute(db, "INSERT INTO live_generation VALUES (1, '\(UUID().uuidString)', 0)")
         try execute(db, "PRAGMA user_version = 2")
@@ -76,7 +85,8 @@ struct JournalV2LiveStore {
 
     /// One transaction, exact pre-state fence, and no blind retry after ambiguous COMMIT.
     func append(
-        _ event: JournalEvent, matching expected: JournalV2LiveState, now: Int64
+        _ event: JournalEvent, matching expected: JournalV2LiveState,
+        now: Int64, observedAt: Int64? = nil
     ) throws -> JournalV2LiveState {
         let nextVersion = StoreVersion(
             epoch: expected.version.epoch, revision: expected.version.revision + 1
@@ -86,7 +96,10 @@ struct JournalV2LiveStore {
         }
         let validated = try Self.connect(url, flags: SQLITE_OPEN_READWRITE) { db in
             try Self.transaction(db) {
-                try Self.insertAppend(event, matching: expected, next: nextVersion, db: db, now: now)
+                try Self.insertAppend(
+                    event, matching: expected, next: nextVersion,
+                    observedAt: observedAt, db: db, now: now
+                )
             }
         }
         // COMMIT has already happened: a failed readback is an ambiguous outcome.
@@ -94,7 +107,8 @@ struct JournalV2LiveStore {
             let committed = try load(now: now)
             guard committed.version == nextVersion,
                   committed.rows == expected.rows + [validated.row],
-                  committed.catalog == validated.catalog
+                  committed.catalog == validated.catalog,
+                  committed.checkpoint?.observedAt == observedAt
             else { throw JournalMigrationError.verificationFailed }
             return committed
         } catch {
@@ -116,6 +130,7 @@ struct JournalV2LiveStore {
                     throw JournalMigrationError.verificationFailed
                 }
                 try Self.execute(db, "DELETE FROM journal_event")
+                try Self.execute(db, "DELETE FROM observation_checkpoint")
                 try Self.statement(db, """
                 UPDATE live_generation SET epoch = ?, revision = 0
                 WHERE id = 1 AND epoch = ? AND revision = ?
@@ -133,7 +148,7 @@ struct JournalV2LiveStore {
         do {
             let committed = try load(now: now)
             guard committed.version == next, committed.rows.isEmpty,
-                  committed.catalog == WorkdayCatalog()
+                  committed.catalog == WorkdayCatalog(), committed.checkpoint == nil
             else { throw JournalMigrationError.verificationFailed }
             return committed
         } catch {
@@ -144,7 +159,7 @@ struct JournalV2LiveStore {
     /// Only runs inside BEGIN IMMEDIATE; validation and CAS are committed together.
     private static func insertAppend(
         _ event: JournalEvent, matching expected: JournalV2LiveState,
-        next: StoreVersion, db: OpaquePointer, now: Int64
+        next: StoreVersion, observedAt: Int64?, db: OpaquePointer, now: Int64
     ) throws -> JournalStagingValidatedAppend {
         let current = try read(db, now: now)
         guard current.version == expected.version else { throw SnapshotStoreError.staleVersion }
@@ -183,6 +198,13 @@ struct JournalV2LiveStore {
             try check(sqlite3_bind_int64(stmt, 3, current.version.revision))
             try check(sqlite3_step(stmt), expected: SQLITE_DONE)
             guard sqlite3_changes(db) == 1 else { throw SnapshotStoreError.staleVersion }
+        }
+        try execute(db, "DELETE FROM observation_checkpoint")
+        if let observedAt {
+            guard let dayID = result.catalog.activeID else { throw ObservationCheckpointError.invalid }
+            let marker = ObservationCheckpoint(version: next, dayID: dayID, observedAt: observedAt)
+            try validateCheckpoint(marker, catalog: result.catalog, lastEvent: event.now, now: now)
+            try writeCheckpoint(db, marker: marker)
         }
         return result
     }
@@ -232,7 +254,13 @@ struct JournalV2LiveStore {
             return rows
         }
         let catalog = try JournalRowCodec.replay(rows, revision: version.revision, now: now)
-        return JournalV2LiveState(version: version, rows: rows, catalog: catalog)
+        let lastEvent = try rows.last.map { try JSONDecoder().decode(JournalEvent.self, from: $0.payload).now }
+        let checkpoint = try readCheckpoint(
+            db, version: version, catalog: catalog, lastEvent: lastEvent, now: now
+        )
+        return JournalV2LiveState(
+            version: version, rows: rows, catalog: catalog, checkpoint: checkpoint
+        )
     }
 
     private static func connect<T>(
