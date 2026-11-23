@@ -86,47 +86,7 @@ struct JournalV2LiveStore {
         }
         let validated = try Self.connect(url, flags: SQLITE_OPEN_READWRITE) { db in
             try Self.transaction(db) {
-                let current = try Self.read(db, now: now)
-                guard current.version == expected.version else { throw SnapshotStoreError.staleVersion }
-                guard current.rows == expected.rows, current.catalog == expected.catalog else {
-                    throw JournalMigrationError.verificationFailed
-                }
-                guard current.version.revision < Int64(JournalRowCodec.maxRows) else {
-                    throw JournalMigrationError.rowLimit
-                }
-                let capacity = JournalCapacity(
-                    revision: current.version.revision, limit: Int64(JournalRowCodec.maxRows)
-                )
-                if case let .command(command, _) = event.action,
-                   command.opensWorkday, !capacity.canOpenWorkday
-                {
-                    throw CatalogPersistenceError.insufficientStartCapacity
-                }
-                if current.catalog.activeID != nil, !capacity.allowsActiveMutation(event.action) {
-                    throw CatalogPersistenceError.reservedExitCapacity
-                }
-                let result = try JournalStagingAppendValidation.validate(
-                    event, rows: current.rows, catalog: current.catalog,
-                    expected: current.version, now: now
-                )
-                try Self.statement(db, "INSERT INTO journal_event VALUES (?, ?)") { stmt in
-                    try Self.check(sqlite3_bind_int64(stmt, 1, result.row.sequence))
-                    try Self.bind(result.row.payload, at: 2, in: stmt)
-                    try Self.check(sqlite3_step(stmt), expected: SQLITE_DONE)
-                }
-                try Self.statement(db, """
-                UPDATE live_generation SET revision = ?
-                WHERE id = 1 AND epoch = ? AND revision = ?
-                """) { stmt in
-                    try Self.check(sqlite3_bind_int64(stmt, 1, nextVersion.revision))
-                    try Self.check(sqlite3_bind_text(
-                        stmt, 2, current.version.epoch.uuidString, -1, transient
-                    ))
-                    try Self.check(sqlite3_bind_int64(stmt, 3, current.version.revision))
-                    try Self.check(sqlite3_step(stmt), expected: SQLITE_DONE)
-                    guard sqlite3_changes(db) == 1 else { throw SnapshotStoreError.staleVersion }
-                }
-                return result
+                try Self.insertAppend(event, matching: expected, next: nextVersion, db: db, now: now)
             }
         }
         // COMMIT has already happened: a failed readback is an ambiguous outcome.
@@ -179,6 +139,54 @@ struct JournalV2LiveStore {
         } catch {
             throw JournalV2LiveWriteError.committedButUnverified(next)
         }
+    }
+
+    /// Only runs inside BEGIN IMMEDIATE; validation and CAS are committed together.
+    private static func insertAppend(
+        _ event: JournalEvent, matching expected: JournalV2LiveState,
+        next: StoreVersion, db: OpaquePointer, now: Int64
+    ) throws -> JournalStagingValidatedAppend {
+        let current = try read(db, now: now)
+        guard current.version == expected.version else { throw SnapshotStoreError.staleVersion }
+        guard current.rows == expected.rows, current.catalog == expected.catalog else {
+            throw JournalMigrationError.verificationFailed
+        }
+        guard current.version.revision < Int64(JournalRowCodec.maxRows) else {
+            throw JournalMigrationError.rowLimit
+        }
+        let capacity = JournalCapacity(
+            revision: current.version.revision, limit: Int64(JournalRowCodec.maxRows)
+        )
+        if case let .command(command, _) = event.action,
+           command.opensWorkday, !capacity.canOpenWorkday
+        {
+            throw CatalogPersistenceError.insufficientStartCapacity
+        }
+        if current.catalog.activeID != nil, !capacity.allowsActiveMutation(event.action) {
+            throw CatalogPersistenceError.reservedExitCapacity
+        }
+        let result = try JournalStagingAppendValidation.validate(
+            event, rows: current.rows, catalog: current.catalog,
+            expected: current.version, now: now
+        )
+        try statement(db, "INSERT INTO journal_event VALUES (?, ?)") { stmt in
+            try check(sqlite3_bind_int64(stmt, 1, result.row.sequence))
+            try bind(result.row.payload, at: 2, in: stmt)
+            try check(sqlite3_step(stmt), expected: SQLITE_DONE)
+        }
+        try statement(db, """
+        UPDATE live_generation SET revision = ?
+        WHERE id = 1 AND epoch = ? AND revision = ?
+        """) { stmt in
+            try check(sqlite3_bind_int64(stmt, 1, next.revision))
+            try check(sqlite3_bind_text(
+                stmt, 2, current.version.epoch.uuidString, -1, transient
+            ))
+            try check(sqlite3_bind_int64(stmt, 3, current.version.revision))
+            try check(sqlite3_step(stmt), expected: SQLITE_DONE)
+            guard sqlite3_changes(db) == 1 else { throw SnapshotStoreError.staleVersion }
+        }
+        return result
     }
 
     private static func read(_ db: OpaquePointer, now: Int64) throws -> JournalV2LiveState {
