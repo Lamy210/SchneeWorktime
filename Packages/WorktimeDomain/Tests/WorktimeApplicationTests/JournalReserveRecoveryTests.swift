@@ -95,4 +95,44 @@ struct JournalReserveRecoveryTests {
             #expect(inspected.validatedSnapshot == before.validatedSnapshot)
         }
     }
+
+    @Test(arguments: [0, 1])
+    func `exhausted startup preserves full journal through read only backup`(remaining: Int) throws {
+        try withLegacyActiveDay(remaining: remaining) { url, repo, before, id in
+            let output = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+            try FileManager.default.createDirectory(
+                at: output, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700]
+            )
+            defer { try? FileManager.default.removeItem(at: output) }
+            let destination = output.appendingPathComponent("preserved.json")
+            let sourceBytes = try Data(contentsOf: url)
+            let originalCheckpoint = try repo.loadObservationCheckpoint(expected: before.version)
+            #expect(originalCheckpoint?.dayID == id)
+
+            // Normal controller startup is blocked when an observation must be
+            // recorded but schema-1 has no remaining safe event capacity.
+            if remaining == 0 {
+                #expect(throws: CatalogPersistenceError.eventLimit) {
+                    try WorktimeController(url: url, sample: sample(10220))
+                }
+            } else {
+                #expect(throws: CatalogPersistenceError.reservedExitCapacity) {
+                    try WorktimeController(url: url, sample: sample(10220))
+                }
+            }
+
+            // Rescue must not depend on a successfully initialized controller,
+            // append an observation, or rewrite the original checkpoint.
+            try PreservationBackup.write(from: url, to: destination, now: 10220)
+            let saved = try CatalogBackup.inspectFile(at: destination, now: 10220)
+            #expect(saved.validatedSnapshot == before.validatedSnapshot)
+            #expect(saved.catalog == before.catalog)
+            #expect(try Data(contentsOf: url) == sourceBytes)
+            #expect(try repo.loadObservationCheckpoint(expected: before.version) == originalCheckpoint)
+            #expect(throws: BackupFileError.self) {
+                try PreservationBackup.write(from: url, to: destination, now: 10220)
+            }
+            #expect(try Data(contentsOf: url) == sourceBytes)
+        }
+    }
 }
