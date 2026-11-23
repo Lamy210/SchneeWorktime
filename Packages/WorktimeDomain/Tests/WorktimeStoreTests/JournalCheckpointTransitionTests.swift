@@ -4,6 +4,13 @@ import WorktimeDomain
 @testable import WorktimeStore
 
 struct JournalCheckpointTransitionTests {
+    private func expectRejected(
+        _ marker: ObservationCheckpoint?, by plan: JournalCheckpointTransition, now: Int64
+    ) {
+        #expect(throws: JournalMigrationError.verificationFailed) {
+            try plan.validateReplacement(marker, now: now)
+        }
+    }
     private func withCandidate(
         _ body: (URL, URL, JournalStagingCandidate, CatalogRepository, UUID) throws -> Void
     ) throws {
@@ -37,33 +44,23 @@ struct JournalCheckpointTransitionTests {
             #expect(plan.activeDayID == id)
             #expect(plan.candidateVersion == candidate.draft.candidateVersion)
             #expect(plan.observedAfter == 110)
-            #expect(throws: JournalMigrationError.verificationFailed) {
-                try plan.validateReplacement(nil, now: 130)
-            }
+            expectRejected(nil, by: plan, now: 130)
             let old = ObservationCheckpoint(
                 version: candidate.draft.source.version, dayID: id, observedAt: 120
             )
-            #expect(throws: JournalMigrationError.verificationFailed) {
-                try plan.validateReplacement(old, now: 130)
-            }
+            expectRejected(old, by: plan, now: 130)
             let stale = ObservationCheckpoint(
                 version: plan.candidateVersion, dayID: id, observedAt: 110
             )
-            #expect(throws: JournalMigrationError.verificationFailed) {
-                try plan.validateReplacement(stale, now: 130)
-            }
+            expectRejected(stale, by: plan, now: 130)
             let wrongDay = ObservationCheckpoint(
                 version: plan.candidateVersion, dayID: UUID(), observedAt: 120
             )
-            #expect(throws: JournalMigrationError.verificationFailed) {
-                try plan.validateReplacement(wrongDay, now: 130)
-            }
+            expectRejected(wrongDay, by: plan, now: 130)
             let future = ObservationCheckpoint(
                 version: plan.candidateVersion, dayID: id, observedAt: 140
             )
-            #expect(throws: JournalMigrationError.verificationFailed) {
-                try plan.validateReplacement(future, now: 130)
-            }
+            expectRejected(future, by: plan, now: 130)
             let fresh = ObservationCheckpoint(
                 version: plan.candidateVersion, dayID: id, observedAt: 120
             )
