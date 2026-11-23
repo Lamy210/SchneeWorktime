@@ -94,6 +94,16 @@ struct JournalV2LiveStore {
                 guard current.version.revision < Int64(JournalRowCodec.maxRows) else {
                     throw JournalMigrationError.rowLimit
                 }
+                let capacity = JournalCapacity(
+                    revision: current.version.revision, limit: Int64(JournalRowCodec.maxRows)
+                )
+                if case let .command(command, _) = event.action,
+                   command.opensWorkday, !capacity.canOpenWorkday {
+                    throw CatalogPersistenceError.insufficientStartCapacity
+                }
+                if current.catalog.activeID != nil, !capacity.allowsActiveMutation(event.action) {
+                    throw CatalogPersistenceError.reservedExitCapacity
+                }
                 let result = try JournalStagingAppendValidation.validate(
                     event, rows: current.rows, catalog: current.catalog,
                     expected: current.version, now: now
