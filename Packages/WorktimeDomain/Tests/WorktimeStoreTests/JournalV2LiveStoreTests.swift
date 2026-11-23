@@ -68,7 +68,7 @@ struct JournalV2LiveStoreTests {
             #expect(disk.version == observed.version)
             #expect(disk.rows == observed.rows)
             #expect(disk.catalog == observed.catalog)
-            #expect(try Data(contentsOf: url).count > 0)
+            #expect(try !Data(contentsOf: url).isEmpty)
         }
     }
 
