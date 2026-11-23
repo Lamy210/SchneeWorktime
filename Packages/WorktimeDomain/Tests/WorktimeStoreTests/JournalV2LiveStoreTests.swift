@@ -273,6 +273,32 @@ struct JournalV2LiveStoreTests {
         }
     }
 
+    @Test func `same revision checkpoint change fences stale journal append and reset`() throws {
+        try fixture { url, store in
+            let id = UUID()
+            let started = try store.append(
+                clockIn(id), matching: store.load(now: 100), now: 100, observedAt: 100
+            )
+            let updated = try store.saveObservationCheckpoint(
+                dayID: id, observedAt: 105, matching: started, now: 105
+            )
+            #expect(updated.version == started.version)
+            let event = JournalEvent(
+                action: .futureRest(dayID: id, remainingSeconds: 60), now: 110
+            )
+            #expect(throws: JournalMigrationError.verificationFailed) {
+                try store.append(event, matching: started, now: 110)
+            }
+            #expect(throws: JournalMigrationError.verificationFailed) {
+                try store.reset(matching: started, now: 110)
+            }
+            let reopened = try JournalV2LiveStore(url: url).load(now: 110)
+            #expect(reopened.checkpoint == updated.checkpoint)
+            #expect(reopened.rows == updated.rows)
+            #expect(reopened.version == updated.version)
+        }
+    }
+
     @Test func `tampered checkpoint cannot be loaded or silently reassigned`() throws {
         try fixture { url, store in
             let id = UUID()
