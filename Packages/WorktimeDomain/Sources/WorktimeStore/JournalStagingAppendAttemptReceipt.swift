@@ -54,10 +54,10 @@ extension JournalStagingDatabase {
         )
         guard inspected.version == expected else { throw SnapshotStoreError.staleVersion }
         // Keep the receipt path and the unreceipted inspection path on the same rules.
-        let row = try JournalStagingAppendValidation.row(
-            for: event, rows: inspected.rows, catalog: inspected.catalog,
+        let row = try JournalStagingAppendValidation.validate(
+            event, rows: inspected.rows, catalog: inspected.catalog,
             expected: expected, now: now
-        )
+        ).row
         return try JournalStagingAppendAttemptReceipt(
             sourceURL: sourceURL, candidate: candidate,
             preserved: preserved, inspected: inspected,
