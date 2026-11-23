@@ -35,10 +35,10 @@ extension JournalStagingDatabase {
             let prefixCatalog = try JournalRowCodec.replay(
                 prefixRows, revision: expected.revision, now: now
             )
-            let attemptedRow = try JournalStagingAppendValidation.row(
-                for: event, rows: prefixRows, catalog: prefixCatalog,
+            let attemptedRow = try JournalStagingAppendValidation.validate(
+                event, rows: prefixRows, catalog: prefixCatalog,
                 expected: expected, now: now
-            )
+            ).row
             if inspection.version == expected {
                 // At this instant the expected append has not appeared. No automatic retry.
                 return .appendNotObserved(inspection.version)
