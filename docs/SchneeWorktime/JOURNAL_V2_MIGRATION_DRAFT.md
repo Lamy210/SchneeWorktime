@@ -1,5 +1,13 @@
 # Journal v2 イベント行方式の移行候補（BUG-01 / P0）
 
+## 初回リリースの採用方針（2026-11-24）
+
+v1.0未リリースのため、schema-1の後方互換および旧DBからの自動移行は**要件から外す**。v1.0正規保存形式は新規作成のschema-2のみ。旧schema-1DB、未知のschema、不正なDBを読み込んだときは上書き・削除・自動再作成せず拒否する。開発中の旧データは利用者の明示操作で保全できるが、自動引継ぎは提供しない。
+
+`JournalV2LiveStore` は新規DBで `live_generation` + 行単位 `journal_event` の作成、Journal再生、全行bytes一致フェンスとepoch/revision CAS付きの原子的追記、論理reset（新epoch・全行削除）を実装する。別用途の `migration_source` を持つオフライン候補を正規ライブDBと見なさない。上限は仮に100,000行・1行64KiB・総64MiBで、長期性能・ディスク不足に対する実機計測は未完了。
+
+**このPRでは `WorktimeController` はまだ既存schema-1ストアを呼んでいる。** 次段階でController/CatalogRepositoryの正式接続、schema-2の観測Checkpointと全操作の原子的処理、削除・バックアップ・復元・クラッシュ復旧を完成する。移行候補や旧epochからのadoptionは採用しない。新規ストアコアの存在だけでP0解除・リリースGOとはならない。
+
 ## スコープと現在の制約
 現行schema-1は10,000件/16MiBの単一payload。#83の読取専用保全で原本の確定Journalを取得できるが、完全枯渇からの退勤はできない。後続PRでオフライン候補のSQLite追記・独立再読込・原本フェンス・不確定結果照合まで進んだが、live採用、UI、schema-1の上限変更、退勤強制は行わない。既存OpenSpecのschema-1要件は維持する。
 
