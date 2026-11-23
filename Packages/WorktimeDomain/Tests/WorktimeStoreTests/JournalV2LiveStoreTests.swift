@@ -19,7 +19,7 @@ struct JournalV2LiveStoreTests {
     private func clockIn(_ id: UUID, now: Int64 = 100) -> JournalEvent {
         JournalEvent(
             action: .command(
-                .clockIn(id: id, target: 25_200, expectedRest: 3600), at: now
+                .clockIn(id: id, target: 25200, expectedRest: 3600), at: now
             ),
             now: now
         )
