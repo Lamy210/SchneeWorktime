@@ -11,7 +11,7 @@ SQLiteへの追記は、COMMIT後の再読込や原本の照合に失敗する�
 - `appendNotObserved(version)`: 候補のRevisionが追記前と同じだったという観測。過去に一度も書かれなかった証明ではない。
 - `indeterminate`: Revision飛び、異なるイベント、未来時刻の試行イベント、元DB/候補の置換・改竄・Checkpoint変化、読み込み失敗等を含む。安全側へ倒す。
 
-**判定対象の制約:** `expected.revision` は候補作成時の `candidate.draft.candidateVersion.revision` と等しい場合だけ観測結果を返せる。候補生成後に一度でも追記済みの場合、その追記を含む直前prefixを固定した不変証拠が存在しないため、2回目以降の追記に関する照合は、現在の候補が一見整合していても `indeterminate` とする。Revision値だけでは過去イベント行の改変を否定できない。複数回追記の判定を行うには、試行前の完全な行BLOB群または強固なdigestと物理identityをバインドした個別のAttempt Receipt、排他制御および継続的な検証が必要。このPRでは再試行許可もAttempt Receiptも提供しない。
+**ReceiptなしAPIの制約:** `expected.revision` は候補作成時の `candidate.draft.candidateVersion.revision` と等しい場合だけ観測結果を返せる。候補生成後に一度でも追記済みの場合、その追記を含む直前prefixを固定した不変証拠が存在しないため、2回目以降の追記に関する照合は `indeterminate` とする。複数回追記の結果を判定する場合は、後述のメモリ内Attempt Receiptを試行**前**に取得し、外部排他を維持して照合する。Revision番号だけでは過去の行BLOBの同一性を証明できない。どちらのAPIも自動再試行は許可しない。
 
 どの結果でもイベントの自動再実行・候補採用・原本変更は行わない。未来時刻（`event.now > now`）の試行イベントは、追記が見えない場合でも `appendNotObserved` にせず `indeterminate` にする。呼出側は排他ロックを保持し、時点の異なる観測を混同しない。クラッシュ後にcaptureを失った場合の自動再開も提供しない。
 
@@ -20,6 +20,8 @@ SQLiteへの追記は、COMMIT後の再読込や原本の照合に失敗する�
 ## メモリ内Attempt Receiptによる複数追記の読取専用判定
 
 `JournalStagingDatabase.captureOfflineAppendAttempt` は、試行**前**に、保持中の原本session/directoryロックのもとで候補の行BLOB全体を読み取り、原本と候補のidentity、元snapshot、元Checkpoint、候補epoch、試行前Revision、イベントの次行BLOBを`JournalStagingAppendAttemptReceipt`に固定する。候補がすでに1回以上追記された状態でも記録できるが、`expected`が最新Revisionでなければ失敗する。
+
+Receipt取得は時刻上限・直前のイベントとの時系列順序だけでなく、対象イベントを複製カタログへ適用し、Journal全行を再生して同じ状態になることまで**読取専用**で事前確認する。無効な操作、過去へ戻るイベント時刻、古いRevisionではReceiptを発行しない。追記時にも別途同じ検証を行い、Receiptそのものは書込み認可を持たない。
 
 `JournalStagingDatabase.inspectUncertainOfflineAppend(receipt, sourceURL: candidate: now:)` は、固定した行prefixと候補の現行行をバイト単位で比較し、原本・候補identityと元Checkpointも再確認する。指定イベントの行が直後の1件だけ増えていれば `matchingAppendObserved`、未変化なら `appendNotObserved`、異なるイベント・後続追記・inode置換・prefix改変等は `indeterminate`。
 
