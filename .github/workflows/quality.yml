@@ -64,6 +64,13 @@ jobs:
         shell: bash
         run: python3 -m unittest scripts.ci.test_tool_installer_retry_policy -v
 
+      - name: Worktime P0 release evidence inventory
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest scripts.release.test_worktime_release_audit -v
+          python3 scripts/release/audit_worktime_release.py
+
       - name: Dependabot configuration policy
         shell: bash
         run: python3 -m unittest scripts.ci.test_dependabot_config -v

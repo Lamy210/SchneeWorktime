@@ -1,25 +1,33 @@
-# v1.0 リリース判定 — 2026-11-18
+# v1.0 リリース判定 — 2026-11-24
 
 ## 判定: NO-GO（検証未完了）
 
-基準: main `b2931b235fe0c73e96891cb396b76e21f5b0c0c8`。機能追加を凍結し、既存P0の達成、障害修正、配布検証を優先する。M1の集計は既に統合されているが、追加機能をM0リリース条件にしない。Developer ID/公証は必須とせず、ad-hoc署名と既存配布手順を維持する。
+再監査の起点: main `741512de937dc71dfb7f0b01e929d9fccd643df6`（PR #109統合時点、後続のマージ後mainとは区別）。機能追加を凍結し、既存P0の達成、障害修正、配布検証を優先する。M1の集計は既に統合されているが、追加機能をM0リリース条件にしない。Developer ID/公証は必須とせず、ad-hoc署名と既存配布手順を維持する。
 
 - [受入マトリクス](ACCEPTANCE_MATRIX.md): P0 148件、P1 24件。個々の試験との完全な照合は未完了。
-- [OpenSpec tasks](../../openspec/changes/initial-worktime-mvp/tasks.md): 81件中11件チェック済み、70件未チェック。チェック率を機能完成率とみなさない。
-- 最新統合PR #52 のHEAD `0024fe0ba0e8e668a8e33973f68cac9b49867b8d` で Tests / Swift Quality / Quality / Secure File Identity / Release Isolation TDD の5件成功。squash後のmainそのもののCI、全P0達成、OS実機成功を意味しない。
+- [OpenSpec tasks](../../openspec/changes/initial-worktime-mvp/tasks.md): 現時点のファイルでは87件中11件チェック済み、76件未チェック。チェック率を機能完成率とみなさない。
+- PR #109のHEAD `f9c6063d0107038ab22a05ed53bd668d71158662` で Tests / Swift Quality / Quality / Secure File Identity / Release Isolation TDD の5件成功。Squash後のmain `741512de937dc71dfb7f0b01e929d9fccd643df6` 自体のpush CI証跡はこの監査では確認できていない。全P0達成・OS実機成功を意味しない。
 
 ## 既存実装の確認起点（個別ACの合格認定ではない）
 
 | 領域 | 実装・試験を確認する起点 | 残る条件 |
 |---|---|---|
 | 通知 | #38, #41, #43, #45, #47, #49, #53 | 実機権限拒否、取消競合、再起動・起床・配信、AC全件対応 |
-| 履歴訂正 | #44, #50 | AC-155 はDomain/StoreとApplication/UIを分離評価。#50のUIは最新勤務終了後のみで、勤務中の過去日訂正は未対応 |
+| 履歴訂正 | #44, #50、OpenSpec 17.6 | AC-155 は後続で勤務中の過去日訂正コード・回帰ケースを追加した記録がある。現在の統合挙動・QAの合否は未確認で、旧記述の「未実装」とは断定しない |
 | 復元 | #36, #37, #45 | 同一世代の正常journalに限定。破損DBの保全・別世代の復旧、障害注入を別途検証 |
 | データ削除 | AC-74, AC-134, AC-135, AC-158 | 論理resetの確認用APIと観測checkpointの同一トランザクション削除を追加。現在DB限定の明示確認UI・通知取消収束・保守排他・再読込を追加。内部backup/診断データ範囲と消去中断復旧、最新CI/実機検証は未完了。ファイルの完全消去を保証しない |
 | 勤務予測 | #35, #40, #41, #42, #43 | AC-10/58の休憩訂正など、UIと永続化の受入条件を照合 |
 | 常駐性能 | #46, #47, #48 | 実機測定未実施。10/100/500日のベンチマークと負荷QA |
 | 配布 | #34、UNSIGNED_RELEASE.md | 最新mainの候補生成、ZIP/checksum、インストール、更新・復旧、実機QA |
 | 振り返り（M1） | #51, #52 | 日週月/グラフ/CSVを統合済み。正式勤怠や給与計算ではない。実機QA未完 |
+
+## P0証跡の再監査（CIで自動照合するインベントリ）
+
+- [P0_RELEASE_EVIDENCE.json](P0_RELEASE_EVIDENCE.json) は148件を一意に列挙し、8つの横断ゲートを同じ形式で管理する。初期状態は `unverified`、資料から欠落が確認された項目だけ `blocked` とし、CI成功やコード存在をもって `passed` に自動昇格しない。
+- `python3 scripts/release/audit_worktime_release.py` は受入ID重複・増減・証跡の形式を確認する。通常モードの成功は **台帳整合性のみ** の成功であり、リリースGOではない。
+- `python3 scripts/release/audit_worktime_release.py --require-complete --source-sha <40桁コミットSHA>` は全148件および8ゲートの `passed`、検証対象SHAと一致する証跡を要求する。将来これが成功しても、実際のOS操作や提供されたログの正しさは独立の承認者が確認する。
+- 候補生成workflowは現行のまま維持する。RCは実機QAに必要なため、未完了のP0がある間も**候補生成そのものを禁止しない**。本番公開・GO判定は別ゲート。
+- 特に既知のP0は容量枯渇、削除の対象範囲/中断、破損DBの保全・復旧。個々のテスト成功が横断P0の解消を意味しない。
 
 ## リリースを阻む条件と次の順序
 

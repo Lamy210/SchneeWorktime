@@ -52,6 +52,7 @@
 
 ## 7. リリース判定
 - [ ] 7.1 `docs/SchneeWorktime/ACCEPTANCE_MATRIX.md` のP0全件にテストIDを割り当てる（検証: 全P0をテストIDへマッピング（未対応を明示））
+  - 証跡台帳とfail-closed監査CLIで全P0 148件を漏れなく列挙し、未検証・blockedを明示。テストID・手動QA・最新source SHAの個別証跡は未収集のため**未チェックを維持**。品質CIでは構造のみ検証し、リリースGO判定には用いない。
 - [ ] 7.2 失敗を隠さずCIをグリーンにし、OS実機テストを実施する（検証: CI実行結果とmacOS QA）
 - [ ] 7.3 macOS実機で起動時間・常駐CPU/RAM・省電力動作を計測する（検証: 実機の負荷計測記録）
   - 人工10/100/500勤務日で全journal再生と完全一致再利用を比較する明示実行ベンチマークを追加。通常CIはfixture等価性のみ、計測はrelease buildで各10回実施する。PERFORMANCE_VALIDATION.mdに実機計測・採用条件を記載。計測結果は未取得。
