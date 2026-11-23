@@ -37,11 +37,10 @@ extension JournalStagingDatabase {
         guard let captured = candidate.capturedSource else {
             throw JournalMigrationError.verificationFailed
         }
-        let latestEventTime: Int64
-        if let last = inspected.rows.last {
-            latestEventTime = try JSONDecoder().decode(JournalEvent.self, from: last.payload).now
+        let latestEventTime: Int64 = if let last = inspected.rows.last {
+            try JSONDecoder().decode(JournalEvent.self, from: last.payload).now
         } else {
-            latestEventTime = Int64.min
+            Int64.min
         }
         let sourceMarkerTime = captured.checkpoint?.observedAt ?? Int64.min
         return JournalCheckpointTransition(
