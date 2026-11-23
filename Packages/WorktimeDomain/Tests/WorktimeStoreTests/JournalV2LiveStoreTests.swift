@@ -149,7 +149,7 @@ struct JournalV2LiveStoreTests {
             let initial = try store.load(now: 100)
             let bytes = try Data(contentsOf: url)
             let bad = JournalEvent(action: .command(.endBreak, at: 100), now: 100)
-            #expect(throws: WorkdayError.invalidTransition) {
+            #expect(throws: WorkdayError.noActiveDay) {
                 try store.append(bad, matching: initial, now: 100)
             }
             #expect(throws: CatalogPersistenceError.futureEvent) {
