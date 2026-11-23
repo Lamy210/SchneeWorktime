@@ -20,9 +20,10 @@ struct JournalV2LiveStore {
     private let fileIdentity: DatabaseFileGuard.Identity
 
     init(url: URL, createIfMissing: Bool = false) throws {
-        self.url = try DatabaseFileGuard.canonicalURL(url)
-        let created = try DatabaseFileGuard.prepare(self.url, createIfMissing: createIfMissing)
-        try Self.connect(self.url, flags: SQLITE_OPEN_READWRITE) { db in
+        let canonical = try DatabaseFileGuard.canonicalURL(url)
+        self.url = canonical
+        let created = try DatabaseFileGuard.prepare(canonical, createIfMissing: createIfMissing)
+        try Self.connect(canonical, flags: SQLITE_OPEN_READWRITE) { db in
             if created {
                 try Self.transaction(db) {
                     guard try Self.scalar(db, "PRAGMA user_version") == 0,
@@ -53,7 +54,7 @@ struct JournalV2LiveStore {
             }
             _ = try Self.read(db, now: Int64.max)
         }
-        fileIdentity = try DatabaseFileGuard.preservationIdentity(self.url)
+        fileIdentity = try DatabaseFileGuard.preservationIdentity(canonical)
     }
 
     /// Reopens and replays only a schema-2 live database; does not repair an invalid file.
