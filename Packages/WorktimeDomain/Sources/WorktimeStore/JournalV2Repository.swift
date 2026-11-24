@@ -112,3 +112,30 @@ public struct JournalV2Repository {
             current.checkpoint == expected.checkpoint
     }
 }
+
+public struct JournalV2ResetPreview {
+    public let version: StoreVersion
+    public let workdays: Int
+    public let corrections: Int
+    public let hasActiveWorkday: Bool
+    fileprivate let session: JournalV2Session
+}
+
+public extension JournalV2Repository {
+    /// Read-only preview. Caller must stop writers/notifications and obtain explicit
+    /// user confirmation before commit; app-managed backup cleanup is not implemented here.
+    func previewReset(now: Int64, matching session: JournalV2Session) throws -> JournalV2ResetPreview {
+        let current = try revalidate(session, now: now)
+        return JournalV2ResetPreview(
+            version: current.version, workdays: current.catalog.days.count,
+            corrections: current.catalog.reviewAudit.count,
+            hasActiveWorkday: current.catalog.activeID != nil, session: current
+        )
+    }
+
+    /// Logical deletion only. Does not claim physical erasure or delete owned backups.
+    func commitReset(_ preview: JournalV2ResetPreview, now: Int64) throws -> JournalV2Session {
+        _ = try revalidate(preview.session, now: now)
+        return try JournalV2Session(store.reset(matching: preview.session.source, now: now))
+    }
+}
