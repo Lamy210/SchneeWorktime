@@ -27,6 +27,12 @@
 | 配布 | #34、UNSIGNED_RELEASE.md | 最新mainの候補生成、ZIP/checksum、インストール、更新・復旧、実機QA |
 | 振り返り（M1） | #51, #52 | 日週月/グラフ/CSVを統合済み。正式勤怠や給与計算ではない。実機QA未完 |
 
+## schema-2アプリ接続の段階的準備
+
+PR #117・#118によりschema-2イベント行ストアと観測Checkpointのトランザクション処理を内部実装済み。後続PRでは `JournalV2Repository` を追加し、打刻・観測・予定変更・Checkpoint・削除プレビューをアプリケーションから利用可能なAPIとして分離する。リビジョンが同じでもCheckpointだけ変更された場合、旧セッションの再利用を拒否する。
+
+**このAPIを追加しても、現行の`WorktimeController`は依然schema-1の`CatalogRepository`を使用する。** 既存の履歴訂正・復元・CSV/バックアップ・起動時復旧を一度に置換せず、schema-2での同等機能の実装・試験を進めてからControllerの本番接続を変更する。未リリースのためschema-1への後方互換や自動移行は不要だが、開発用既存DBの無断消去は禁止する。
+
 ## P0証跡の再監査（CIで自動照合するインベントリ）
 
 - [P0_RELEASE_EVIDENCE.json](P0_RELEASE_EVIDENCE.json) は148件を一意に列挙し、8つの横断ゲートを同じ形式で管理する。初期状態は `unverified`、資料から欠落が確認された項目だけ `blocked` とし、CI成功やコード存在をもって `passed` に自動昇格しない。
