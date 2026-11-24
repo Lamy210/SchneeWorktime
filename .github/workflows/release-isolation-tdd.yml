@@ -77,7 +77,9 @@ jobs:
 
       - name: Bounded exact fixture artifact fetch tests
         shell: bash
-        run: python3 scripts/ci/test_fetch_fixture_artifact.py -v
+        run: |
+          python3 scripts/ci/test_fetch_fixture_artifact.py -v
+          python3 -m unittest scripts.ci.test_release_artifact_fixture_order -v
 
       - name: Shell repository identity guardrails
         shell: bash
