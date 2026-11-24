@@ -174,3 +174,160 @@ struct JournalV2LiveStoreTests {
         }
     }
 }
+
+extension JournalV2LiveStoreTests {
+    @Test func `atomic append persists checkpoint in the new journal generation`() throws {
+        try fixture { url, store in
+            let id = UUID()
+            let initial = try store.load(now: 100)
+            let started = try store.append(clockIn(id), matching: initial, now: 100, observedAt: 100)
+            #expect(started.checkpoint?.version == started.version)
+            #expect(started.checkpoint?.dayID == id)
+            #expect(started.checkpoint?.observedAt == 100)
+            let observation = JournalEvent(
+                action: .observation(dayID: id, start: 110, end: 120), now: 120
+            )
+            let updated = try store.append(
+                observation, matching: started, now: 120, observedAt: 120
+            )
+            #expect(updated.checkpoint?.version == updated.version)
+            #expect(updated.checkpoint?.observedAt == 120)
+            let reopened = try JournalV2LiveStore(url: url).load(now: 130)
+            #expect(reopened.rows == updated.rows)
+            #expect(reopened.checkpoint == updated.checkpoint)
+        }
+    }
+
+    @Test func `append without a new clock observation clears the prior marker`() throws {
+        try fixture { url, store in
+            let id = UUID()
+            let start = try store.append(
+                clockIn(id), matching: store.load(now: 100), now: 100, observedAt: 100
+            )
+            let next = try store.append(
+                .init(action: .futureRest(dayID: id, remainingSeconds: 60), now: 110),
+                matching: start, now: 110
+            )
+            #expect(next.checkpoint == nil)
+            #expect(try JournalV2LiveStore(url: url).load(now: 110).checkpoint == nil)
+            #expect(next.version.revision == start.version.revision + 1)
+        }
+    }
+
+    @Test func `invalid checkpoint rolls back the event and epoch revision`() throws {
+        try fixture { url, store in
+            let initial = try store.load(now: 100)
+            #expect(throws: ObservationCheckpointError.invalid) {
+                try store.append(clockIn(UUID()), matching: initial, now: 100, observedAt: 99)
+            }
+            let reloaded = try JournalV2LiveStore(url: url).load(now: 110)
+            #expect(reloaded.version == initial.version)
+            #expect(reloaded.rows == initial.rows)
+            #expect(reloaded.checkpoint == nil)
+            #expect(reloaded.catalog == initial.catalog)
+        }
+    }
+
+    @Test func `checkpoint-only update is monotonic and does not change journal revision`() throws {
+        try fixture { url, store in
+            let id = UUID()
+            let started = try store.append(clockIn(id), matching: store.load(now: 100), now: 100)
+            let first = try store.saveObservationCheckpoint(
+                dayID: id, observedAt: 110, matching: started, now: 110
+            )
+            #expect(first.version == started.version)
+            let second = try store.saveObservationCheckpoint(
+                dayID: id, observedAt: 120, matching: first, now: 120
+            )
+            #expect(second.rows == started.rows)
+            #expect(second.checkpoint?.observedAt == 120)
+            #expect(try JournalV2LiveStore(url: url).load(now: 130).checkpoint == second.checkpoint)
+            #expect(throws: ObservationCheckpointError.regressed) {
+                try store.saveObservationCheckpoint(
+                    dayID: id, observedAt: 115, matching: second, now: 130
+                )
+            }
+            #expect(throws: ObservationCheckpointError.invalid) {
+                try store.saveObservationCheckpoint(
+                    dayID: UUID(), observedAt: 121, matching: second, now: 130
+                )
+            }
+        }
+    }
+
+    @Test func `checkpoint writers for stale revision are fenced`() throws {
+        try fixture { url, store in
+            let id = UUID()
+            let started = try store.append(
+                clockIn(id), matching: store.load(now: 100), now: 100, observedAt: 100
+            )
+            let updated = try store.append(
+                .init(action: .futureRest(dayID: id, remainingSeconds: 60), now: 110),
+                matching: started, now: 110
+            )
+            #expect(throws: SnapshotStoreError.staleVersion) {
+                try store.saveObservationCheckpoint(
+                    dayID: id, observedAt: 115, matching: started, now: 120
+                )
+            }
+            #expect(updated.checkpoint == nil)
+            #expect(try JournalV2LiveStore(url: url).load(now: 120).version == updated.version)
+        }
+    }
+
+    @Test func `same revision checkpoint change fences stale journal append and reset`() throws {
+        try fixture { url, store in
+            let id = UUID()
+            let started = try store.append(
+                clockIn(id), matching: store.load(now: 100), now: 100, observedAt: 100
+            )
+            let updated = try store.saveObservationCheckpoint(
+                dayID: id, observedAt: 105, matching: started, now: 105
+            )
+            #expect(updated.version == started.version)
+            let event = JournalEvent(
+                action: .futureRest(dayID: id, remainingSeconds: 60), now: 110
+            )
+            #expect(throws: JournalMigrationError.verificationFailed) {
+                try store.append(event, matching: started, now: 110)
+            }
+            #expect(throws: JournalMigrationError.verificationFailed) {
+                try store.reset(matching: started, now: 110)
+            }
+            let reopened = try JournalV2LiveStore(url: url).load(now: 110)
+            #expect(reopened.checkpoint == updated.checkpoint)
+            #expect(reopened.rows == updated.rows)
+            #expect(reopened.version == updated.version)
+        }
+    }
+
+    @Test func `tampered checkpoint cannot be loaded or silently reassigned`() throws {
+        try fixture { url, store in
+            let id = UUID()
+            let started = try store.append(
+                clockIn(id), matching: store.load(now: 100), now: 100, observedAt: 100
+            )
+            try tamper(url, sql: "UPDATE observation_checkpoint SET revision = 2")
+            #expect(throws: ObservationCheckpointError.invalid) {
+                try store.load(now: 130)
+            }
+            #expect(throws: ObservationCheckpointError.invalid) {
+                try store.saveObservationCheckpoint(
+                    dayID: id, observedAt: 110, matching: started, now: 130
+                )
+            }
+        }
+    }
+
+    @Test func `logical reset removes old checkpoint in the same generation change`() throws {
+        try fixture { url, store in
+            let started = try store.append(
+                clockIn(UUID()), matching: store.load(now: 100), now: 100, observedAt: 100
+            )
+            let cleared = try store.reset(matching: started, now: 110)
+            #expect(cleared.checkpoint == nil)
+            #expect(cleared.version.epoch != started.version.epoch)
+            #expect(try JournalV2LiveStore(url: url).load(now: 120).checkpoint == nil)
+        }
+    }
+}
