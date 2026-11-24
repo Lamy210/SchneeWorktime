@@ -174,6 +174,9 @@ struct JournalV2LiveStoreTests {
         }
     }
 
+}
+
+extension JournalV2LiveStoreTests {
     @Test func `atomic append persists checkpoint in the new journal generation`() throws {
         try fixture { url, store in
             let id = UUID()
