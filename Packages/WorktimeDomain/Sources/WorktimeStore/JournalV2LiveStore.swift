@@ -205,7 +205,6 @@ struct JournalV2LiveStore {
             throw JournalV2LiveWriteError.committedButUnverified(expected.version)
         }
     }
-
 }
 
 private extension JournalV2LiveStore {
