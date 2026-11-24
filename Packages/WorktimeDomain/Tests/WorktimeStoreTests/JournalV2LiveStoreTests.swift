@@ -173,7 +173,6 @@ struct JournalV2LiveStoreTests {
             #expect(try store.load(now: 100).version.revision == 0)
         }
     }
-
 }
 
 extension JournalV2LiveStoreTests {
