@@ -89,6 +89,21 @@ public struct JournalV2Repository {
         ))
     }
 
+    /// Only called with a domain-validated preview bound to an exact loaded session.
+    /// A replay of the proposed event must produce precisely the previewed catalog.
+    func commitVerified(
+        _ event: JournalEvent, matching session: JournalV2Session,
+        previewedCatalog: WorkdayCatalog
+    ) throws -> JournalV2Session {
+        let current = try revalidate(session, now: event.now)
+        var replayed = current.catalog
+        try event.apply(to: &replayed)
+        guard replayed == previewedCatalog, replayed != current.catalog else {
+            throw JournalMigrationError.verificationFailed
+        }
+        return try mutate(event, matching: session, observedAt: nil)
+    }
+
     private func mutate(
         _ event: JournalEvent, matching session: JournalV2Session, observedAt: Int64?
     ) throws -> JournalV2Session {

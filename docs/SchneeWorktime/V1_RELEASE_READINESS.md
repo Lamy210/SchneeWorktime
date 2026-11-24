@@ -33,6 +33,12 @@ PR #117・#118によりschema-2イベント行ストアと観測Checkpointのト
 
 **このAPIを追加しても、現行の`WorktimeController`は依然schema-1の`CatalogRepository`を使用する。** 既存の履歴訂正・復元・CSV/バックアップ・起動時復旧を一度に置換せず、schema-2での同等機能の実装・試験を進めてからControllerの本番接続を変更する。未リリースのためschema-1への後方互換や自動移行は不要だが、開発用既存DBの無断消去は禁止する。
 
+## schema-2のレビュー・履歴訂正API（段階的実装）
+
+`JournalV2Corrections` はschema-2 `JournalV2Repository`に対し、観測欠損のレビュー、休憩開始/終了境界の訂正、過去の出勤/退勤時刻訂正を追加する。全操作は「読み取り専用のプレビュー → 元Journal行・カタログ・Checkpointを完全一致検査 → ドメインによる確認結果の再計算 → 監査イベント1件の原子的追記」を経る。別操作・epoch reset・同revisionのCheckpoint更新が起きれば古いプレビューは拒否する。原本イベントを削除・書き換えない。
+
+**留意:** アプリ`WorktimeController`、バックアップ/復元、CSV、削除範囲、OS時計の実機観測の正式接続はまだ旧形式であり、これらのAPIを追加してもv1.0をGOにはできない。CIのテスト成功は本番動線の確認を意味しない。
+
 ## P0証跡の再監査（CIで自動照合するインベントリ）
 
 - [P0_RELEASE_EVIDENCE.json](P0_RELEASE_EVIDENCE.json) は148件を一意に列挙し、8つの横断ゲートを同じ形式で管理する。初期状態は `unverified`、資料から欠落が確認された項目だけ `blocked` とし、CI成功やコード存在をもって `passed` に自動昇格しない。
