@@ -206,6 +206,9 @@ struct JournalV2LiveStore {
         }
     }
 
+}
+
+private extension JournalV2LiveStore {
     /// Only runs inside BEGIN IMMEDIATE; validation and CAS are committed together.
     private static func insertAppend(
         _ event: JournalEvent, matching expected: JournalV2LiveState,
