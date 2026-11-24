@@ -39,6 +39,14 @@ PR #117・#118によりschema-2イベント行ストアと観測Checkpointのト
 
 **留意:** アプリ`WorktimeController`、バックアップ/復元、CSV、削除範囲、OS時計の実機観測の正式接続はまだ旧形式であり、これらのAPIを追加してもv1.0をGOにはできない。CIのテスト成功は本番動線の確認を意味しない。
 
+## schema-2バックアップ対応の暫定範囲
+
+- `JournalV2Repository.makeBackup/writeBackup` は、現行epoch/revision・全イベント行bytes・再生catalog・観測Checkpointが一致するセッションからのみ、schema-2専用JSONバックアップを作成する。
+- `JournalV2Backup.inspect` はschemaVersion=2のイベント行を**読み取り専用**で再生検証する。schema-1用の`CatalogBackup`形式は自動受入しない。バックアップにCheckpointを含めず、観測時刻を勤務実績として誤用しない。
+- `BackupFile`の既存の安全な排他書込（私有ディレクトリ、600モード、fsync、既存ファイルの上書拒否）を再利用する。**24MiB超のJSONバックアップは明示的な`tooLarge`で拒否**。schema-2 Journal本体の64MiB容量をカバーする大容量・ストリーミングバックアップは未完了のP0。
+- アーカイブは署名済み証跡ではなく、内容が他者に変更されていない保証はない。復元時には別途、原本の明示保全、同一/別epochルール、atomic commitとクラッシュ復旧が必要。
+- この段階では**自動復元・本番Controller接続をしない**。旧DBを変換・消去せず、v1.0はNO-GOを維持する。
+
 ## P0証跡の再監査（CIで自動照合するインベントリ）
 
 - [P0_RELEASE_EVIDENCE.json](P0_RELEASE_EVIDENCE.json) は148件を一意に列挙し、8つの横断ゲートを同じ形式で管理する。初期状態は `unverified`、資料から欠落が確認された項目だけ `blocked` とし、CI成功やコード存在をもって `passed` に自動昇格しない。
