@@ -65,6 +65,60 @@ public struct JournalV2WorktimeController {
         try repository.writeCSV(to: destination, now: now, matching: session)
     }
 
+    /// Read-only deletion preview. The caller must own the session lock and
+    /// stop owned reminders before invoking commitReset after explicit confirmation.
+    public func previewReset(sample: ClockSample) throws -> JournalV2ResetPreview {
+        var checked = clock
+        _ = try checked.advance(to: sample)
+        return try repository.previewReset(now: sample.wall, matching: session)
+    }
+
+    public func isCurrent(_ proposal: JournalV2ResetPreview) -> Bool {
+        session.version == proposal.version
+    }
+
+    /// Logical Journal/Checkpoint deletion only, not physical erasure or external
+    /// backup cleanup. A successful commit replaces this controller's cached
+    /// state with the new epoch, so even accidental reuse cannot show old days.
+    /// On any thrown error, the caller must discard and reopen this controller.
+    public mutating func commitReset(_ proposal: JournalV2ResetPreview, sample: ClockSample) throws {
+        guard isCurrent(proposal) else { throw SnapshotStoreError.staleVersion }
+        var checked = clock
+        _ = try checked.advance(to: sample)
+        let cleared = try repository.commitReset(proposal, now: sample.wall)
+        session = cleared
+        clock = checked
+    }
+
+    /// A healthy same-epoch, earlier, fully ended Journal prefix is the only
+    /// supported restoration source. Preview never changes the live database.
+    public func previewRollback(file: URL, sample: ClockSample) throws -> JournalV2RollbackProposal {
+        var checked = clock
+        _ = try checked.advance(to: sample)
+        return try repository.previewRollback(file: file, now: sample.wall, matching: session)
+    }
+
+    public func isCurrent(_ proposal: JournalV2RollbackProposal) -> Bool {
+        session.version == proposal.currentVersion && session.catalog.activeID == nil
+    }
+
+    /// Requires settled notification cancellation, explicit user confirmation and
+    /// an unused owner-private preservation destination outside the database tree.
+    /// The repository durably preserves the exact current generation before SQL
+    /// mutation. Never retry automatically after an uncertain outcome.
+    public mutating func commitRollback(
+        _ proposal: JournalV2RollbackProposal, preserveCurrentAt destination: URL, sample: ClockSample
+    ) throws {
+        guard isCurrent(proposal) else { throw SnapshotStoreError.staleVersion }
+        var checked = clock
+        _ = try checked.advance(to: sample)
+        let restored = try repository.commitRollback(
+            proposal, preserveCurrentAt: destination, now: sample.wall
+        )
+        session = restored
+        clock = checked
+    }
+
     private var activeWorkingDay: Workday? {
         guard let day = session.catalog.days.last, day.state == .working else { return nil }
         return day
