@@ -1,0 +1,54 @@
+# schema-2 全履歴削除のデータ所在・世代境界（P0作業中）
+
+対象: v1.0未リリースのschema-2 Journal。Issue #113、AC-74/134/135/158。
+この資料は**ソースコードから確認した範囲の暫定インベントリ**であり、全データ消去の受入証跡ではない。
+
+## データ所在と今回の処理範囲
+
+| 所在・種類 | 確認できる生成/使用箇所 | 削除境界 |
+|---|---|---|
+| `~/Library/Application Support/SchneeWorktime/worktime.sqlite` | `DesktopModel.databaseURL()`; schema-2は`JournalV2LiveStore` | schema-2ではJournalイベント行、カタログ再生元、観測Checkpointを**同じSQLiteトランザクション**で論理削除し、epochを更新。DBファイルそのものは消さない |
+| SQLite `-journal` / `-wal` / `-shm` | `DatabaseFileGuard`が安全性を検査 | アプリが直接unlinkしない。SQLiteの内部管理に従う。物理完全消去や残留ページの消去は保証しない |
+| `session.lock` | `LocalSessionLock` | セッション排他用。勤務履歴そのものではない。削除中も保持が必要で、勝手に消さない |
+| ユーザーが選んだ保存先のJSON/CSV/復元前保全ファイル | `DesktopModelBackup.chooseBackupDestination`、`choosePreservationDestination`、`confirmRollback` | **自動削除しない**。選択された場所がApp Support配下でも、利用者管理のエクスポートとして扱い、明示的な別操作なしに削除しない |
+| 通知予約 | `DesktopModelReset.completeReset`、`DesktopReminderCoordinator` | 既存のUIでは所有通知の取消収束を削除前に要求。新schema-2アプリセッションは**通知を操作しない**ため、呼出し側の調整は未完成 |
+| UserDefaultsに保存した通知設定 | `DesktopModel` | 履歴データではない設定。削除対象から独立させるか要件確認が必要 |
+| アプリ管理下の専用バックアップ台帳・勤務由来診断ファイル | コード上の網羅調査・管理台帳は未完了 | **unknown**。存在しないと断定しない。正規ディレクトリ、ログ出力先、将来の生成物の収集/削除設計が必要 |
+| Time Machine、クラウド同期、外部コピー、SSD上の残存痕跡 | OS/ユーザー管理 | アプリの自動削除対象外。UXに明示する |
+
+## アプリケーション層の安全な論理削除（PR #127）
+
+1. 呼出し側は`LocalSessionLock`等の単一所有者排他を保持し、書込み/通知予約を止める。**通知取消の収束はこのコアの責任外**。
+2. `JournalV2WorktimeController.previewReset(sample:)`はOS時計と現在のJournal全行/Checkpoint CASを検証して日数・監査数・active状態を返す。**プレビュー中のDB変更はしない**。
+3. 利用者が削除範囲と旧世代の再利用不可を明示確認してから`commitReset`。プレビュー後の同revisionでのCheckpoint変更も拒否する。
+4. SQLite `BEGIN IMMEDIATE`内で元Journal全行・catalog・Checkpoint一致を再検証し、イベント/Checkpoint削除と新epoch採番をアトミックに確定する。
+5. 成功した場合、アプリケーション層セッションは新epochと空カタログに更新。失敗、書込み結果不確実、クラッシュ時は**既存セッションの継続利用/自動リトライを禁止**し、正常なDBから再ロードして世代を確認する。
+6. 同じepochからの厳密な旧Journal prefixのみを許す限定ロールバックは、reset後の旧epochアーカイブを拒否する。旧バックアップを自動採用しない。
+
+## 限定ロールバックの安全なアプリケーション層フロー
+
+- `previewRollback(file:sample:)`は読み取り専用。旧epoch・分岐履歴・active勤務・未来/不正な候補を拒否する。
+- 利用者が復元対象と失われる履歴を明示確認し、呼出し側が通知を止め、既存のない所有者専用ディレクトリの保存先を選ぶ。
+- `commitRollback`は**現在の正常世代全体を保全して読戻し照合したあと**SQLiteのCAS/新epochで復元する。保存失敗または競合なら置換しない。ファイルが公開された後の同期/読戻し失敗など曖昧な状態は安全側で停止し、自動再試行しない。
+
+## 中断・障害時の試験整理
+
+| 時点 | 期待される結果 | 今回の検証範囲 |
+|---|---|---|
+| 削除プレビューのみ | ライブDB/Checkpointは不変 | アプリケーション層の回帰テスト |
+| プレビュー後のCheckpoint単独更新 | 同revisionでもCAS不一致で削除拒否 | アプリケーション層の回帰テスト |
+| SQLite reset成功後 | 新epoch・空Journal・Checkpoint消失、旧画面状態の再表示なし | アプリケーション層の回帰テスト |
+| 旧epochの外部バックアップを検証 | 自動復活禁止、通常の限定復元も拒否 | アプリケーション層の回帰テスト |
+| 保全済み過去prefixへの限定復元 | 元世代を別ファイルに保全し、新epochで復元 | アプリケーション層の回帰テスト |
+| プレビュー後に新たな打刻 | stale確認案で復元拒否、保全先へ新規ファイルを書かない | アプリケーション層の回帰テスト |
+| SQLite COMMIT直前/直後の電源断 | 旧/新の一貫した世代からの再読込、曖昧結果の自動再試行禁止 | **未実施** |
+| 管理下バックアップ削除途中の強制終了 | 未完了表示/冪等な再開/誤削除なし | **未実装、未実施** |
+| UI通知の停止/実機確認 | 通知収束後のみ削除/復元 | **schema-2未接続、未実施** |
+| ファイルシステムの物理残存痕跡 | 完全消去を宣言しない | OSレベルの保証なし |
+
+## リリース判定
+
+この段階で完了するのは**schema-2アプリケーション層の論理reset・限定ロールバック接続**だけ。
+アプリ管理下バックアップ/診断ファイルの正規インベントリと削除、UI確認/通知収束、
+クラッシュ・ディスク不足・電源断の試験、実機QAおよびP0 148件の証跡は未完了。
+**v1.0はNO-GOのまま**。既存schema-1の`WorktimeController`や`DesktopModel`はこのPRで切り替えない。
