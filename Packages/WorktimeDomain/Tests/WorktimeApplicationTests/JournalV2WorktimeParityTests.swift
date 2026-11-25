@@ -35,7 +35,7 @@ struct JournalV2WorktimeParityTests {
             let profile = try WorkdayProfile()
             var ids: [UUID] = []
             for index in 0 ..< 31 {
-                ids.append(try ended(&controller, start: 100 + Int64(index) * 10, profile: profile))
+                try ids.append(ended(&controller, start: 100 + Int64(index) * 10, profile: profile))
             }
             let before = try JournalV2Repository(url: url).load(now: 500)
             let page = try controller.recentHistory(now: 500)
