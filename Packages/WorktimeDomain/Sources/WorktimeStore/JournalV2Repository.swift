@@ -8,6 +8,12 @@ public struct JournalV2Session {
     public let version: StoreVersion
     public let catalog: WorkdayCatalog
     public let checkpoint: ObservationCheckpoint?
+
+    /// schema-2 has a 100,000-row journal budget, distinct from the schema-1 limit.
+    public var journalCapacity: JournalCapacity {
+        JournalCapacity(revision: version.revision, limit: Int64(JournalRowCodec.maxRows))
+    }
+
     fileprivate let source: JournalV2LiveState
 
     fileprivate init(_ source: JournalV2LiveState) {
