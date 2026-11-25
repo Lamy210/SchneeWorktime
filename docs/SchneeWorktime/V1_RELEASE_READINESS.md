@@ -40,6 +40,13 @@ PR #117・#118によりschema-2イベント行ストアと観測Checkpointのト
 - `JournalV2WorktimeControllerTests`で基本打刻/新100,000行容量ビュー/ギャップ処理/起動復旧/休憩とCheckpoint/時計逆行/CAS競合/旧schema-1原本保全/出力の検証を追加する。
 - **本番切替ではない**。既存`WorktimeController`と`DesktopModel`の通常UI・履歴訂正/復元/削除/通知の接続はschema-1のまま。機能同等性、ロックの所有、旧テストのschema-2への全面移管、障害注入、実機QA後に正式切替する。v1.0は引き続き**NO-GO**。
 
+## schema-2の全履歴削除・限定復元のアプリ層接続（PR #127 検証中）
+
+- `JournalV2WorktimeController`へ`previewReset/commitReset`を追加し、時計の検証、プレビュー後の厳密なJournal全行/Checkpoint CAS、新epochへの切替を公開する。正常commit後は**このアプリセッションの状態も即時に新epochへ更新**し、消去した履歴を表示し続けない。
+- `previewRollback/commitRollback`もアプリ層へ追加。正常・同epochの過去の終了済みprefixに限定し、DB外の所有者専用保全先へ現世代を排他保存/読戻ししたうえで新epochへ復元する。保全できない場合は書き換えない。
+- 同revisionのCheckpoint競合、旧epochバックアップの拒否、異常時の原本保全、時計逆行、成功後の再起動での新epoch読み込みを回帰試験する。削除対象の暫定インベントリと障害境界は [SCHEMA2_RESET_SCOPE.md](SCHEMA2_RESET_SCOPE.md)。
+- **未完:** `DesktopModel`と既存`WorktimeController`はschema-1経路のまま。schema-2用のUI確認・通知停止、アプリ管理バックアップ/診断ファイルの削除と中断再開、実機/電源断QA、全P0の受入証跡は未完。論理削除を物理消去と誤認しない。**v1.0 NO-GO**。
+
 ## schema-2のレビュー・履歴訂正API（段階的実装）
 
 `JournalV2Corrections` はschema-2 `JournalV2Repository`に対し、観測欠損のレビュー、休憩開始/終了境界の訂正、過去の出勤/退勤時刻訂正を追加する。全操作は「読み取り専用のプレビュー → 元Journal行・カタログ・Checkpointを完全一致検査 → ドメインによる確認結果の再計算 → 監査イベント1件の原子的追記」を経る。別操作・epoch reset・同revisionのCheckpoint更新が起きれば古いプレビューは拒否する。原本イベントを削除・書き換えない。
