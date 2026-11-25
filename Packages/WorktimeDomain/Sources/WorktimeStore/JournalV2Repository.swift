@@ -89,6 +89,26 @@ public struct JournalV2Repository {
         ))
     }
 
+    /// Captures only an exact, still-current schema-2 generation. The observation
+    /// checkpoint is deliberately excluded: it must not be treated as fresh after restore.
+    public func makeBackup(now: Int64, matching session: JournalV2Session) throws -> Data {
+        let current = try revalidate(session, now: now)
+        return try JournalV2Backup.encode(current.source, now: now)
+    }
+
+    /// Publishes an immutable plaintext archive into a private owner-only directory.
+    /// Fails rather than overwriting an existing backup; no live DB mutation is performed.
+    public func writeBackup(
+        to destination: URL, now: Int64, matching session: JournalV2Session
+    ) throws {
+        let data = try makeBackup(now: now, matching: session)
+        try BackupFile.publish(data, to: destination)
+        // A failed readback after durable publication is ambiguous, never delete or retry blindly.
+        guard try BackupFile.load(destination) == data else {
+            throw JournalV2BackupError.invalidArchive
+        }
+    }
+
     /// Only called with a domain-validated preview bound to an exact loaded session.
     /// A replay of the proposed event must produce precisely the previewed catalog.
     func commitVerified(
