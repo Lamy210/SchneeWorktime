@@ -53,6 +53,12 @@ PR #117・#118によりschema-2イベント行ストアと観測Checkpointのト
 - schema-1の`CatalogCSV.encode`は共通レンダラを使うだけで、既存のCSV列構成・出力内容は変更しない。CSVは診断・閲覧用途であり、**復元用アーカイブではない**。
 - 24MiB上限、Controller未接続、OS実機QA未完了は継続する。本APIのテスト成功だけでv1.0をGOにしない。
 
+## schema-2限定ロールバックの内部実装（PR検証中）
+
+- schema-2に対して、同一epochの厳密な過去Journal prefixのみを対象とする`previewRollback/commitRollback`を追加。現行・候補にactive勤務がある場合、分岐履歴、旧epoch、陳腐化した確認案は拒否する。
+- 保存済み原本の完全なJSONバックアップをDB外の私有ディレクトリへ排他書出し・再読込検証してから、SQLite同一トランザクションでJournal置換・Checkpoint破棄・新epoch更新を行う。途中例外でのROLLBACK回帰テストを追加。
+- 詳細は[JOURNAL_V2_ROLLBACK.md](JOURNAL_V2_ROLLBACK.md)。本APIは破損DB復旧・任意アーカイブ復元ではない。Controller未接続、現在の24MiB保全上限、macOS実機・障害QA未完につき、**v1.0はNO-GO**のまま。
+
 ## P0証跡の再監査（CIで自動照合するインベントリ）
 
 - [P0_RELEASE_EVIDENCE.json](P0_RELEASE_EVIDENCE.json) は148件を一意に列挙し、8つの横断ゲートを同じ形式で管理する。初期状態は `unverified`、資料から欠落が確認された項目だけ `blocked` とし、CI成功やコード存在をもって `passed` に自動昇格しない。
