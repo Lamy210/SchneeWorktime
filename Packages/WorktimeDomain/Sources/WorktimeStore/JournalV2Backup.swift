@@ -26,6 +26,9 @@ struct JournalV2RestorableBackup {
 public enum JournalV2Backup {
     private static let format = "schneeworktime-journal"
     private static let version = 2
+    /// 64MiB raw event rows expand to <90MiB of Base64 JSON with <=100,000 rows.
+    /// Keep headroom while rejecting oversized archives before JSON decoding.
+    static let maxBytes = BackupFile.maxSupportedBytes
 
     private struct Archive: Codable {
         let format: String
@@ -48,7 +51,7 @@ public enum JournalV2Backup {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
         let data = try encoder.encode(archive)
-        guard data.count <= BackupFile.maxBytes else { throw JournalV2BackupError.tooLarge }
+        guard data.count <= maxBytes else { throw JournalV2BackupError.tooLarge }
         return data
     }
 
@@ -63,7 +66,7 @@ public enum JournalV2Backup {
     /// Validate the complete payload before it can be compared to a committed journal prefix.
     /// This does not authenticate the file or authorize applying it to another epoch.
     static func decodeValidated(_ data: Data, now: Int64) throws -> JournalV2RestorableBackup {
-        guard data.count <= BackupFile.maxBytes else { throw JournalV2BackupError.tooLarge }
+        guard data.count <= maxBytes else { throw JournalV2BackupError.tooLarge }
         let archive: Archive
         do {
             archive = try JSONDecoder().decode(Archive.self, from: data)
