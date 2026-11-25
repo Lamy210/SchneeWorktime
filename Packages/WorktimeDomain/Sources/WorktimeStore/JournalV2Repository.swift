@@ -22,9 +22,11 @@ public struct JournalV2Session {
 /// The application coordinator must own its private directory/session lock.
 public struct JournalV2Repository {
     private let store: JournalV2LiveStore
+    private let databaseURL: URL
 
     public init(url: URL, createIfMissing: Bool = false) throws {
-        store = try JournalV2LiveStore(url: url, createIfMissing: createIfMissing)
+        databaseURL = try DatabaseFileGuard.canonicalURL(url)
+        store = try JournalV2LiveStore(url: databaseURL, createIfMissing: createIfMissing)
     }
 
     public func load(now: Int64) throws -> JournalV2Session {
@@ -172,5 +174,80 @@ public extension JournalV2Repository {
     func commitReset(_ preview: JournalV2ResetPreview, now: Int64) throws -> JournalV2Session {
         _ = try revalidate(preview.session, now: now)
         return try JournalV2Session(store.reset(matching: preview.session.source, now: now))
+    }
+}
+
+public struct JournalV2RollbackProposal {
+    public let currentVersion: StoreVersion
+    public let sourceVersion: StoreVersion
+    public let currentDays: Int
+    public let restoredDays: Int
+    fileprivate let session: JournalV2Session
+    fileprivate let candidate: JournalV2RestorableBackup
+}
+
+public extension JournalV2Repository {
+    /// Preview one private schema-2 backup; no files or databases are modified.
+    func previewRollback(
+        file: URL, now: Int64, matching session: JournalV2Session
+    ) throws -> JournalV2RollbackProposal {
+        try previewRollback(from: BackupFile.load(file), now: now, matching: session)
+    }
+
+    /// Accept only exact historical prefixes from this healthy, ended generation.
+    /// Captured row bytes are used at commit instead of reopening a replaceable archive file.
+    func previewRollback(
+        from data: Data, now: Int64, matching session: JournalV2Session
+    ) throws -> JournalV2RollbackProposal {
+        let current = try revalidate(session, now: now)
+        let candidate = try JournalV2Backup.decodeValidated(data, now: now)
+        try Self.verifyRollbackCandidate(candidate, against: current)
+        return JournalV2RollbackProposal(
+            currentVersion: current.version, sourceVersion: candidate.version,
+            currentDays: current.catalog.days.count, restoredDays: candidate.catalog.days.count,
+            session: current, candidate: candidate
+        )
+    }
+
+    /// Caller must explicitly confirm, quiesce writers/notifications, and provide
+    /// a *new* owner-only preservation destination outside the database directory.
+    /// A failed preservation aborts before any live DB change.
+    func commitRollback(
+        _ proposal: JournalV2RollbackProposal, preserveCurrentAt destination: URL, now: Int64
+    ) throws -> JournalV2Session {
+        let current = try revalidate(proposal.session, now: now)
+        try Self.verifyRollbackCandidate(proposal.candidate, against: current)
+
+        let sourceDirectory = databaseURL.deletingLastPathComponent().pathComponents
+        let destinationDirectory = destination.deletingLastPathComponent()
+            .resolvingSymlinksInPath().pathComponents
+        guard !destinationDirectory.starts(with: sourceDirectory) else {
+            throw BackupFileError.invalidDestination
+        }
+
+        // Verify and durably preserve the exact committed generation, then verify again
+        // inside the SQLite write transaction to reject any concurrent mutation.
+        try writeBackup(to: destination, now: now, matching: current)
+        let restored = try store.replaceForRollback(
+            proposal.candidate, matching: current.source, now: now
+        )
+        return JournalV2Session(restored)
+    }
+
+    private static func verifyRollbackCandidate(
+        _ candidate: JournalV2RestorableBackup, against current: JournalV2Session
+    ) throws {
+        guard candidate.version.epoch == current.version.epoch else {
+            throw CatalogRollbackError.differentGeneration
+        }
+        guard candidate.version.revision > 0,
+              candidate.version.revision < current.version.revision
+        else { throw CatalogRollbackError.notEarlier }
+        guard current.catalog.activeID == nil, candidate.catalog.activeID == nil else {
+            throw CatalogRollbackError.activeWorkday
+        }
+        guard current.source.rows.prefix(candidate.rows.count).elementsEqual(candidate.rows) else {
+            throw CatalogRollbackError.divergentHistory
+        }
     }
 }
