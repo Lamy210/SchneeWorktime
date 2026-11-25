@@ -222,10 +222,13 @@ jobs:
           test -f api-extracted/release-input/unsigned-macos-app.tar.gz
           test -f api-extracted/release-input/build-provenance.json
 
+      # The same-job internal artifact catalog may not expose the freshly uploaded ID.
+      # Force the read-only GitHub API route after exact ID, digest and ZIP validation.
       - name: Download namespaced release artifact fixture
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           artifact-ids: ${{ steps.upload.outputs.artifact-id }}
+          github-token: ${{ github.token }}
           path: downloaded
           merge-multiple: true
 
