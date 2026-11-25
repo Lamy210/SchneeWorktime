@@ -31,7 +31,7 @@ struct JournalV2WorktimeControllerTests {
             ))
             #expect(started.day.state == .working)
             #expect(controller.version.revision == 1)
-            #expect(controller.journalCapacity.remainingEvents == 99_999)
+            #expect(controller.journalCapacity.remainingEvents == 99999)
             let persisted = try JournalV2Repository(url: url).load(now: 100)
             #expect(persisted.version == controller.version)
             #expect(persisted.checkpoint?.observedAt == 100)
