@@ -175,46 +175,9 @@ struct JournalV2LiveStore {
         guard replayed == candidate.catalog else { throw JournalMigrationError.verificationFailed }
         try Self.connect(url, flags: SQLITE_OPEN_READWRITE) { db in
             try Self.transaction(db) {
-                let current = try Self.read(db, now: now)
-                guard current.version == expected.version else { throw SnapshotStoreError.staleVersion }
-                guard current.rows == expected.rows, current.catalog == expected.catalog,
-                      current.checkpoint == expected.checkpoint
-                else { throw JournalMigrationError.verificationFailed }
-                guard candidate.version.epoch == current.version.epoch else {
-                    throw CatalogRollbackError.differentGeneration
-                }
-                guard candidate.version.revision > 0,
-                      candidate.version.revision < current.version.revision
-                else { throw CatalogRollbackError.notEarlier }
-                guard current.catalog.activeID == nil, candidate.catalog.activeID == nil else {
-                    throw CatalogRollbackError.activeWorkday
-                }
-                guard current.rows.prefix(candidate.rows.count).elementsEqual(candidate.rows) else {
-                    throw CatalogRollbackError.divergentHistory
-                }
-
-                try Self.execute(db, "DELETE FROM journal_event")
-                try Self.execute(db, "DELETE FROM observation_checkpoint")
-                for row in candidate.rows {
-                    try Self.statement(db, "INSERT INTO journal_event (sequence, payload) VALUES (?, ?)") { stmt in
-                        try Self.check(sqlite3_bind_int64(stmt, 1, row.sequence))
-                        try Self.bind(row.payload, at: 2, in: stmt)
-                        try Self.check(sqlite3_step(stmt), expected: SQLITE_DONE)
-                    }
-                }
-                try Self.statement(db, """
-                UPDATE live_generation SET epoch = ?, revision = ?
-                WHERE id = 1 AND epoch = ? AND revision = ?
-                """) { stmt in
-                    try Self.check(sqlite3_bind_text(stmt, 1, next.epoch.uuidString, -1, Self.transient))
-                    try Self.check(sqlite3_bind_int64(stmt, 2, next.revision))
-                    try Self.check(sqlite3_bind_text(
-                        stmt, 3, current.version.epoch.uuidString, -1, Self.transient
-                    ))
-                    try Self.check(sqlite3_bind_int64(stmt, 4, current.version.revision))
-                    try Self.check(sqlite3_step(stmt), expected: SQLITE_DONE)
-                    guard sqlite3_changes(db) == 1 else { throw SnapshotStoreError.staleVersion }
-                }
+                try Self.applyRollbackRows(
+                    candidate, matching: expected, next: next, now: now, db: db
+                )
                 try beforeCommit?()
             }
         }
@@ -280,6 +243,53 @@ struct JournalV2LiveStore {
 }
 
 private extension JournalV2LiveStore {
+    /// Invoked only after BEGIN IMMEDIATE. Every check runs before any DELETE.
+    private static func applyRollbackRows(
+        _ candidate: JournalV2RestorableBackup, matching expected: JournalV2LiveState,
+        next: StoreVersion, now: Int64, db: OpaquePointer
+    ) throws {
+        let current = try Self.read(db, now: now)
+        guard current.version == expected.version else { throw SnapshotStoreError.staleVersion }
+        guard current.rows == expected.rows, current.catalog == expected.catalog,
+              current.checkpoint == expected.checkpoint
+        else { throw JournalMigrationError.verificationFailed }
+        guard candidate.version.epoch == current.version.epoch else {
+            throw CatalogRollbackError.differentGeneration
+        }
+        guard candidate.version.revision > 0,
+              candidate.version.revision < current.version.revision
+        else { throw CatalogRollbackError.notEarlier }
+        guard current.catalog.activeID == nil, candidate.catalog.activeID == nil else {
+            throw CatalogRollbackError.activeWorkday
+        }
+        guard current.rows.prefix(candidate.rows.count).elementsEqual(candidate.rows) else {
+            throw CatalogRollbackError.divergentHistory
+        }
+
+        try Self.execute(db, "DELETE FROM journal_event")
+        try Self.execute(db, "DELETE FROM observation_checkpoint")
+        for row in candidate.rows {
+            try Self.statement(db, "INSERT INTO journal_event (sequence, payload) VALUES (?, ?)") { stmt in
+                try Self.check(sqlite3_bind_int64(stmt, 1, row.sequence))
+                try Self.bind(row.payload, at: 2, in: stmt)
+                try Self.check(sqlite3_step(stmt), expected: SQLITE_DONE)
+            }
+        }
+        try Self.statement(db, """
+        UPDATE live_generation SET epoch = ?, revision = ?
+        WHERE id = 1 AND epoch = ? AND revision = ?
+        """) { stmt in
+            try Self.check(sqlite3_bind_text(stmt, 1, next.epoch.uuidString, -1, Self.transient))
+            try Self.check(sqlite3_bind_int64(stmt, 2, next.revision))
+            try Self.check(sqlite3_bind_text(
+                stmt, 3, current.version.epoch.uuidString, -1, Self.transient
+            ))
+            try Self.check(sqlite3_bind_int64(stmt, 4, current.version.revision))
+            try Self.check(sqlite3_step(stmt), expected: SQLITE_DONE)
+            guard sqlite3_changes(db) == 1 else { throw SnapshotStoreError.staleVersion }
+        }
+    }
+
     /// Only runs inside BEGIN IMMEDIATE; validation and CAS are committed together.
     private static func insertAppend(
         _ event: JournalEvent, matching expected: JournalV2LiveState,
