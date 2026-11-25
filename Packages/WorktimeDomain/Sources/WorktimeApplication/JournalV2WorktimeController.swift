@@ -11,9 +11,17 @@ public struct JournalV2WorktimeController {
     private var session: JournalV2Session
     private var clock: ClockObservation
 
-    public var version: StoreVersion { session.version }
-    public var checkpoint: ObservationCheckpoint? { session.checkpoint }
-    public var journalCapacity: JournalCapacity { session.journalCapacity }
+    public var version: StoreVersion {
+        session.version
+    }
+
+    public var checkpoint: ObservationCheckpoint? {
+        session.checkpoint
+    }
+
+    public var journalCapacity: JournalCapacity {
+        session.journalCapacity
+    }
 
     /// Fresh schema-2 files only. An existing schema-1/unknown DB is never converted or erased.
     public init(url: URL, createIfMissing: Bool = false, sample: ClockSample) throws {
@@ -67,7 +75,9 @@ public struct JournalV2WorktimeController {
     private mutating func recoverOpenInterval(sample: ClockSample) throws {
         guard let day = activeWorkingDay, let start = day.intervals.last?.start else { return }
         let known = session.checkpoint?.observedAt
-        if let known, known > sample.wall { throw ApplicationClockError.unreliableClock }
+        if let known, known > sample.wall {
+            throw ApplicationClockError.unreliableClock
+        }
         let unknownStart = max(start, known ?? start)
         if unknownStart < sample.wall {
             session = try repository.recordObservation(
@@ -81,7 +91,9 @@ public struct JournalV2WorktimeController {
         guard let day = activeWorkingDay else { return }
         if let observed = session.checkpoint?.observedAt {
             guard observed <= sample.wall else { throw ApplicationClockError.unreliableClock }
-            if sample.wall - observed < 10 { return }
+            if sample.wall - observed < 10 {
+                return
+            }
         }
         session = try repository.saveObservationCheckpoint(
             dayID: day.id, observedAt: sample.wall, now: sample.wall, matching: session
