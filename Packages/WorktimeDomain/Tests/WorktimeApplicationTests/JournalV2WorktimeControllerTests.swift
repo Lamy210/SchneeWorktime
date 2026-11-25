@@ -2,7 +2,7 @@ import Foundation
 import Testing
 import WorktimeApplication
 import WorktimeDomain
-import WorktimeStore
+@testable import WorktimeStore
 
 struct JournalV2WorktimeControllerTests {
     private func sample(_ seconds: Int64) throws -> ClockSample {
@@ -25,10 +25,12 @@ struct JournalV2WorktimeControllerTests {
                 url: url, createIfMissing: true, sample: sample(100)
             )
             #expect(controller.journalCapacity.remainingEvents == 100_000)
-            #expect(try controller.refresh(sample: sample(100))?.day == nil)
-            let started = try #require(controller.perform(
+            let empty = try controller.refresh(sample: sample(100))
+            #expect(empty?.day == nil)
+            let startResult = try controller.perform(
                 .clockIn(id: UUID(), profile: WorkdayProfile()), sample: sample(100)
-            ))
+            )
+            let started = try #require(startResult)
             #expect(started.day.state == .working)
             #expect(controller.version.revision == 1)
             #expect(controller.journalCapacity.remainingEvents == 99999)
@@ -49,13 +51,15 @@ struct JournalV2WorktimeControllerTests {
             )
             _ = try controller.refresh(sample: sample(110))
             #expect(controller.checkpoint?.observedAt == 110)
-            let gap = try #require(controller.refresh(sample: sample(140)))
+            let gapResult = try controller.refresh(sample: sample(140))
+            let gap = try #require(gapResult)
             #expect(gap.snapshot.bounds.lower == 10)
             #expect(gap.snapshot.bounds.upper == 40)
             #expect(controller.checkpoint?.observedAt == 140)
-            let ended = try #require(controller.perform(
+            let endedResult = try controller.perform(
                 .clockOut(confirmBreak: false), sample: sample(150)
-            ))
+            )
+            let ended = try #require(endedResult)
             // The ten seconds after the latest observation are verified work.
             #expect(ended.snapshot.bounds.lower == 20)
             #expect(ended.snapshot.bounds.upper == 50)
@@ -63,7 +67,8 @@ struct JournalV2WorktimeControllerTests {
             let saved = try JournalV2Repository(url: url).load(now: 160)
             #expect(saved.catalog.observations[ended.day.id]?.count == 1)
             var reopened = try JournalV2WorktimeController(url: url, sample: sample(160))
-            let result = try #require(reopened.refresh(sample: sample(160)))
+            let restoredResult = try reopened.refresh(sample: sample(160))
+            let result = try #require(restoredResult)
             #expect(result.snapshot == ended.snapshot)
         }
     }
@@ -78,7 +83,8 @@ struct JournalV2WorktimeControllerTests {
             )
             _ = try first.refresh(sample: sample(110))
             var reopened = try JournalV2WorktimeController(url: url, sample: sample(200))
-            let current = try #require(reopened.refresh(sample: sample(210)))
+            let currentResult = try reopened.refresh(sample: sample(210))
+            let current = try #require(currentResult)
             // Checkpoint at 110 and live observation from 200 to 210 each
             // contribute ten verified seconds; only 110...200 is uncertain.
             #expect(current.snapshot.bounds.lower == 20)
@@ -103,7 +109,8 @@ struct JournalV2WorktimeControllerTests {
             _ = try controller.perform(.startBreak, sample: sample(110))
             #expect(controller.checkpoint == nil)
             var reopened = try JournalV2WorktimeController(url: url, sample: sample(200))
-            let duringBreak = try #require(reopened.refresh(sample: sample(200)))
+            let breakResult = try reopened.refresh(sample: sample(200))
+            let duringBreak = try #require(breakResult)
             #expect(duringBreak.day.state == .onBreak)
             #expect(duringBreak.snapshot.bounds.lower == 10)
             #expect(duringBreak.snapshot.bounds.upper == 10)
