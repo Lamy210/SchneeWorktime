@@ -469,15 +469,15 @@ private extension JournalV2WorktimeController {
     ) throws -> JournalV2Session {
         switch candidate {
         case let .review(plan):
-            return try repository.commitReview(plan, now: now, observedAt: observedAt)
+            try repository.commitReview(plan, now: now, observedAt: observedAt)
         case let .restStart(plan):
-            return try repository.commitRestStartCorrection(plan, now: now, observedAt: observedAt)
+            try repository.commitRestStartCorrection(plan, now: now, observedAt: observedAt)
         case let .restEnd(plan):
-            return try repository.commitRestEndCorrection(plan, now: now, observedAt: observedAt)
+            try repository.commitRestEndCorrection(plan, now: now, observedAt: observedAt)
         case let .clockIn(plan):
-            return try repository.commitClockInCorrection(plan, now: now, observedAt: observedAt)
+            try repository.commitClockInCorrection(plan, now: now, observedAt: observedAt)
         case let .clockOut(plan):
-            return try repository.commitClockOutCorrection(plan, now: now, observedAt: observedAt)
+            try repository.commitClockOutCorrection(plan, now: now, observedAt: observedAt)
         }
     }
 
