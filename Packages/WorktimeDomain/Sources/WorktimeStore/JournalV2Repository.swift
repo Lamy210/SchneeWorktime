@@ -104,9 +104,9 @@ public struct JournalV2Repository {
         to destination: URL, now: Int64, matching session: JournalV2Session
     ) throws {
         let data = try makeBackup(now: now, matching: session)
-        try BackupFile.publish(data, to: destination)
+        try BackupFile.publish(data, to: destination, maxBytes: JournalV2Backup.maxBytes)
         // A failed readback after durable publication is ambiguous, never delete or retry blindly.
-        guard try BackupFile.load(destination) == data else {
+        guard try BackupFile.load(destination, maxBytes: JournalV2Backup.maxBytes) == data else {
             throw JournalV2BackupError.invalidArchive
         }
     }
@@ -191,7 +191,10 @@ public extension JournalV2Repository {
     func previewRollback(
         file: URL, now: Int64, matching session: JournalV2Session
     ) throws -> JournalV2RollbackProposal {
-        try previewRollback(from: BackupFile.load(file), now: now, matching: session)
+        try previewRollback(
+            from: BackupFile.load(file, maxBytes: JournalV2Backup.maxBytes),
+            now: now, matching: session
+        )
     }
 
     /// Accept only exact historical prefixes from this healthy, ended generation.
