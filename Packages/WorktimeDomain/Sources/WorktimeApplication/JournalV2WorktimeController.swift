@@ -256,7 +256,7 @@ public struct JournalV2WorktimeController {
         }
     }
 
-    // Package-internal for schema-2 confirmation flows in JournalV2WorktimeIntent.
+    /// Package-internal for schema-2 confirmation flows in JournalV2WorktimeIntent.
     mutating func saveCheckpoint(sample: ClockSample) throws {
         guard let day = activeWorkingDay else { return }
         if let observed = session.checkpoint?.observedAt {
