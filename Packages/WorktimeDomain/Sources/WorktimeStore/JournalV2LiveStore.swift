@@ -158,6 +158,78 @@ struct JournalV2LiveStore {
         }
     }
 
+    /// Atomically replaces a healthy, ended journal with a validated older prefix.
+    /// A new epoch fences all old sessions. Caller must first durably preserve the current journal.
+    /// The optional hook is used only for failure-injection tests before SQLite COMMIT.
+    func replaceForRollback(
+        _ candidate: JournalV2RestorableBackup, matching expected: JournalV2LiveState,
+        now: Int64, beforeCommit: (() throws -> Void)? = nil
+    ) throws -> JournalV2LiveState {
+        let next = StoreVersion(epoch: UUID(), revision: candidate.version.revision)
+        guard try DatabaseFileGuard.preservationIdentity(url) == fileIdentity else {
+            throw DatabaseFileError.unsafeFile
+        }
+        let replayed = try JournalRowCodec.replay(
+            candidate.rows, revision: candidate.version.revision, now: now
+        )
+        guard replayed == candidate.catalog else { throw JournalMigrationError.verificationFailed }
+        try Self.connect(url, flags: SQLITE_OPEN_READWRITE) { db in
+            try Self.transaction(db) {
+                let current = try Self.read(db, now: now)
+                guard current.version == expected.version else { throw SnapshotStoreError.staleVersion }
+                guard current.rows == expected.rows, current.catalog == expected.catalog,
+                      current.checkpoint == expected.checkpoint
+                else { throw JournalMigrationError.verificationFailed }
+                guard candidate.version.epoch == current.version.epoch else {
+                    throw CatalogRollbackError.differentGeneration
+                }
+                guard candidate.version.revision > 0,
+                      candidate.version.revision < current.version.revision
+                else { throw CatalogRollbackError.notEarlier }
+                guard current.catalog.activeID == nil, candidate.catalog.activeID == nil else {
+                    throw CatalogRollbackError.activeWorkday
+                }
+                guard current.rows.prefix(candidate.rows.count).elementsEqual(candidate.rows) else {
+                    throw CatalogRollbackError.divergentHistory
+                }
+
+                try Self.execute(db, "DELETE FROM journal_event")
+                try Self.execute(db, "DELETE FROM observation_checkpoint")
+                for row in candidate.rows {
+                    try Self.statement(db, "INSERT INTO journal_event (sequence, payload) VALUES (?, ?)") { stmt in
+                        try Self.check(sqlite3_bind_int64(stmt, 1, row.sequence))
+                        try Self.bind(row.payload, at: 2, in: stmt)
+                        try Self.check(sqlite3_step(stmt), expected: SQLITE_DONE)
+                    }
+                }
+                try Self.statement(db, """
+                UPDATE live_generation SET epoch = ?, revision = ?
+                WHERE id = 1 AND epoch = ? AND revision = ?
+                """) { stmt in
+                    try Self.check(sqlite3_bind_text(stmt, 1, next.epoch.uuidString, -1, Self.transient))
+                    try Self.check(sqlite3_bind_int64(stmt, 2, next.revision))
+                    try Self.check(sqlite3_bind_text(
+                        stmt, 3, current.version.epoch.uuidString, -1, Self.transient
+                    ))
+                    try Self.check(sqlite3_bind_int64(stmt, 4, current.version.revision))
+                    try Self.check(sqlite3_step(stmt), expected: SQLITE_DONE)
+                    guard sqlite3_changes(db) == 1 else { throw SnapshotStoreError.staleVersion }
+                }
+                try beforeCommit?()
+            }
+        }
+        // A failed readback after COMMIT must never prompt a blind retry.
+        do {
+            let committed = try load(now: now)
+            guard committed.version == next, committed.rows == candidate.rows,
+                  committed.catalog == candidate.catalog, committed.checkpoint == nil
+            else { throw JournalMigrationError.verificationFailed }
+            return committed
+        } catch {
+            throw JournalV2LiveWriteError.committedButUnverified(next)
+        }
+    }
+
     /// Saves a fresh observation against the exact current epoch/revision without adding attendance.
     /// This metadata is not independent evidence of actual work. Caller must validate the OS clock.
     func saveObservationCheckpoint(
