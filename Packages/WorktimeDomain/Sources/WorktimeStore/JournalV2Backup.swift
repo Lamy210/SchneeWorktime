@@ -81,8 +81,12 @@ public enum JournalV2Backup {
         let events = try JournalRowCodec.decode(rows, revision: revision)
         var previous: Int64?
         for event in events {
-            guard event.now <= now else { throw CatalogPersistenceError.futureEvent }
-            if let previous, event.now < previous { throw JournalMigrationError.invalidEvent }
+            guard event.now <= now else {
+                throw CatalogPersistenceError.futureEvent
+            }
+            if let previous, event.now < previous {
+                throw JournalMigrationError.invalidEvent
+            }
             previous = event.now
         }
         return try JournalRowCodec.replay(rows, revision: revision, now: now)
