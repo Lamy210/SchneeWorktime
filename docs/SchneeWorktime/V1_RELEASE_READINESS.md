@@ -33,6 +33,13 @@ PR #117・#118によりschema-2イベント行ストアと観測Checkpointのト
 
 **このAPIを追加しても、現行の`WorktimeController`は依然schema-1の`CatalogRepository`を使用する。** 既存の履歴訂正・復元・CSV/バックアップ・起動時復旧を一度に置換せず、schema-2での同等機能の実装・試験を進めてからControllerの本番接続を変更する。未リリースのためschema-1への後方互換や自動移行は不要だが、開発用既存DBの無断消去は禁止する。
 
+## schema-2アプリケーション層セッション（段階的移行・検証中）
+
+- `JournalV2WorktimeController`を`WorktimeApplication`に独立追加。新規schema-2 DBのみを開き、`ClockSample`の単調時刻/壁時計検証、起動時に観測できなかった稼働区間の不確実記録、打刻・休憩・再開・定期Checkpoint、バックアップ・CSV保存を`JournalV2Repository`経由で実行する。
+- 新規勤務開始・休憩終了・勤務再開では、打刻イベントと初回観測CheckpointをSQLite同一トランザクションへ記録する。スリープ/観測欠落からの復帰時も不確実区間のイベントと観測時刻を同一トランザクションに書く。schema-2のフルJournal/Checkpoint CASで古いセッションを拒否する。
+- `JournalV2WorktimeControllerTests`で基本打刻/新100,000行容量ビュー/ギャップ処理/起動復旧/休憩とCheckpoint/時計逆行/CAS競合/旧schema-1原本保全/出力の検証を追加する。
+- **本番切替ではない**。既存`WorktimeController`と`DesktopModel`の通常UI・履歴訂正/復元/削除/通知の接続はschema-1のまま。機能同等性、ロックの所有、旧テストのschema-2への全面移管、障害注入、実機QA後に正式切替する。v1.0は引き続き**NO-GO**。
+
 ## schema-2のレビュー・履歴訂正API（段階的実装）
 
 `JournalV2Corrections` はschema-2 `JournalV2Repository`に対し、観測欠損のレビュー、休憩開始/終了境界の訂正、過去の出勤/退勤時刻訂正を追加する。全操作は「読み取り専用のプレビュー → 元Journal行・カタログ・Checkpointを完全一致検査 → ドメインによる確認結果の再計算 → 監査イベント1件の原子的追記」を経る。別操作・epoch reset・同revisionのCheckpoint更新が起きれば古いプレビューは拒否する。原本イベントを削除・書き換えない。
