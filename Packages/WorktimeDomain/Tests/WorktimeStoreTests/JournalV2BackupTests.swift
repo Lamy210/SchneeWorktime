@@ -117,7 +117,7 @@ struct JournalV2BackupTests {
                 try JournalV2Backup.inspect(Data("invalid-json".utf8), now: 120)
             }
             #expect(throws: JournalV2BackupError.tooLarge) {
-                try JournalV2Backup.inspect(Data(repeating: 0, count: BackupFile.maxBytes + 1), now: 120)
+                try JournalV2Backup.inspect(Data(repeating: 0, count: JournalV2Backup.maxBytes + 1), now: 120)
             }
             #expect(throws: CatalogPersistenceError.futureEvent) {
                 try JournalV2Backup.inspect(valid, now: 99)
