@@ -54,6 +54,13 @@ PR #117・#118によりschema-2イベント行ストアと観測Checkpointのト
 - 勤務中の休憩見込み変更はJournalと新しい観測Checkpointを同一SQLiteトランザクションに書く。休憩中は勤務観測を新規作成しない。変更なし要求でもCASを検証する。
 - [2026-11-25リリースブロッカー再監査](RELEASE_BLOCKER_AUDIT_2026_11_25.md)参照。**本番`WorktimeController`/`DesktopModel`はschema-1のまま**。レビュー/履歴訂正・予定退勤・外部エクスポートなどの全機能の切替、削除の完全性、RC/実機・P0証跡は未完。**NO-GO継続**。
 
+## schema-2訂正操作のアプリケーション層接続（PR #129 検証中）
+
+- `JournalV2WorktimeController`へ、既存のschema-2 `JournalV2Corrections`を使用する監査付きプレビュー/確定APIを追加。観測欠損区間のレビュー、休憩開始/終了境界、出勤/退勤時刻の変更を扱う。変更前後の`WorktimeGlance`を提示し、ユーザーの明示確認前には書込しない。
+- 選択した過去日と表示中の履歴はepoch/revision・元Workdayに紐付け、古い表示や別セッションからのCheckpoint-only更新をDB全行/Checkpoint CASで拒否。勤務中の過去日訂正をコミットする場合、**監査イベントと現在勤務中の観測Checkpointを同じSQLiteトランザクションで保存する**（休憩中・終了済みはCheckpointを生成しない）。
+- 訂正前/訂正後の見込み、出勤時刻訂正の期間集計影響をプレビューに含める。異常な壁時計、15秒超の観測ギャップがある場合は非破壊で拒否する。未確認の勤務時間を訂正だけで確定しない。
+- **残るP0:** 現行`DesktopModel`はschema-1 `WorktimeController`を使用。通知のキャンセル/再予約と履歴訂正UIの統合、予定退勤/過去始業のアプリ層差分、管理下全ファイルの削除・破損DB/容量限界、実機と受入証跡は未完。v1.0は引き続きNO-GO。
+
 ## schema-2のレビュー・履歴訂正API（段階的実装）
 
 `JournalV2Corrections` はschema-2 `JournalV2Repository`に対し、観測欠損のレビュー、休憩開始/終了境界の訂正、過去の出勤/退勤時刻訂正を追加する。全操作は「読み取り専用のプレビュー → 元Journal行・カタログ・Checkpointを完全一致検査 → ドメインによる確認結果の再計算 → 監査イベント1件の原子的追記」を経る。別操作・epoch reset・同revisionのCheckpoint更新が起きれば古いプレビューは拒否する。原本イベントを削除・書き換えない。

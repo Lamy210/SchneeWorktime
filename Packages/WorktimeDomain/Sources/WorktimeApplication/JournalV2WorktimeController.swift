@@ -7,9 +7,11 @@ import WorktimeStore
 /// The caller owns the exclusive session/directory lock and must discard this
 /// value after any clock or storage error, especially an ambiguous COMMIT.
 public struct JournalV2WorktimeController {
-    private let repository: JournalV2Repository
-    private var session: JournalV2Session
-    private var clock: ClockObservation
+    // Shared only inside WorktimeApplication with the audited correction coordinator.
+    // No caller may bypass the repository's full Journal/checkpoint CAS fence.
+    let repository: JournalV2Repository
+    var session: JournalV2Session
+    var clock: ClockObservation
 
     public var version: StoreVersion {
         session.version
@@ -282,7 +284,7 @@ public struct JournalV2WorktimeController {
         clock = nextClock
     }
 
-    private func glance(now: Int64) throws -> WorktimeGlance? {
+    func glance(now: Int64) throws -> WorktimeGlance? {
         guard !session.catalog.days.isEmpty else { return nil }
         return try WorktimeGlance(catalog: session.catalog, now: now)
     }

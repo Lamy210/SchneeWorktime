@@ -40,7 +40,9 @@ public extension JournalV2Repository {
     }
 
     /// The domain preview is rechecked, then the correction is written as an audit event.
-    func commitReview(_ proposal: JournalV2ReviewProposal, now: Int64) throws -> JournalV2Session {
+    func commitReview(
+        _ proposal: JournalV2ReviewProposal, now: Int64, observedAt: Int64? = nil
+    ) throws -> JournalV2Session {
         let source = try revalidate(proposal.source, now: now)
         var expected = source.catalog
         try expected.commitReview(proposal.preview, now: now)
@@ -51,7 +53,8 @@ public extension JournalV2Repository {
             classification: JournalClassification(preview.review.classification)
         )
         return try commitVerified(
-            JournalEvent(action: action, now: now), matching: source, previewedCatalog: expected
+            JournalEvent(action: action, now: now), matching: source,
+            previewedCatalog: expected, observedAt: observedAt
         )
     }
 
@@ -78,17 +81,17 @@ public extension JournalV2Repository {
     }
 
     func commitRestEndCorrection(
-        _ proposal: JournalV2RestCorrectionProposal, now: Int64
+        _ proposal: JournalV2RestCorrectionProposal, now: Int64, observedAt: Int64? = nil
     ) throws -> JournalV2Session {
         guard proposal.preview.boundary == .end else { throw RestEndCorrectionError.changedPreview }
-        return try commitRestBoundary(proposal, now: now)
+        return try commitRestBoundary(proposal, now: now, observedAt: observedAt)
     }
 
     func commitRestStartCorrection(
-        _ proposal: JournalV2RestCorrectionProposal, now: Int64
+        _ proposal: JournalV2RestCorrectionProposal, now: Int64, observedAt: Int64? = nil
     ) throws -> JournalV2Session {
         guard proposal.preview.boundary == .start else { throw RestEndCorrectionError.changedPreview }
-        return try commitRestBoundary(proposal, now: now)
+        return try commitRestBoundary(proposal, now: now, observedAt: observedAt)
     }
 
     func previewClockOutCorrection(
@@ -103,7 +106,7 @@ public extension JournalV2Repository {
     }
 
     func commitClockOutCorrection(
-        _ proposal: JournalV2ClockOutCorrectionProposal, now: Int64
+        _ proposal: JournalV2ClockOutCorrectionProposal, now: Int64, observedAt: Int64? = nil
     ) throws -> JournalV2Session {
         let source = try revalidate(proposal.source, now: now)
         var expected = source.catalog
@@ -113,7 +116,8 @@ public extension JournalV2Repository {
             dayID: preview.dayID, oldEnd: preview.oldEnd, newEnd: preview.newEnd
         )
         return try commitVerified(
-            JournalEvent(action: action, now: now), matching: source, previewedCatalog: expected
+            JournalEvent(action: action, now: now), matching: source,
+            previewedCatalog: expected, observedAt: observedAt
         )
     }
 
@@ -129,19 +133,20 @@ public extension JournalV2Repository {
     }
 
     func commitClockInCorrection(
-        _ proposal: JournalV2ClockInCorrectionProposal, now: Int64
+        _ proposal: JournalV2ClockInCorrectionProposal, now: Int64, observedAt: Int64? = nil
     ) throws -> JournalV2Session {
         let source = try revalidate(proposal.source, now: now)
         var expected = source.catalog
         try expected.commitClockInCorrection(proposal.preview, now: now)
         let action = JournalAction.correctClockIn(proposal.preview.record)
         return try commitVerified(
-            JournalEvent(action: action, now: now), matching: source, previewedCatalog: expected
+            JournalEvent(action: action, now: now), matching: source,
+            previewedCatalog: expected, observedAt: observedAt
         )
     }
 
     private func commitRestBoundary(
-        _ proposal: JournalV2RestCorrectionProposal, now: Int64
+        _ proposal: JournalV2RestCorrectionProposal, now: Int64, observedAt: Int64?
     ) throws -> JournalV2Session {
         let source = try revalidate(proposal.source, now: now)
         var expected = source.catalog
@@ -158,7 +163,8 @@ public extension JournalV2Repository {
             action = .correctRestEnd(dayID: preview.dayID, oldEnd: preview.oldEnd, newEnd: preview.newEnd)
         }
         return try commitVerified(
-            JournalEvent(action: action, now: now), matching: source, previewedCatalog: expected
+            JournalEvent(action: action, now: now), matching: source,
+            previewedCatalog: expected, observedAt: observedAt
         )
     }
 }
