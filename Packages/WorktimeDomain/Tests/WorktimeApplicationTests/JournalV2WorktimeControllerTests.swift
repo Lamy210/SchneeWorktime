@@ -56,7 +56,8 @@ struct JournalV2WorktimeControllerTests {
             let ended = try #require(controller.perform(
                 .clockOut(confirmBreak: false), sample: sample(150)
             ))
-            #expect(ended.snapshot.bounds.lower == 10)
+            // The ten seconds after the latest observation are verified work.
+            #expect(ended.snapshot.bounds.lower == 20)
             #expect(ended.snapshot.bounds.upper == 50)
             #expect(controller.checkpoint == nil)
             let saved = try JournalV2Repository(url: url).load(now: 160)
@@ -78,7 +79,9 @@ struct JournalV2WorktimeControllerTests {
             _ = try first.refresh(sample: sample(110))
             var reopened = try JournalV2WorktimeController(url: url, sample: sample(200))
             let current = try #require(reopened.refresh(sample: sample(210)))
-            #expect(current.snapshot.bounds.lower == 10)
+            // Checkpoint at 110 and live observation from 200 to 210 each
+            // contribute ten verified seconds; only 110...200 is uncertain.
+            #expect(current.snapshot.bounds.lower == 20)
             #expect(current.snapshot.bounds.upper == 110)
             #expect(current.forecast.goal == .uncertain)
             #expect(reopened.checkpoint?.observedAt == 210)
