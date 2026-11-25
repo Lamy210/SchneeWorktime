@@ -12,12 +12,17 @@ public enum CatalogCSV {
     ]
 
     public static func encode(_ session: CatalogSession) throws -> Data {
+        try encode(catalog: session.catalog, version: session.version)
+    }
+
+    /// Shared schema-independent CSV rendering; the caller must validate the live store first.
+    public static func encode(catalog: WorkdayCatalog, version: StoreVersion) throws -> Data {
         var data = Data()
         try append(header, to: &data)
-        let epoch = session.version.epoch.uuidString
-        let revision = String(session.version.revision)
+        let epoch = version.epoch.uuidString
+        let revision = String(version.revision)
         try append(["snapshot"] + Array(repeating: "", count: 11) + [epoch, revision], to: &data)
-        for day in session.catalog.days {
+        for day in catalog.days {
             let prefix = [day.id.uuidString, String(day.revision), state(day.state)]
             let profile = [String(day.profile.target), String(day.profile.expectedRest)]
             for interval in day.intervals {
@@ -25,12 +30,12 @@ public enum CatalogCSV {
                 let fields = ["interval"] + prefix + [kind(interval.kind)] + times + profile
                 try append(fields + ["", "", "", epoch, revision], to: &data)
             }
-            for gap in session.catalog.observations[day.id] ?? [] {
+            for gap in catalog.observations[day.id] ?? [] {
                 let fields = ["unverified"] + prefix + ["", String(gap.start), String(gap.end)] + profile
                 try append(fields + ["", "", "", epoch, revision], to: &data)
             }
         }
-        for audit in session.catalog.reviewAudit {
+        for audit in catalog.reviewAudit {
             let review = audit.review
             let recordType = switch audit.origin {
             case .observation: "correction"

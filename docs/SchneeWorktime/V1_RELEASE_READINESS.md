@@ -47,6 +47,12 @@ PR #117・#118によりschema-2イベント行ストアと観測Checkpointのト
 - アーカイブは署名済み証跡ではなく、内容が他者に変更されていない保証はない。復元時には別途、原本の明示保全、同一/別epochルール、atomic commitとクラッシュ復旧が必要。
 - この段階では**自動復元・本番Controller接続をしない**。旧DBを変換・消去せず、v1.0はNO-GOを維持する。
 
+## schema-2 CSV出力の内部API
+
+- `JournalV2Repository.makeCSV/writeCSV` はschema-2の完全一致セッション（epoch/revision、全Journal行、catalog、観測Checkpoint）を再検証してから、既存の14列CSV形式を生成・排他新規書出しする。補助Checkpointの時刻を勤務実績として追加しない。
+- schema-1の`CatalogCSV.encode`は共通レンダラを使うだけで、既存のCSV列構成・出力内容は変更しない。CSVは診断・閲覧用途であり、**復元用アーカイブではない**。
+- 24MiB上限、Controller未接続、OS実機QA未完了は継続する。本APIのテスト成功だけでv1.0をGOにしない。
+
 ## P0証跡の再監査（CIで自動照合するインベントリ）
 
 - [P0_RELEASE_EVIDENCE.json](P0_RELEASE_EVIDENCE.json) は148件を一意に列挙し、8つの横断ゲートを同じ形式で管理する。初期状態は `unverified`、資料から欠落が確認された項目だけ `blocked` とし、CI成功やコード存在をもって `passed` に自動昇格しない。
