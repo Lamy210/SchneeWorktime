@@ -289,4 +289,3 @@ public struct JournalV2WorktimeController {
         return try WorktimeGlance(catalog: session.catalog, now: now)
     }
 }
-
