@@ -186,7 +186,7 @@ struct JournalV2WorktimeControllerTests {
             try controller.writeCSV(to: csv, now: 160)
             #expect(try JournalV2Backup.inspect(Data(contentsOf: archive), now: 160)
                 .version == controller.version)
-            #expect(try Data(contentsOf: csv).count > 0)
+            #expect(try !Data(contentsOf: csv).isEmpty)
             #expect(throws: BackupFileError.self) {
                 try controller.writeBackup(to: archive, now: 160)
             }
