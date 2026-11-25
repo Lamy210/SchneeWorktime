@@ -121,7 +121,7 @@ public struct JournalV2Repository {
     /// A replay of the proposed event must produce precisely the previewed catalog.
     func commitVerified(
         _ event: JournalEvent, matching session: JournalV2Session,
-        previewedCatalog: WorkdayCatalog
+        previewedCatalog: WorkdayCatalog, observedAt: Int64? = nil
     ) throws -> JournalV2Session {
         let current = try revalidate(session, now: event.now)
         var replayed = current.catalog
@@ -129,7 +129,7 @@ public struct JournalV2Repository {
         guard replayed == previewedCatalog, replayed != current.catalog else {
             throw JournalMigrationError.verificationFailed
         }
-        return try mutate(event, matching: session, observedAt: nil)
+        return try mutate(event, matching: session, observedAt: observedAt)
     }
 
     private func mutate(
