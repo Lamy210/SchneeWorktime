@@ -67,7 +67,7 @@ public struct JournalV2WorktimeController {
     private mutating func recoverOpenInterval(sample: ClockSample) throws {
         guard let day = activeWorkingDay, let start = day.intervals.last?.start else { return }
         let known = session.checkpoint?.observedAt
-        guard known == nil || known! <= sample.wall else { throw ApplicationClockError.unreliableClock }
+        if let known, known > sample.wall { throw ApplicationClockError.unreliableClock }
         let unknownStart = max(start, known ?? start)
         if unknownStart < sample.wall {
             session = try repository.recordObservation(
