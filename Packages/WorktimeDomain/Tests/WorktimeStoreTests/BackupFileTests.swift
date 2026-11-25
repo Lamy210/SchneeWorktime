@@ -96,6 +96,46 @@ struct BackupFileTests {
         }
     }
 
+    @Test func `schema two permits files above legacy limit without changing legacy readers`() throws {
+        try withDirectory { root in
+            let url = root.appendingPathComponent("large.json")
+            let data = Data(repeating: 0x36, count: BackupFile.maxBytes + 1)
+            #expect(throws: BackupFileError.tooLarge) {
+                try BackupFile.publish(data, to: url)
+            }
+            try BackupFile.publish(data, to: url, maxBytes: JournalV2Backup.maxBytes)
+            #expect(throws: BackupFileError.tooLarge) {
+                try BackupFile.load(url)
+            }
+            #expect(try BackupFile.load(url, maxBytes: JournalV2Backup.maxBytes) == data)
+            let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+            #expect(attributes[.posixPermissions] as? Int == 0o600)
+            #expect(throws: BackupFileError.self) {
+                try BackupFile.publish(data, to: url, maxBytes: JournalV2Backup.maxBytes)
+            }
+            #expect(try BackupFile.load(url, maxBytes: JournalV2Backup.maxBytes) == data)
+        }
+    }
+
+    @Test func `schema two hard limit rejects oversized file metadata before allocation`() throws {
+        try withDirectory { root in
+            let url = root.appendingPathComponent("oversized.json")
+            try Data().write(to: url)
+            let writer = try FileHandle(forWritingTo: url)
+            try writer.truncate(atOffset: UInt64(JournalV2Backup.maxBytes + 1))
+            try writer.close()
+            try FileManager.default.setAttributes(
+                [.posixPermissions: 0o600], ofItemAtPath: url.path
+            )
+            #expect(throws: BackupFileError.tooLarge) {
+                try BackupFile.load(url, maxBytes: JournalV2Backup.maxBytes)
+            }
+            #expect(throws: BackupFileError.tooLarge) {
+                try BackupFile.load(url)
+            }
+        }
+    }
+
     @Test func `insecure files and hard links are rejected`() throws {
         try withDirectory { root in
             let url = root.appendingPathComponent("backup.json")
