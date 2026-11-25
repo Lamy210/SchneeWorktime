@@ -87,7 +87,8 @@ struct JournalV2CSVTests {
                 try repository.writeCSV(to: target, now: 110, matching: started)
             }
             #expect(!FileManager.default.fileExists(atPath: target.path))
-            #expect(try repository.makeCSV(now: 110, matching: newer).count > 0)
+            let currentCSV = try repository.makeCSV(now: 110, matching: newer)
+            #expect(!currentCSV.isEmpty)
         }
     }
 
