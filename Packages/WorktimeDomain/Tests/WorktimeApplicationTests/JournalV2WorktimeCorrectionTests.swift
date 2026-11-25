@@ -55,7 +55,7 @@ struct JournalV2WorktimeCorrectionTests {
             _ = try controller.commitCorrection(plan, sample: sample(146))
             let saved = try JournalV2Repository(url: url).load(now: 147)
             #expect(saved.catalog.reviewAudit.count == 1)
-            #expect(saved.catalog.reviewAudit.last?.origin == .observationReview)
+            #expect(saved.catalog.reviewAudit.last?.origin == .observation)
             #expect(saved.version == controller.version)
             #expect(saved.checkpoint?.observedAt == 146)
             #expect(saved.checkpoint?.dayID == before.day.id)
