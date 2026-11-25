@@ -43,21 +43,27 @@ PR #117・#118によりschema-2イベント行ストアと観測Checkpointのト
 
 - `JournalV2Repository.makeBackup/writeBackup` は、現行epoch/revision・全イベント行bytes・再生catalog・観測Checkpointが一致するセッションからのみ、schema-2専用JSONバックアップを作成する。
 - `JournalV2Backup.inspect` はschemaVersion=2のイベント行を**読み取り専用**で再生検証する。schema-1用の`CatalogBackup`形式は自動受入しない。バックアップにCheckpointを含めず、観測時刻を勤務実績として誤用しない。
-- `BackupFile`の既存の安全な排他書込（私有ディレクトリ、600モード、fsync、既存ファイルの上書拒否）を再利用する。**24MiB超のJSONバックアップは明示的な`tooLarge`で拒否**。schema-2 Journal本体の64MiB容量をカバーする大容量・ストリーミングバックアップは未完了のP0。
+- `BackupFile`の安全な排他書込（私有ディレクトリ、600モード、fsync、既存ファイル上書拒否）を維持し、**schema-2 JSONのみ96MiB**の上限を明示的に適用する。schema-2 Journalの64MiB行本体をBase64化したJSONは構造上96MiB以内に収まる。既存のschema-1・CSVは24MiBのまま。96MiB超は拒否する。最大データ量の実測、メモリ使用量、ストリーミング/ディスク満杯の障害試験はP0として未完了。
 - アーカイブは署名済み証跡ではなく、内容が他者に変更されていない保証はない。復元時には別途、原本の明示保全、同一/別epochルール、atomic commitとクラッシュ復旧が必要。
 - この段階では**自動復元・本番Controller接続をしない**。旧DBを変換・消去せず、v1.0はNO-GOを維持する。
+
+## schema-2大容量アーカイブ対応の境界（PR検証中）
+
+- schema-2イベント行の合計上限64MiB/最大100,000行をJSON Base64配列に変換しても、96MiBを超えない設計上の上界を採用。\`JournalV2Backup.maxBytes\`および専用\`BackupFile.publish/load(maxBytes:)\`に適用する。
+- ファイル読込前のfstatサイズ判定と、64KiB単位のread中の上限確認を継続する。書込みはO_EXCL/O_NOFOLLOW/owner-only/fsyncで、新旧アーカイブが混在しても上書しない。
+- **96MiBまでの上限緩和はストリーミング化ではない。** JSONエンコード/デコード時は全イベントとバイト列をメモリに保持する。最大64MiBでの負荷・RSS・電力・長時間動作の実測、クラッシュ/ディスク枯渇/復元の検証は未完了。初回公開のGO判定は行わない。
 
 ## schema-2 CSV出力の内部API
 
 - `JournalV2Repository.makeCSV/writeCSV` はschema-2の完全一致セッション（epoch/revision、全Journal行、catalog、観測Checkpoint）を再検証してから、既存の14列CSV形式を生成・排他新規書出しする。補助Checkpointの時刻を勤務実績として追加しない。
 - schema-1の`CatalogCSV.encode`は共通レンダラを使うだけで、既存のCSV列構成・出力内容は変更しない。CSVは診断・閲覧用途であり、**復元用アーカイブではない**。
-- 24MiB上限、Controller未接続、OS実機QA未完了は継続する。本APIのテスト成功だけでv1.0をGOにしない。
+- CSVの24MiB上限、Controller未接続、OS実機QA未完了は継続する。本APIのテスト成功だけでv1.0をGOにしない。
 
-## schema-2限定ロールバックの内部実装（PR検証中）
+## schema-2限定ロールバックの内部実装（PR #124で統合済み）
 
 - schema-2に対して、同一epochの厳密な過去Journal prefixのみを対象とする`previewRollback/commitRollback`を追加。現行・候補にactive勤務がある場合、分岐履歴、旧epoch、陳腐化した確認案は拒否する。
 - 保存済み原本の完全なJSONバックアップをDB外の私有ディレクトリへ排他書出し・再読込検証してから、SQLite同一トランザクションでJournal置換・Checkpoint破棄・新epoch更新を行う。途中例外でのROLLBACK回帰テストを追加。
-- 詳細は[JOURNAL_V2_ROLLBACK.md](JOURNAL_V2_ROLLBACK.md)。本APIは破損DB復旧・任意アーカイブ復元ではない。Controller未接続、現在の24MiB保全上限、macOS実機・障害QA未完につき、**v1.0はNO-GO**のまま。
+- 詳細は[JOURNAL_V2_ROLLBACK.md](JOURNAL_V2_ROLLBACK.md)。本APIは破損DB復旧・任意アーカイブ復元ではない。Controller未接続、全容量の復元・性能・障害注入やmacOS実機QA未完につき、**v1.0はNO-GO**のまま。
 
 ## P0証跡の再監査（CIで自動照合するインベントリ）
 
