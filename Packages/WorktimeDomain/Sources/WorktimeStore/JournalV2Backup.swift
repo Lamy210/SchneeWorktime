@@ -12,6 +12,14 @@ public struct JournalV2BackupInspection {
     public let eventCount: Int
 }
 
+/// Validated, immutable candidate for a same-generation rollback.
+/// Untrusted archive bytes never grant permission to replace a live database.
+struct JournalV2RestorableBackup {
+    let version: StoreVersion
+    let catalog: WorkdayCatalog
+    let rows: [JournalEventRow]
+}
+
 /// Explicit schema-2 export, independent of schema-1 snapshots or migration drafts.
 /// Checkpoints are never portable: a copied observation does not prove current work.
 /// Archives are untrusted data, not signatures or proof of authenticity.
@@ -46,6 +54,15 @@ public enum JournalV2Backup {
 
     /// Inspects a bounded archive without creating a DB, mutating records or adopting its source epoch.
     public static func inspect(_ data: Data, now: Int64) throws -> JournalV2BackupInspection {
+        let candidate = try decodeValidated(data, now: now)
+        return JournalV2BackupInspection(
+            version: candidate.version, catalog: candidate.catalog, eventCount: candidate.rows.count
+        )
+    }
+
+    /// Validate the complete payload before it can be compared to a committed journal prefix.
+    /// This does not authenticate the file or authorize applying it to another epoch.
+    static func decodeValidated(_ data: Data, now: Int64) throws -> JournalV2RestorableBackup {
         guard data.count <= BackupFile.maxBytes else { throw JournalV2BackupError.tooLarge }
         let archive: Archive
         do {
@@ -58,9 +75,12 @@ public enum JournalV2Backup {
         let catalog = try validatedCatalog(
             payloads: archive.payloads, revision: archive.revision, now: now
         )
-        return JournalV2BackupInspection(
+        let rows = archive.payloads.enumerated().map { index, payload in
+            JournalEventRow(sequence: Int64(index + 1), payload: payload)
+        }
+        return JournalV2RestorableBackup(
             version: StoreVersion(epoch: archive.sourceEpoch, revision: archive.revision),
-            catalog: catalog, eventCount: archive.payloads.count
+            catalog: catalog, rows: rows
         )
     }
 
