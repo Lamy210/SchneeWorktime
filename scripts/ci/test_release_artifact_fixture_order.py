@@ -29,6 +29,8 @@ class ReleaseArtifactFixtureOrderTests(unittest.TestCase):
         self.assertIn('test "${actual_digest}" = "${canonical_digest}"', job)
         self.assertIn("scripts/release/validate-actions-artifact.py", job)
         self.assertIn("artifact-ids: ${{ steps.upload.outputs.artifact-id }}", job)
+        self.assertIn("github-token: ${{ github.token }}", job)
+        self.assertIn("      actions: read", job)
         self.assertNotIn("continue-on-error:", job)
 
     def test_fixture_download_does_not_use_a_mutable_name_selector(self):
