@@ -36,21 +36,26 @@ public struct WorktimeHistory: Sendable, Equatable {
     }
 
     public init(session: CatalogSession, now: Int64, offset: Int = 0) throws {
-        version = session.version
+        try self.init(catalog: session.catalog, version: session.version, now: now, offset: offset)
+    }
+
+    /// Shared projection for the schema-2 event Journal; never replays another format.
+    init(catalog: WorkdayCatalog, version: StoreVersion, now: Int64, offset: Int = 0) throws {
+        self.version = version
         loadedAt = now
-        let ended = session.catalog.days.filter { $0.state == .ended }
+        let ended = catalog.days.filter { $0.state == .ended }
         totalEndedDays = ended.count
         guard offset >= 0, offset.isMultiple(of: Self.pageSize),
               offset == 0 || offset < ended.count
         else { throw WorktimeHistoryError.invalidOffset }
         self.offset = offset
         let selected = ended.reversed().dropFirst(offset).prefix(Self.pageSize)
-        let corrections = Dictionary(grouping: session.catalog.reviewAudit, by: \.dayID)
+        let corrections = Dictionary(grouping: catalog.reviewAudit, by: \.dayID)
         rows = try selected.map { day in
             guard let start = day.intervals.first?.start, let end = day.intervals.last?.end else {
                 throw WorkdayError.invalidEventTime
             }
-            let snapshot = try day.snapshot(now: now, uncertainty: session.catalog.observations[day.id] ?? [])
+            let snapshot = try day.snapshot(now: now, uncertainty: catalog.observations[day.id] ?? [])
             let worked = snapshot.bounds.lower ... snapshot.bounds.upper
             let forecast = try DailyForecast.calculate(
                 worked: worked, target: day.profile.target, remainingRest: snapshot.remainingRest, now: end,
