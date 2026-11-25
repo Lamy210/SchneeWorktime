@@ -256,7 +256,8 @@ public struct JournalV2WorktimeController {
         }
     }
 
-    private mutating func saveCheckpoint(sample: ClockSample) throws {
+    /// Package-internal for schema-2 confirmation flows in JournalV2WorktimeIntent.
+    mutating func saveCheckpoint(sample: ClockSample) throws {
         guard let day = activeWorkingDay else { return }
         if let observed = session.checkpoint?.observedAt {
             guard observed <= sample.wall else { throw ApplicationClockError.unreliableClock }
