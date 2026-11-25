@@ -454,17 +454,18 @@ public extension JournalV2WorktimeController {
             throw JournalV2WorktimeCorrectionError.staleProposal
         }
         let observedAt: Int64? = stored.catalog.days.last?.state == .working ? sample.wall : nil
-        let updated: JournalV2Session = try switch proposal.source {
+        let updated: JournalV2Session
+        switch proposal.source {
         case let .review(candidate):
-            repository.commitReview(candidate, now: sample.wall, observedAt: observedAt)
+            updated = try repository.commitReview(candidate, now: sample.wall, observedAt: observedAt)
         case let .restStart(candidate):
-            repository.commitRestStartCorrection(candidate, now: sample.wall, observedAt: observedAt)
+            updated = try repository.commitRestStartCorrection(candidate, now: sample.wall, observedAt: observedAt)
         case let .restEnd(candidate):
-            repository.commitRestEndCorrection(candidate, now: sample.wall, observedAt: observedAt)
+            updated = try repository.commitRestEndCorrection(candidate, now: sample.wall, observedAt: observedAt)
         case let .clockIn(candidate):
-            repository.commitClockInCorrection(candidate, now: sample.wall, observedAt: observedAt)
+            updated = try repository.commitClockInCorrection(candidate, now: sample.wall, observedAt: observedAt)
         case let .clockOut(candidate):
-            repository.commitClockOutCorrection(candidate, now: sample.wall, observedAt: observedAt)
+            updated = try repository.commitClockOutCorrection(candidate, now: sample.wall, observedAt: observedAt)
         }
         session = updated
         clock = checked
