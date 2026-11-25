@@ -454,19 +454,9 @@ public extension JournalV2WorktimeController {
             throw JournalV2WorktimeCorrectionError.staleProposal
         }
         let observedAt: Int64? = stored.catalog.days.last?.state == .working ? sample.wall : nil
-        let updated: JournalV2Session
-        switch proposal.source {
-        case let .review(candidate):
-            updated = try repository.commitReview(candidate, now: sample.wall, observedAt: observedAt)
-        case let .restStart(candidate):
-            updated = try repository.commitRestStartCorrection(candidate, now: sample.wall, observedAt: observedAt)
-        case let .restEnd(candidate):
-            updated = try repository.commitRestEndCorrection(candidate, now: sample.wall, observedAt: observedAt)
-        case let .clockIn(candidate):
-            updated = try repository.commitClockInCorrection(candidate, now: sample.wall, observedAt: observedAt)
-        case let .clockOut(candidate):
-            updated = try repository.commitClockOutCorrection(candidate, now: sample.wall, observedAt: observedAt)
-        }
+        let updated = try commitVerifiedCorrection(
+            proposal.source, now: sample.wall, observedAt: observedAt
+        )
         session = updated
         clock = checked
         return try glance(now: sample.wall)
@@ -474,6 +464,23 @@ public extension JournalV2WorktimeController {
 }
 
 private extension JournalV2WorktimeController {
+    func commitVerifiedCorrection(
+        _ candidate: JournalV2WorktimeCorrectionSource, now: Int64, observedAt: Int64?
+    ) throws -> JournalV2Session {
+        switch candidate {
+        case let .review(plan):
+            return try repository.commitReview(plan, now: now, observedAt: observedAt)
+        case let .restStart(plan):
+            return try repository.commitRestStartCorrection(plan, now: now, observedAt: observedAt)
+        case let .restEnd(plan):
+            return try repository.commitRestEndCorrection(plan, now: now, observedAt: observedAt)
+        case let .clockIn(plan):
+            return try repository.commitClockInCorrection(plan, now: now, observedAt: observedAt)
+        case let .clockOut(plan):
+            return try repository.commitClockOutCorrection(plan, now: now, observedAt: observedAt)
+        }
+    }
+
     func correctionSession(
         expectedDay: Workday, historical: HistoricalReviewContext?, sample: ClockSample
     ) throws -> JournalV2Session {
