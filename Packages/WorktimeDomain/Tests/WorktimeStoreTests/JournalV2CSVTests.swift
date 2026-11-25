@@ -15,7 +15,7 @@ struct JournalV2CSVTests {
         let repository = try JournalV2Repository(
             url: root.appendingPathComponent("worktime.sqlite"), createIfMissing: true
         )
-        try body(root, repository, try repository.load(now: 100))
+        try body(root, repository, repository.load(now: 100))
     }
 
     private func rows(_ data: Data) -> [[String]] {
@@ -57,9 +57,9 @@ struct JournalV2CSVTests {
             #expect(output[1][13] == String(reviewed.version.revision))
             #expect(output.contains { $0[0] == "correction" })
             #expect(output.contains { $0[0] == "unverified" })
-            #expect(csv == (try CatalogCSV.encode(
+            #expect(try csv == CatalogCSV.encode(
                 catalog: reviewed.catalog, version: reviewed.version
-            )))
+            ))
             let target = root.appendingPathComponent("schema2.csv")
             try repository.writeCSV(to: target, now: 170, matching: reviewed)
             #expect(try BackupFile.load(target) == csv)
@@ -105,7 +105,7 @@ struct JournalV2CSVTests {
                 )
             }
             #expect(!FileManager.default.fileExists(atPath: root.appendingPathComponent("old.csv").path))
-            #expect(rows(try repository.makeCSV(now: 112, matching: reset)).count == 2)
+            #expect(try rows(repository.makeCSV(now: 112, matching: reset)).count == 2)
         }
     }
 }
