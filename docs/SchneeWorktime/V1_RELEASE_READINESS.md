@@ -4,7 +4,7 @@
 
 ## 保存形式のリリース方針変更
 
-未リリースのため、v1.0ではschema-1との後方互換、自動移行、ダウングレードを要求しない。初回公開時は新規schema-2 DBのみを正式形式とする。既存の開発用schema-1や不正なDBがある場合、データを無断削除・自動初期化するのではなく拒否し、利用者に明示保全を求める。新規schema-2ストアコアはまだApplicationに接続されていないため、P0は未達。
+未リリースのため、v1.0ではschema-1との後方互換、自動移行、ダウングレードを要求しない。初回公開時は新規schema-2 DBのみを正式形式とする。既存の開発用schema-1や不正なDBがある場合、データを無断削除・自動初期化するのではなく拒否し、利用者に明示保全を求める。schema-2専用のアプリケーション層セッションは用意済みだが、配布アプリのDesktopModelは依然schema-1に接続されており、P0は未達。
 
 
 
@@ -46,6 +46,13 @@ PR #117・#118によりschema-2イベント行ストアと観測Checkpointのト
 - `previewRollback/commitRollback`もアプリ層へ追加。正常・同epochの過去の終了済みprefixに限定し、DB外の所有者専用保全先へ現世代を排他保存/読戻ししたうえで新epochへ復元する。保全できない場合は書き換えない。
 - 同revisionのCheckpoint競合、旧epochバックアップの拒否、異常時の原本保全、時計逆行、成功後の再起動での新epoch読み込みを回帰試験する。削除対象の暫定インベントリと障害境界は [SCHEMA2_RESET_SCOPE.md](SCHEMA2_RESET_SCOPE.md)。
 - **未完:** `DesktopModel`と既存`WorktimeController`はschema-1経路のまま。schema-2用のUI確認・通知停止、アプリ管理バックアップ/診断ファイルの削除と中断再開、実機/電源断QA、全P0の受入証跡は未完。論理削除を物理消去と誤認しない。**v1.0 NO-GO**。
+
+## schema-2の履歴/集計/通知・予測のアプリ層機能差分（PR #128）
+
+- `JournalV2WorktimeController`から、履歴ページング、日週月集計、集計CSV、休憩予定変更と読み取り専用の通知計画を利用できるようにする。旧schema-1を読み込まず、同じ`WorktimeHistory`投影処理を共有する。
+- 履歴/集計/通知計画を表示する前に全Journal行とCheckpointをrevalidateし、ページ継続時にversionが違う場合は拒否する。通知計画は時計異常や15秒を超える未観測ギャップでは返さない。
+- 勤務中の休憩見込み変更はJournalと新しい観測Checkpointを同一SQLiteトランザクションに書く。休憩中は勤務観測を新規作成しない。変更なし要求でもCASを検証する。
+- [2026-11-25リリースブロッカー再監査](RELEASE_BLOCKER_AUDIT_2026_11_25.md)参照。**本番`WorktimeController`/`DesktopModel`はschema-1のまま**。レビュー/履歴訂正・予定退勤・外部エクスポートなどの全機能の切替、削除の完全性、RC/実機・P0証跡は未完。**NO-GO継続**。
 
 ## schema-2のレビュー・履歴訂正API（段階的実装）
 

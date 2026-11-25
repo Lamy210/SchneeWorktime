@@ -119,6 +119,119 @@ public struct JournalV2WorktimeController {
         clock = checked
     }
 
+    /// Revalidates every committed event and the observation checkpoint before
+    /// materializing a page; navigating history never writes attendance.
+    public func recentHistory(
+        now: Int64, offset: Int = 0, previous: WorktimeHistory? = nil
+    ) throws -> WorktimeHistory {
+        let stored = try repository.revalidate(session, now: now)
+        if let previous {
+            guard previous.version == stored.version else { throw WorktimeHistoryError.stalePage }
+        } else if offset != 0 {
+            throw WorktimeHistoryError.stalePage
+        }
+        return try WorktimeHistory(
+            catalog: stored.catalog, version: stored.version, now: now, offset: offset
+        )
+    }
+
+    public func isCurrent(_ history: WorktimeHistory) -> Bool {
+        session.version == history.version
+    }
+
+    /// Only the committed catalog is read. Calendar navigation does not change
+    /// the checkpoint, perform journal writes or schedule reminders.
+    public func summary(
+        period: WorktimeSummaryPeriod, sample: ClockSample, previous: WorktimeSummary? = nil
+    ) throws -> WorktimeSummary {
+        var checked = clock
+        _ = try checked.advance(to: sample)
+        let stored = try repository.revalidate(session, now: sample.wall)
+        if let previous, previous.version != stored.version {
+            throw WorktimeSummaryError.staleSummary
+        }
+        return try WorktimeSummary(
+            catalog: stored.catalog, version: stored.version, period: period, now: sample.wall
+        )
+    }
+
+    public func isCurrent(_ summary: WorktimeSummary) -> Bool {
+        session.version == summary.version
+    }
+
+    /// Refuse stale display context and unobserved gaps. The event and fresh
+    /// checkpoint are committed together when a working interval is active.
+    /// A no-op request still revalidates the complete checkpoint CAS fence.
+    public mutating func setFutureRest(
+        minutes: Int?, expectedDay: Workday, sample: ClockSample
+    ) throws -> WorktimeGlance? {
+        guard session.catalog.days.last == expectedDay, session.catalog.activeID == expectedDay.id else {
+            throw FutureRestChangeError.staleContext
+        }
+        if let minutes, !NextDaySettings.restRange.contains(minutes) {
+            throw FutureRestChangeError.invalidMinutes
+        }
+        var checked = clock
+        guard try checked.advance(to: sample) == nil else { throw FutureRestChangeError.staleContext }
+        let seconds = minutes.map { Int64($0) * 60 }
+
+        // Detect no-ops before requesting an atomic mutation+checkpoint. A no-op
+        // carrying observedAt would otherwise be rejected by the Journal writer.
+        var proposed = session.catalog
+        try proposed.setFutureRest(
+            dayID: expectedDay.id, remainingSeconds: seconds,
+            now: sample.wall, expectedRevision: proposed.revision
+        )
+        if proposed == session.catalog {
+            session = try repository.revalidate(session, now: sample.wall)
+        } else {
+            session = try repository.setFutureRest(
+                dayID: expectedDay.id, remainingSeconds: seconds, now: sample.wall,
+                matching: session, observedAt: activeWorkingDay == nil ? nil : sample.wall
+            )
+        }
+        clock = checked
+        try saveCheckpoint(sample: sample)
+        return try glance(now: sample.wall)
+    }
+
+    /// A clock gap or clock regression cannot produce precise reminders. This
+    /// reads only a CAS-verified committed generation; no notification is sent.
+    public func reminderState(
+        sample: ClockSample, departureLeads: Set<ReminderLead> = [.fifteen],
+        earliestLeads: Set<ReminderLead> = [], referenceEnabled: Bool = false
+    ) throws -> ReminderSyncState? {
+        var checked = clock
+        guard try checked.advance(to: sample) == nil else { return nil }
+        let stored = try repository.revalidate(session, now: sample.wall)
+        guard !stored.catalog.days.isEmpty else { return nil }
+        let glance = try WorktimeGlance(catalog: stored.catalog, now: sample.wall)
+        let basis = try glance.departureReminderBasis()
+        let desired = ReminderPlan.desired(
+            forecast: glance.forecast.goal, now: sample.wall, clockTrusted: true,
+            departureLeads: departureLeads, earliestLeads: earliestLeads,
+            referenceAt: referenceEnabled ? glance.day.profile.reference?.referenceAt : nil,
+            departureBasis: basis
+        )
+        return ReminderSyncState(
+            epoch: stored.version.epoch, dayID: glance.day.id,
+            revision: stored.version.revision, desired: desired
+        )
+    }
+
+    /// Exact displayed summary only. CSV is a report, never a restorable Journal.
+    public func writeSummaryCSV(
+        _ displayed: WorktimeSummary, to destination: URL, sample: ClockSample
+    ) throws {
+        let current = try summary(period: displayed.period, sample: sample, previous: displayed)
+        guard current.daily == displayed.daily, current.worked == displayed.worked,
+              current.target == displayed.target, current.recordedRest == displayed.recordedRest,
+              current.endedDays == displayed.endedDays, current.uncertainDays == displayed.uncertainDays,
+              current.dailyShortfall == displayed.dailyShortfall, current.dailySurplus == displayed.dailySurplus
+        else { throw WorktimeSummaryError.staleSummary }
+        try BackupFile.publish(WorktimeSummaryCSV.encode(displayed), to: destination)
+    }
+
     private var activeWorkingDay: Workday? {
         guard let day = session.catalog.days.last, day.state == .working else { return nil }
         return day
