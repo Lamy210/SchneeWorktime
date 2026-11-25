@@ -187,6 +187,40 @@ struct JournalV2RollbackTests {
         }
     }
 
+    @Test func `schema two preview accepts a valid archive above the legacy file limit`() throws {
+        try fixture { database, preserve, repository in
+            let first = try endedDay(
+                repository, starting: 100, matching: repository.load(now: 100)
+            )
+            let original = try repository.makeBackup(now: 120, matching: first)
+            let padding = BackupFile.maxBytes + 1 - original.count
+            #expect(padding > 0)
+            let paddedArchive = original + Data(repeating: 0x20, count: padding)
+            let selected = preserve.appendingPathComponent("selected.json")
+            try BackupFile.publish(
+                paddedArchive, to: selected, maxBytes: JournalV2Backup.maxBytes
+            )
+            #expect(throws: BackupFileError.tooLarge) {
+                try BackupFile.load(selected)
+            }
+            let latest = try endedDay(repository, starting: 200, matching: first)
+            let preview = try repository.previewRollback(
+                file: selected, now: 230, matching: latest
+            )
+            #expect(preview.sourceVersion == first.version)
+            let preserved = preserve.appendingPathComponent("current.json")
+            let restored = try repository.commitRollback(
+                preview, preserveCurrentAt: preserved, now: 240
+            )
+            #expect(restored.catalog == first.catalog)
+            #expect(restored.version.epoch != first.version.epoch)
+            #expect(try JournalV2Repository(url: database).load(now: 250).catalog == first.catalog)
+            #expect(try JournalV2Backup.inspect(
+                BackupFile.load(preserved, maxBytes: JournalV2Backup.maxBytes), now: 250
+            ).version == latest.version)
+        }
+    }
+
     @Test func `preservation inside source database directory is rejected`() throws {
         try fixture { database, _, repository in
             let first = try endedDay(repository, starting: 100, matching: repository.load(now: 100))

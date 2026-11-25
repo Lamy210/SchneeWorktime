@@ -13,15 +13,29 @@ public enum BackupFileError: Error, Equatable {
 
 /// Local plaintext archive I/O. A private directory is required; this is not protection against the same user.
 package enum BackupFile {
+    /// Existing CSV and schema-1 archives retain their original default limit.
     static let maxBytes = 24 * 1024 * 1024
+    /// Hard upper bound for explicitly opted-in schema-2 archive I/O.
+    static let maxSupportedBytes = 96 * 1024 * 1024
 
     package static func publish(_ data: Data, to url: URL) throws {
-        try publish(data, to: url, synchronizeDirectory: syncDirectory)
+        try publish(data, to: url, maxBytes: maxBytes)
+    }
+
+    static func publish(_ data: Data, to url: URL, maxBytes: Int) throws {
+        try publish(data, to: url, maxBytes: maxBytes, synchronizeDirectory: syncDirectory)
     }
 
     /// The final file may exist if publication succeeded but directory synchronization failed.
     static func publish(_ data: Data, to url: URL, synchronizeDirectory: (Int32) throws -> Void) throws {
-        guard data.count <= maxBytes else { throw BackupFileError.tooLarge }
+        try publish(data, to: url, maxBytes: maxBytes, synchronizeDirectory: synchronizeDirectory)
+    }
+
+    private static func publish(
+        _ data: Data, to url: URL, maxBytes: Int, synchronizeDirectory: (Int32) throws -> Void
+    ) throws {
+        guard maxBytes > 0, maxBytes <= maxSupportedBytes, data.count <= maxBytes
+        else { throw BackupFileError.tooLarge }
         try withDirectory(url) { directory, name in
             let temp = ".worktime-\(UUID().uuidString).partial"
             let fd = openat(directory, temp, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0o600)
@@ -54,7 +68,12 @@ package enum BackupFile {
     }
 
     static func load(_ url: URL) throws -> Data {
-        try withDirectory(url) { directory, name in
+        try load(url, maxBytes: maxBytes)
+    }
+
+    static func load(_ url: URL, maxBytes: Int) throws -> Data {
+        guard maxBytes > 0, maxBytes <= maxSupportedBytes else { throw BackupFileError.tooLarge }
+        return try withDirectory(url) { directory, name in
             let fd = openat(directory, name, O_RDONLY | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK)
             guard fd >= 0 else { throw BackupFileError.system(errno) }
             defer { close(fd) }
@@ -64,7 +83,7 @@ package enum BackupFile {
                   info.st_nlink == 1, info.st_mode & 0o077 == 0
             else { throw BackupFileError.unsafeFile }
             guard info.st_size >= 0, info.st_size <= maxBytes else { throw BackupFileError.tooLarge }
-            return try readAll(fd: fd)
+            return try readAll(fd: fd, maxBytes: maxBytes)
         }
     }
 
@@ -96,7 +115,7 @@ package enum BackupFile {
         }
     }
 
-    private static func readAll(fd: Int32) throws -> Data {
+    private static func readAll(fd: Int32, maxBytes: Int) throws -> Data {
         var data = Data()
         var buffer = [UInt8](repeating: 0, count: 65536)
         while true {
