@@ -66,7 +66,7 @@ struct JournalV2WorktimeMaintenanceTests {
             #expect(controller.version.revision == 0)
             #expect(controller.checkpoint == nil)
             let emptyResult = try controller.refresh(sample: sample(110))
-            #expect(emptyResult == nil)
+            #expect(emptyResult?.day == nil)
             let cleared = try JournalV2Repository(url: url).load(now: 110)
             #expect(cleared.version == controller.version)
             #expect(cleared.catalog.days.isEmpty)
@@ -118,7 +118,7 @@ struct JournalV2WorktimeMaintenanceTests {
             #expect(fresh.version == controller.version)
             #expect(fresh.version.epoch != oldVersion.epoch)
             #expect(fresh.catalog.days.isEmpty)
-            #expect(try FileManager.default.fileExists(atPath: archive.path))
+            #expect(FileManager.default.fileExists(atPath: archive.path))
             #expect(throws: CatalogRollbackError.differentGeneration) {
                 try controller.previewRollback(file: archive, sample: sample(130))
             }
