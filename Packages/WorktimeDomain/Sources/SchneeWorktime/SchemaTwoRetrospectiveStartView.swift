@@ -18,6 +18,11 @@
             try? NextDaySettings(targetMinutes: targetMinutes, restMinutes: restMinutes).profile
         }
 
+        private func capturedProfile(at instant: Int64) throws -> WorkdayProfile {
+            guard let profile else { throw WorkdayError.invalidProfile }
+            return try model.capturedProfile(profile, at: instant)
+        }
+
         private var selectedInstant: Int64? {
             Int64(exactly: (start.timeIntervalSince1970 / 60).rounded(.down) * 60)
         }
@@ -25,7 +30,8 @@
         var body: some View {
             DisclosureGroup("過去の始業時刻を記録（schema-2）") {
                 DatePicker("始業日時", selection: $start, displayedComponents: [.date, .hourAndMinute])
-                Text("過去の勤務は観測事実ではなく、利用者による明示的な申告です。")
+                ReferenceSettingsView()
+                Text("過去の勤務は観測事実ではなく、利用者による明示的な申告です。現在のタイムゾーンで始業日時を解釈します。")
                     .font(.caption)
                 Button("記録内容を確認") { prepare() }
                     .disabled(!model.schemaTwoRetrospectiveStartEnabled || profile == nil)
@@ -52,11 +58,20 @@
                 Text("始業：\(label(value.startedAt))").font(.headline)
                 Text("確認時点の実働：\(DepartureCountdown.duration(value.preview.snapshot.bounds.lower))")
                     .font(.caption)
+                if let reference = value.preview.day.profile.reference {
+                    Text("捕捉した勤務開始日：\(reference.logicalDate)・\(reference.timeZoneID)")
+                        .font(.caption)
+                    if reference.resolution == .disabled {
+                        Text("参考終業時刻：使用しない").font(.caption)
+                    } else {
+                        ReferenceStatusView(glance: value.preview)
+                    }
+                }
                 Text("始業から保存時点まで休憩・中断なしで勤務した場合にだけ確定してください。")
                     .font(.caption)
                 Button("申告した勤務実績を確定") { commit(value) }
                     .disabled(!model.schemaTwoRetrospectiveStartEnabled ||
-                        expected != model.schemaTwoActionContext || profile != value.preview.day.profile ||
+                        expected != model.schemaTwoActionContext ||
                         selectedInstant != value.startedAt)
                 Button("候補をキャンセル") { reset() }
             }
@@ -64,15 +79,14 @@
 
         private func prepare() {
             reset()
-            guard let context = model.schemaTwoActionContext, let profile,
-                  let instant = selectedInstant
+            guard let context = model.schemaTwoActionContext, let instant = selectedInstant
             else {
                 notice = "日時と勤務開始設定を確認してください。"
                 return
             }
             do {
                 proposal = try model.previewSchemaTwoRetrospectiveStart(
-                    at: instant, profile: profile, matching: context
+                    at: instant, profile: capturedProfile(at: instant), matching: context
                 )
                 expected = context
             } catch RetrospectiveStartError.futureStart {
@@ -80,22 +94,23 @@
             } catch RetrospectiveStartError.currentStart {
                 notice = "現在の始業は「勤務開始」から記録してください。"
             } catch {
-                notice = "過去日時・重複・容量・時計を確認してください。"
+                notice = "過去日時・重複・容量・時計・参考終業設定を確認してください。"
             }
         }
 
         private func commit(_ value: RetrospectiveStartProposal) {
-            guard let context = expected, let profile,
+            guard let context = expected,
                   context == model.schemaTwoActionContext, selectedInstant == value.startedAt,
-                  profile == value.preview.day.profile
+                  let captured = try? capturedProfile(at: value.startedAt),
+                  captured == value.preview.day.profile
             else {
                 reset()
-                notice = "記録が更新されました。保存せず再確認してください。"
+                notice = "記録・勤務設定・タイムゾーンが変更されたか、設定が無効です。保存せず再確認してください。"
                 return
             }
             reset()
             do {
-                try model.commitSchemaTwoRetrospectiveStart(value, profile: profile, matching: context)
+                try model.commitSchemaTwoRetrospectiveStart(value, profile: captured, matching: context)
             } catch {
                 notice = "保存を確認できません。自動再試行せず記録を確認してください。"
             }
