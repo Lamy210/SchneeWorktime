@@ -30,9 +30,13 @@ public struct JournalV2Repository {
     private let store: JournalV2LiveStore
     private let databaseURL: URL
 
-    public init(url: URL, createIfMissing: Bool = false) throws {
+    public init(
+        url: URL, createIfMissing: Bool = false, requireNew: Bool = false
+    ) throws {
         databaseURL = try DatabaseFileGuard.canonicalURL(url)
-        store = try JournalV2LiveStore(url: databaseURL, createIfMissing: createIfMissing)
+        store = try JournalV2LiveStore(
+            url: databaseURL, createIfMissing: createIfMissing, requireNew: requireNew
+        )
     }
 
     /// Full replay under SQLITE_OPEN_READONLY and query_only, without recovery
