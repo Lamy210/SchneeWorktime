@@ -5,8 +5,10 @@ import unittest
 from scripts.release.audit_worktime_release import (
     AuditError,
     GATES,
+    MATRIX,
     check_record,
     matrix_p0,
+    parse_evidence,
 )
 
 SHA = "a" * 40
@@ -41,6 +43,46 @@ class ReleaseAuditTests(unittest.TestCase):
         source = "| AC-01 | P0 | a | b |\n| AC-01 | P1 | c | d |\n"
         with self.assertRaisesRegex(AuditError, "duplicate"):
             matrix_p0(source, enforce_baseline=False)
+
+    def test_baseline_rejects_equal_count_priority_exchange(self):
+        source = MATRIX.read_text(encoding="utf-8")
+        self.assertEqual(len(matrix_p0(source)), 148)
+        swapped = source.replace("| AC-01 | P0 |", "| AC-01 | P1 |", 1)
+        swapped = swapped.replace("| AC-33 | P1 |", "| AC-33 | P0 |", 1)
+        self.assertNotEqual(source, swapped)
+        with self.assertRaisesRegex(AuditError, "priority baseline"):
+            matrix_p0(swapped)
+
+    def test_duplicate_json_keys_fail_at_any_depth(self):
+        for source in (
+            '{"schema_version": 1, "schema_version": 1}',
+            '{"p0": {"AC-01": {}, "AC-01": {}}}',
+            '{"p0": {"AC-01": {"status": "blocked", "status": "passed"}}}',
+        ):
+            with self.subTest(source=source):
+                with self.assertRaisesRegex(AuditError, "duplicate evidence JSON key"):
+                    parse_evidence(source)
+        self.assertEqual(parse_evidence('{"status": "blocked"}'), {"status": "blocked"})
+
+    def test_root_fields_and_schema_version_are_strict(self):
+        for version in (True, 1.0, "1", None):
+            with self.subTest(version=version):
+                evidence = fixture()
+                evidence["schema_version"] = version
+                with self.assertRaisesRegex(AuditError, "unsupported evidence schema"):
+                    check_record(evidence, {"AC-01", "AC-02"})
+        evidence = fixture()
+        evidence["override"] = True
+        with self.assertRaisesRegex(AuditError, "root fields"):
+            check_record(evidence, {"AC-01", "AC-02"})
+
+    def test_non_string_status_is_rejected_as_an_audit_error(self):
+        for state in ([], {}, True, None, 1):
+            with self.subTest(state=state):
+                evidence = fixture()
+                evidence["p0"]["AC-01"]["status"] = state
+                with self.assertRaisesRegex(AuditError, "invalid state"):
+                    check_record(evidence, {"AC-01", "AC-02"})
 
     def test_inventory_lint_allows_known_blockers_without_approving_release(self):
         result = check_record(fixture(), {"AC-01", "AC-02"})
