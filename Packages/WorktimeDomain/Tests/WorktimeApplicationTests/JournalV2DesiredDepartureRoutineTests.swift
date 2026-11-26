@@ -57,6 +57,16 @@ struct JournalV2DesiredDepartureRoutineTests {
                 try current.clearConfirmedDesiredDeparture(matching: displayed, sample: sample(113))
             }
             #expect(try repository.load(now: 113).version == before.version)
+            let replacement = try current.previewDesiredDeparture(at: 4100, sample: sample(114))
+            _ = try current.commitDesiredDeparture(replacement, warningAcknowledged: false, sample: sample(115))
+            let replaced = try repository.load(now: 115)
+            #expect(throws: DesiredDepartureSaveError.staleProposal) {
+                try current.clearConfirmedDesiredDeparture(matching: displayed, sample: sample(116))
+            }
+            let preserved = try repository.load(now: 116)
+            #expect(preserved.version == replaced.version)
+            #expect(preserved.catalog == replaced.catalog)
+            #expect(preserved.checkpoint == replaced.checkpoint)
         }
     }
 
