@@ -16,7 +16,8 @@ struct WorktimeDatabaseFormatProbeTests {
 
     @Test func `missing database is detected without creating directories or sqlite files`() throws {
         try fixture { _, url in
-            #expect(try WorktimeDatabaseFormatProbe.inspect(url: url) == .missing)
+            let format = try WorktimeDatabaseFormatProbe.inspect(url: url)
+            #expect(format == .missing)
             #expect(!FileManager.default.fileExists(atPath: url.path))
         }
     }
