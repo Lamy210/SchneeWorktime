@@ -1,6 +1,7 @@
 import CSQLite
 import Foundation
 import Testing
+import WorktimeDomain
 @testable import WorktimeStore
 
 struct WorktimeDatabaseFormatProbeTests {
