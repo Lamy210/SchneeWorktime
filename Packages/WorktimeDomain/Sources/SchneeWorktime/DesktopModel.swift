@@ -122,21 +122,6 @@
             schemaTwoInspection = nil
         }
 
-        /// Every page uses a fresh, strict SQLite read-only Journal replay. A
-        /// concurrent Journal or checkpoint change invalidates the old page.
-        func schemaTwoHistoryPage(
-            offset: Int, previous: JournalV2ReadOnlyInspection
-        ) throws -> JournalV2ReadOnlyInspection {
-            guard !ready, controller == nil, sessionLock != nil,
-                  let displayed = schemaTwoInspection,
-                  displayed.version == previous.version,
-                  displayed.lastObservedAt == previous.lastObservedAt
-            else { throw WorktimeHistoryError.stalePage }
-            return try JournalV2ReadOnlyInspection(
-                url: databaseURL(), now: Self.sample().wall, offset: offset, previous: previous
-            )
-        }
-
         func recentHistory(offset: Int = 0, previous: WorktimeHistory? = nil) throws -> WorktimeHistory? {
             try controller?.recentHistory(now: Self.sample().wall, offset: offset, previous: previous)
         }
