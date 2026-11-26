@@ -19,8 +19,9 @@ struct JournalV2DesiredDepartureSafetyTests {
         try run(directory.appendingPathComponent("worktime.sqlite"))
     }
 
-    private func started(_ url: URL, profile: WorkdayProfile = WorkdayProfile()) throws
-        -> (JournalV2WorktimeController, UUID) {
+    private func started(
+        _ url: URL, profile: WorkdayProfile = WorkdayProfile()
+    ) throws -> (JournalV2WorktimeController, UUID) {
         var controller = try JournalV2WorktimeController(url: url, createIfMissing: true, sample: sample(100))
         let dayID = UUID()
         _ = try controller.perform(
@@ -50,8 +51,9 @@ struct JournalV2DesiredDepartureSafetyTests {
             #expect(plan?.desired.count == 1)
             #expect(plan?.desired.first?.trigger == 3100)
 
+            let savedDay = try #require(changed?.day)
             let cleared = try controller.clearDesiredDeparture(
-                expectedDay: try #require(changed?.day), sample: sample(104)
+                expectedDay: savedDay, sample: sample(104)
             )
             #expect(cleared?.desiredDepartureAt == nil)
             let automatic = try controller.reminderState(sample: sample(105))
