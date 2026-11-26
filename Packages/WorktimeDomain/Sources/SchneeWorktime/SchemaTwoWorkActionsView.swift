@@ -50,6 +50,13 @@
                 if let notice = model.schemaTwoWorkNotice {
                     Text(notice).font(.caption).foregroundStyle(.orange)
                 }
+                Button("schema-2全履歴をJSONでバックアップ") {
+                    model.chooseSchemaTwoBackupDestination()
+                }
+                .disabled(model.choosingBackupDestination || model.schemaTwoWorkBusy)
+                if let backupNotice = model.backupNotice {
+                    Text(backupNotice).font(.caption).textSelection(.enabled)
+                }
                 Button("観測を停止して履歴の読み取り専用表示に戻る") {
                     model.stopSchemaTwoObservation()
                 }
