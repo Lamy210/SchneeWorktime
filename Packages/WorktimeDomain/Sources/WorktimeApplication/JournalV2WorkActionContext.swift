@@ -36,12 +36,9 @@ public extension JournalV2WorktimeController {
             throw JournalV2WorkActionError.staleContext
         }
         _ = try repository.revalidate(session, now: sample.wall)
-        let hasCapacity: Bool
-        switch command {
-        case .clockIn:
-            hasCapacity = expected.canOpenWorkday
-        default:
-            hasCapacity = expected.canAppend
+        let hasCapacity = switch command {
+        case .clockIn: expected.canOpenWorkday
+        default: expected.canAppend
         }
         guard hasCapacity else {
             throw JournalV2WorkActionError.insufficientCapacity
