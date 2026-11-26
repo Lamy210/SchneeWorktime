@@ -1,7 +1,7 @@
 import Foundation
 import Testing
 import WorktimeDomain
-import WorktimeStore
+@testable import WorktimeStore
 @testable import WorktimeApplication
 
 @MainActor
