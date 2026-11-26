@@ -170,9 +170,9 @@
 
         private func worked(_ glance: WorktimeGlance) -> String {
             let bounds = glance.snapshot.bounds
-            return bounds.lowerBound == bounds.upperBound
-                ? "\(bounds.lowerBound)秒"
-                : "\(bounds.lowerBound)〜\(bounds.upperBound)秒"
+            return bounds.lower == bounds.upper
+                ? "\(bounds.lower)秒"
+                : "\(bounds.lower)〜\(bounds.upper)秒"
         }
 
         private func categoryLabel(_ value: ReviewClassification?) -> String {
