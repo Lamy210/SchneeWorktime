@@ -100,6 +100,33 @@ struct JournalV2WorktimeIntentTests {
         }
     }
 
+    @Test func `confirmed retrospective start distinguishes future and current time without writing`() throws {
+        try fixture { url, controller in
+            let context = controller.workActionContext
+            let profile = try WorkdayProfile()
+            let repository = try JournalV2Repository(url: url)
+            let before = try repository.load(now: 100)
+            #expect(throws: RetrospectiveStartError.futureStart) {
+                try controller.previewConfirmedRetrospectiveStart(
+                    at: 101, profile: profile, matching: context, sample: sample(100)
+                )
+            }
+            #expect(throws: RetrospectiveStartError.currentStart) {
+                try controller.previewConfirmedRetrospectiveStart(
+                    at: 100, profile: profile, matching: context, sample: sample(100)
+                )
+            }
+            let prior = try controller.previewConfirmedRetrospectiveStart(
+                at: 99, profile: profile, matching: context, sample: sample(100)
+            )
+            #expect(prior.startedAt == 99)
+            let after = try repository.load(now: 100)
+            #expect(after.version == before.version)
+            #expect(after.catalog == before.catalog)
+            #expect(after.checkpoint == before.checkpoint)
+        }
+    }
+
     @Test func `backdated start refuses stale confirmation and overlapping start`() throws {
         try fixture { url, initial in
             var controller = initial
