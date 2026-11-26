@@ -100,10 +100,14 @@
         }
 
         func schemaTwoClockInSettings(profile: WorkdayProfile) throws -> JournalV2ClockInSettings {
-            try JournalV2ClockInSettings(
-                profile: profile, timeZoneID: TimeZone.current.identifier,
-                wallTime: ReferencePreferences.wallTime()
-            )
+            do {
+                return try JournalV2ClockInSettings(
+                    profile: profile, timeZoneID: TimeZone.current.identifier,
+                    wallTime: ReferencePreferences.wallTime()
+                )
+            } catch is ReferenceTimeError {
+                throw JournalV2ClockInSettingsError.invalidReference
+            }
         }
 
         func performSchemaTwoWork(
@@ -133,7 +137,7 @@
                 queueReminders(force: true)
             } catch JournalV2WorkActionError.staleContext {
                 schemaTwoWorkNotice = "勤務記録・設定・タイムゾーンが更新されました。操作内容を再確認してください。"
-            } catch is ReferenceTimeError {
+            } catch JournalV2ClockInSettingsError.invalidReference {
                 schemaTwoWorkNotice = "参考終業時刻の設定を確認してください。"
             } catch JournalV2WorkActionError.invalidTransition {
                 schemaTwoWorkNotice = "勤務状態が操作と一致しません。操作を再確認してください。"
