@@ -19,6 +19,7 @@ public struct JournalV2WorktimeCorrectionProposal {
     public let after: WorktimeGlance
     public let summaryImpacts: [ClockInSummaryImpact]
     fileprivate let source: JournalV2WorktimeCorrectionSource
+    fileprivate let displayedContext: JournalV2WorkActionContext
 
     public var movesSummaryPeriod: Bool {
         summaryImpacts.count > 1
@@ -152,6 +153,47 @@ public extension JournalV2WorktimeController {
         session.version == proposal.version && session.catalog.days.contains(proposal.before.day)
     }
 
+    /// Rebuild only an unchanged observation review against the current owned
+    /// session. Never rebind a boundary correction or accept a different
+    /// selection, classification, day or Journal generation.
+    mutating func commitReviewAfterRoutineObservation(
+        _ proposal: JournalV2WorktimeCorrectionProposal,
+        matching expected: JournalV2WorkActionContext, sample: ClockSample
+    ) throws -> WorktimeGlance? {
+        guard proposal.displayedContext == expected,
+              workActionContext.permitsRoutineObservation(since: expected),
+              proposal.before.day == expected.day, isCurrent(proposal),
+              case let .review(original) = proposal.source
+        else { throw JournalV2WorktimeCorrectionError.staleProposal }
+        guard expected.canAppend else {
+            throw JournalV2WorkActionError.insufficientCapacity
+        }
+        if expected == workActionContext {
+            return try commitConfirmedReview(proposal, matching: expected, sample: sample)
+        }
+        let review = original.preview.review
+        guard let source = proposal.before.reviewableGaps.first(where: {
+            $0.start <= review.selection.start && $0.end >= review.selection.end
+        }) else { throw JournalV2WorktimeCorrectionError.staleProposal }
+        let fresh = try previewConfirmedReview(
+            source: source, selection: review.selection, classification: review.classification,
+            matching: workActionContext, sample: sample
+        )
+        guard case let .review(rebuilt) = fresh.source,
+              original.preview.version == rebuilt.preview.version,
+              original.preview.dayID == rebuilt.preview.dayID,
+              Self.sameReviewEffect(review, rebuilt.preview.review)
+        else { throw JournalV2WorktimeCorrectionError.staleProposal }
+        return try commitConfirmedReview(fresh, matching: workActionContext, sample: sample)
+    }
+
+    private static func sameReviewEffect(_ original: HistoryReviewResult, _ fresh: HistoryReviewResult) -> Bool {
+        original.selection == fresh.selection && original.classification == fresh.classification &&
+            original.beforeIntervals == fresh.beforeIntervals && original.beforeUncertainty == fresh.beforeUncertainty &&
+            original.afterIntervals == fresh.afterIntervals && original.afterUncertainty == fresh.afterUncertainty &&
+            original.reviewedAt <= fresh.reviewedAt
+    }
+
     /// A correction to an ended historical day may coexist with an active day.
     /// Preserve that day's observedAt marker in the very same SQLite COMMIT
     /// as the audit event. Never manufacture a marker while on break.
@@ -221,7 +263,7 @@ private extension JournalV2WorktimeController {
         let after = try WorktimeGlance(catalog: revised, now: sample.wall, dayID: before.day.id)
         return JournalV2WorktimeCorrectionProposal(
             version: session.version, kind: kind, before: before, after: after,
-            summaryImpacts: impacts, source: source
+            summaryImpacts: impacts, source: source, displayedContext: workActionContext
         )
     }
 }
