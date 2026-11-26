@@ -35,11 +35,10 @@ public struct JournalV2WorktimeController {
         )
         session = try repository.load(now: sample.wall)
         if let expectedReadOnly {
-            guard session.version == expectedReadOnly.version else {
-                throw SnapshotStoreError.staleVersion
-            }
-            guard JournalV2Repository.sameCommittedState(expectedReadOnly, session) else {
-                throw JournalMigrationError.verificationFailed
+            guard session.version == expectedReadOnly.version,
+                  JournalV2Repository.sameCommittedState(expectedReadOnly, session)
+            else {
+                throw JournalV2ReadOnlyActivationError.staleSnapshot
             }
         }
         clock = ClockObservation(initial: sample)
