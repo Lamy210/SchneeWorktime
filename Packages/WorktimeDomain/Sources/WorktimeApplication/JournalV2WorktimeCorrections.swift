@@ -189,7 +189,8 @@ public extension JournalV2WorktimeController {
 
     private static func sameReviewEffect(_ original: HistoryReviewResult, _ fresh: HistoryReviewResult) -> Bool {
         original.selection == fresh.selection && original.classification == fresh.classification &&
-            original.beforeIntervals == fresh.beforeIntervals && original.beforeUncertainty == fresh.beforeUncertainty &&
+            original.beforeIntervals == fresh.beforeIntervals &&
+            original.beforeUncertainty == fresh.beforeUncertainty &&
             original.afterIntervals == fresh.afterIntervals && original.afterUncertainty == fresh.afterUncertainty &&
             original.reviewedAt <= fresh.reviewedAt
     }
