@@ -36,11 +36,12 @@
             warningAcknowledged: Bool
         ) throws {
             guard schemaTwoDesiredDepartureEnabled, var current = schemaTwoWorkSession,
-                  expected == current.workActionContext, current.isCurrent(proposal)
+                  current.workActionContext.permitsRoutineObservation(since: expected),
+                  current.isCurrent(proposal)
             else { throw DesiredDepartureSaveError.staleProposal }
             do {
-                let updated = try current.commitDesiredDeparture(
-                    proposal, warningAcknowledged: warningAcknowledged, sample: Self.sample()
+                let updated = try current.commitConfirmedDesiredDeparture(
+                    proposal, matching: expected, warningAcknowledged: warningAcknowledged, sample: Self.sample()
                 )
                 schemaTwoWorkSession = current
                 schemaTwoWorkGlance = updated
@@ -58,12 +59,12 @@
 
         func clearSchemaTwoDesiredDeparture(matching expected: JournalV2WorkActionContext) throws {
             guard schemaTwoDesiredDepartureEnabled, var current = schemaTwoWorkSession,
-                  expected == current.workActionContext, let day = expected.day,
+                  current.workActionContext.permitsRoutineObservation(since: expected), let day = expected.day,
                   schemaTwoWorkGlance?.day == day,
                   schemaTwoWorkGlance?.desiredDepartureAt != nil
             else { throw DesiredDepartureSaveError.staleProposal }
             do {
-                let updated = try current.clearDesiredDeparture(expectedDay: day, sample: Self.sample())
+                let updated = try current.clearConfirmedDesiredDeparture(matching: expected, sample: Self.sample())
                 schemaTwoWorkSession = current
                 schemaTwoWorkGlance = updated
                 schemaTwoWorkNotice = nil
