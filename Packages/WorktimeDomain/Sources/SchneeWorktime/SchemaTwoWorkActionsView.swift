@@ -214,7 +214,7 @@
             guard let time = settings.wallTime else { return "無効・\(settings.timeZoneID)" }
             let day = time.dayOffset == 0 ? "開始日" : "翌日"
             let clock = String(format: "%02d:%02d", time.hour, time.minute)
-            let occurrence: String = switch time.repeatedTime {
+            let occurrence = switch time.repeatedTime {
             case .earlier: "早い方"
             case .later: "遅い方"
             case nil: "未選択"
