@@ -27,7 +27,16 @@
 | 配布 | #34、UNSIGNED_RELEASE.md | 最新mainの候補生成、ZIP/checksum、インストール、更新・復旧、実機QA |
 | 振り返り（M1） | #51, #52 | 日週月/グラフ/CSVを統合済み。正式勤怠や給与計算ではない。実機QA未完 |
 
-## schema-2の希望退勤UI（PR #136・検証中）
+## schema-2の未観測区間レビューUI（PR #137・検証中）
+
+- schema-2のmacOS勤務操作画面に、**最後に表示された勤務日の未観測区間**を秒単位で選択し、利用者が明示的に「勤務」「休憩」「非勤務」のいずれかで訂正する画面を追加。勤務が実際に行われたかを自動推定しない。過去日の選択・訂正はこのUIに含めない。
+- 訂正候補は`JournalV2WorktimeController.previewReview`と`ReviewRangeSelection.selection`で検証。Journal・Checkpointを変更せずに訂正前後の実働上下限・記録済み休憩秒数を表示し、**ユーザーが「訂正を確定して保存」するまで書き込まない**。
+- 画面で確認した`JournalV2WorkActionContext`（epoch/revision・Workday・Checkpoint）と訂正プレビューを確定時に突き合わせる。勤務日変更、別の打刻/訂正、Checkpointのみの並行更新、休止・時計異常・Journal容量不足は拒否。実際の書込みは既存`commitCorrection`の監査付きイベントと現行勤務日のCheckpointを**同一トランザクション**で保存する。
+- 保存後はschema-2の現行勤務Glanceと所有通知を再計算。ストレージの結果が不確実ならセッションを破棄し所有通知の取消を進め、同じ訂正を自動再試行しない。
+- 追加5テストで部分区間の休憩訂正と残余、勤務としての明示確定までの原本不変、同revisionのCheckpoint-only再観測・外部並行変更、範囲外指定の拒否を検証。macOS実機UI/VoiceOver、過去勤務日の選択・訂正、休憩境界/出退勤時刻変更UIは未検証/未接続。
+- P0残存: 過去日を含む完全な履歴訂正UI、参考時刻・過去始業、復元/全履歴削除と中断復旧、macOS実機QA/RC受入。**v1.0 NO-GOを継続**。
+
+## schema-2の希望退勤UI（PR #136・統合済み）
 
 - **既存のschema-2 `JournalV2WorktimeController.previewDesiredDeparture / commitDesiredDeparture / clearDesiredDeparture`をmacOSメニュー・パネルに接続。** 現在の勤務日が稼働中または休憩中の場合、希望退勤日時を確認して保存・変更・解除できる。これは利用者の希望であり、**退勤打刻・勤務実績の推定・自動終業を行わない**。
 - 候補プレビューは読み取り専用のJournal/Checkpoint再検証を行い、保存時は表示済み`JournalV2WorkActionContext`（epoch/revision・Workday・Checkpoint）と`JournalV2DesiredDepartureProposal`の両方を検査。時間が進んで候補の可否が変化した場合やDBが更新された場合は再確認を求める。**Checkpoint-onlyの同revision更新もCASで拒否**。
