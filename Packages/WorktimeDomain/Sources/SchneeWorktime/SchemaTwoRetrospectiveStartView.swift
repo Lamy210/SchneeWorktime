@@ -31,6 +31,11 @@
             DisclosureGroup("過去の始業時刻を記録（schema-2）") {
                 DatePicker("始業日時", selection: $start, displayedComponents: [.date, .hourAndMinute])
                 ReferenceSettingsView()
+                    .disabled(proposal != nil)
+                if proposal != nil {
+                    Text("参考終業設定を変更する場合は確認案をキャンセルしてください。")
+                        .font(.caption)
+                }
                 Text("過去の勤務は観測事実ではなく、利用者による明示的な申告です。現在のタイムゾーンで始業日時を解釈します。")
                     .font(.caption)
                 Button("記録内容を確認") { prepare() }
