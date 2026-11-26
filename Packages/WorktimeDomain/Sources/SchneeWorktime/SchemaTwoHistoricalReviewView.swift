@@ -24,7 +24,7 @@
                     }
                 }
                 if let historical, model.schemaTwoWorkSession?.isCurrent(historical) == true {
-                    SchemaTwoHistoricalGapEditor(model: model, historical: historical)
+                    SchemaTwoHistoricalGapEditor(model: model, historical: historical, onSaved: didSave)
                         .id(historical.glance.day.id)
                     Button("選択解除") { self.historical = nil }
                 }
@@ -36,6 +36,11 @@
             .onChange(of: model.schemaTwoActionContext?.version) { _, _ in
                 historical = nil
             }
+        }
+
+        private func didSave() {
+            reload()
+            notice = history == nil ? "訂正を保存しました。履歴の再読込が必要です。" : "訂正を保存し、最新履歴を読み込みました。"
         }
 
         private func page(_ page: WorktimeHistory) -> some View {
@@ -87,6 +92,7 @@
     private struct SchemaTwoHistoricalGapEditor: View {
         @ObservedObject var model: DesktopModel
         let historical: HistoricalReviewContext
+        let onSaved: () -> Void
         @State private var index = 0
         @State private var start = "0"
         @State private var end = ""
@@ -151,10 +157,13 @@
                 Text("選択：\(label(value.selection.start))〜\(label(value.selection.end))")
                 Text("分類：\(category(value.classification))")
                 Text("実働：\(worked(value.correction.before)) → \(worked(value.correction.after))")
-                Text("休憩：\(value.correction.before.snapshot.recordedRest) → \(value.correction.after.snapshot.recordedRest)秒")
+                let before = value.correction.before.snapshot.recordedRest
+                let after = value.correction.after.snapshot.recordedRest
+                Text("休憩：\(before) → \(after)秒")
                 Text("申告した区間だけ訂正し、監査履歴を保存します。").font(.caption)
                 Button("訂正を確定") { commit(value, gap: gap) }
-                    .disabled(model.schemaTwoWorkSession?.isCurrent(value) != true || selection(in: gap) != value.selection)
+                    .disabled(model.schemaTwoWorkSession?.isCurrent(value) != true ||
+                        selection(in: gap) != value.selection)
                 Button("キャンセル") { proposal = nil }
             }
             .font(.caption)
@@ -180,7 +189,7 @@
             proposal = nil
             do {
                 try model.commitSchemaTwoHistoricalGap(value)
-                notice = "訂正を保存しました。最新履歴を読み込んでください。"
+                onSaved()
             } catch {
                 notice = "保存を確認できません。自動再試行せず、最新記録を確認してください。"
             }
