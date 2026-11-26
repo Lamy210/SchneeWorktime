@@ -3,7 +3,8 @@ import WorktimeDomain
 import WorktimeStore
 
 /// A specific observed Journal/Checkpoint generation shown to the user.
-/// The token is invalid after any command or checkpoint-only write.
+/// Strict confirmations require this exact token. Basic attendance actions may
+/// explicitly allow a routine checkpoint advance within the same live session.
 public struct JournalV2WorkActionContext: Sendable, Equatable {
     let sessionID: UUID
     public let version: StoreVersion
@@ -20,6 +21,7 @@ public struct JournalV2WorkActionContext: Sendable, Equatable {
               day == displayed.day, day?.state == .working,
               canOpenWorkday == displayed.canOpenWorkday, canAppend == displayed.canAppend,
               let before = displayed.checkpoint, let after = checkpoint,
+              before.version == displayed.version, after.version == version,
               before.dayID == after.dayID, after.dayID == day?.id
         else { return false }
         return after.observedAt > before.observedAt
