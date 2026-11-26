@@ -16,6 +16,7 @@
         @Published var schemaTwoWorkGlance: WorktimeGlance? {
             didSet { updateObservationTimer() }
         }
+
         @Published var schemaTwoWorkNotice: String?
         @Published var schemaTwoWorkBusy = false
         @Published private(set) var message: String?
@@ -65,9 +66,8 @@
         }
 
         private func updateObservationTimer() {
-            observationTimer.update(
-                to: ObservationCadence(dayState: schemaTwoWorkGlance?.day.state ?? glance?.day.state)
-            ) { [weak self] in
+            let cadence = ObservationCadence(dayState: schemaTwoWorkGlance?.day.state ?? glance?.day.state)
+            observationTimer.update(to: cadence) { [weak self] in
                 self?.tick()
             }
         }
@@ -302,8 +302,8 @@
                 message = "記録を停止：\(error)。既存DBを上書きせず、時刻・権限・バックアップを確認してください。"
             }
         }
-
     }
+
     extension DesktopModel {
         var remindersSupported: Bool {
             reminderCoordinator != nil
