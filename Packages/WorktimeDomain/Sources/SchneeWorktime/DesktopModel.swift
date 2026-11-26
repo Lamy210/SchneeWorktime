@@ -90,6 +90,12 @@
                     return
                 }
                 let sample = try Self.sample()
+                if let reason = try schemaTwoStartupBlockReason(url: url, create: create) {
+                    message = reason
+                    reminderStateUntrusted = true
+                    queueReminders(force: true)
+                    return
+                }
                 var opened = try WorktimeController(url: url, createIfMissing: create, sample: sample)
                 glance = try opened.refresh(sample: sample)
                 controller = opened
