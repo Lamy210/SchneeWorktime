@@ -18,6 +18,10 @@
             try? NextDaySettings(targetMinutes: targetMinutes, restMinutes: restMinutes).profile
         }
 
+        private var selectedInstant: Int64? {
+            Int64(exactly: (start.timeIntervalSince1970 / 60).rounded(.down) * 60)
+        }
+
         var body: some View {
             DisclosureGroup("過去の始業時刻を記録（schema-2）") {
                 DatePicker("始業日時", selection: $start, displayedComponents: [.date, .hourAndMinute])
@@ -52,7 +56,8 @@
                     .font(.caption)
                 Button("申告した勤務実績を確定") { commit(value) }
                     .disabled(!model.schemaTwoRetrospectiveStartEnabled ||
-                        expected != model.schemaTwoActionContext || profile != value.preview.day.profile)
+                        expected != model.schemaTwoActionContext || profile != value.preview.day.profile ||
+                        selectedInstant != value.startedAt)
                 Button("候補をキャンセル") { reset() }
             }
         }
@@ -60,7 +65,7 @@
         private func prepare() {
             reset()
             guard let context = model.schemaTwoActionContext, let profile,
-                  let instant = Int64(exactly: (start.timeIntervalSince1970 / 60).rounded(.down) * 60)
+                  let instant = selectedInstant
             else {
                 notice = "日時と勤務開始設定を確認してください。"
                 return
@@ -77,7 +82,8 @@
 
         private func commit(_ value: RetrospectiveStartProposal) {
             guard let context = expected, let profile,
-                  context == model.schemaTwoActionContext
+                  context == model.schemaTwoActionContext, selectedInstant == value.startedAt,
+                  profile == value.preview.day.profile
             else {
                 reset()
                 notice = "記録が更新されました。保存せず再確認してください。"
