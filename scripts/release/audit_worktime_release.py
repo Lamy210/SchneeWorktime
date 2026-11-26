@@ -20,6 +20,16 @@ EVIDENCE = ROOT / "docs/SchneeWorktime/P0_RELEASE_EVIDENCE.json"
 ROW = re.compile(r"^\|\s*(AC-\d{2,3})\s*\|\s*(P[01])\s*\|")
 SHA = re.compile(r"^[0-9a-f]{40}$")
 STATES = {"unverified", "blocked", "passed"}
+# Pin identities, not only counts: exchanging a P0 and a P1 must not
+# silently remove a release requirement. Change only by explicit scope review.
+BASELINE_P1 = {
+    "AC-33", "AC-34", "AC-35", "AC-36",
+    "AC-37", "AC-38", "AC-39", "AC-40",
+    "AC-54", "AC-55", "AC-56", "AC-76",
+    "AC-77", "AC-78", "AC-79", "AC-80",
+    "AC-81", "AC-82", "AC-83", "AC-84",
+    "AC-89", "AC-100", "AC-117", "AC-138",
+}
 GATES = {
     "openspec_strict",
     "main_required_ci",
@@ -55,15 +65,34 @@ def matrix_p0(text: str, *, enforce_baseline: bool = True) -> set[str]:
     p0 = {ac_id for ac_id, priority in found.items() if priority == "P0"}
     if enforce_baseline and len(p0) != 148:
         raise AuditError(f"P0 baseline changed: expected 148, got {len(p0)}")
+    if enforce_baseline and set(found) - p0 != BASELINE_P1:
+        raise AuditError("acceptance priority baseline changed; review P0/P1 identities")
     return p0
+
+
+def unique_json_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    """Reject duplicate JSON keys at every depth instead of silently overwriting."""
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise AuditError(f"duplicate evidence JSON key: {key}")
+        result[key] = value
+    return result
+
+
+def parse_evidence(text: str) -> Any:
+    return json.loads(text, object_pairs_hook=unique_json_object)
 
 
 def check_record(
     record: Any, p0: set[str], *, require_complete: bool = False,
     source_sha: str | None = None,
 ) -> dict[str, int]:
-    if not isinstance(record, dict) or record.get("schema_version") != 1:
+    if (not isinstance(record, dict) or type(record.get("schema_version")) is not int
+            or record["schema_version"] != 1):
         raise AuditError("unsupported evidence schema")
+    if set(record) != {"schema_version", "p0", "release_gates"}:
+        raise AuditError("missing or extra evidence root fields")
     entries = record.get("p0")
     if not isinstance(entries, dict) or set(entries) != p0:
         missing = sorted(p0 - set(entries)) if isinstance(entries, dict) else sorted(p0)
@@ -82,7 +111,7 @@ def check_record(
         if set(entry) != {"status", "test_ids", "evidence_urls", "source_sha", "note"}:
             raise AuditError(f"{name}: missing or extra evidence fields")
         state = entry["status"]
-        if state not in STATES:
+        if not isinstance(state, str) or state not in STATES:
             raise AuditError(f"{name}: invalid state {state!r}")
         counts[state] += 1
         if not isinstance(entry["note"], str):
@@ -125,7 +154,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         p0 = matrix_p0(args.matrix.read_text(encoding="utf-8"))
-        record = json.loads(args.evidence.read_text(encoding="utf-8"))
+        record = parse_evidence(args.evidence.read_text(encoding="utf-8"))
         counts = check_record(
             record, p0, require_complete=args.require_complete,
             source_sha=args.source_sha,
