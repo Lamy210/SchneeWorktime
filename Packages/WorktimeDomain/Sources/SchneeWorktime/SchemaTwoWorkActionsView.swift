@@ -55,6 +55,7 @@
                 if let glance = model.schemaTwoWorkGlance, !glance.reviewableGaps.isEmpty {
                     SchemaTwoReviewableGapsView(model: model, glance: glance)
                 }
+                clockBoundaryControls
                 SchemaTwoDesiredDepartureView(model: model)
                 SchemaTwoReminderSettingsView(model: model)
                 Button("観測を停止して履歴の読み取り専用表示に戻る") {
@@ -67,6 +68,13 @@
             }
             .onChange(of: targetMinutes) { _, _ in invalidateProfile() }
             .onChange(of: restMinutes) { _, _ in invalidateProfile() }
+        }
+
+        @ViewBuilder
+        private var clockBoundaryControls: some View {
+            if let day = model.schemaTwoWorkGlance?.day, day.state == .ended {
+                SchemaTwoClockBoundaryView(model: model, day: day)
+            }
         }
 
         @ViewBuilder
