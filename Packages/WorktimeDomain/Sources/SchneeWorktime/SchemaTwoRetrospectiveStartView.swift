@@ -75,6 +75,10 @@
                     at: instant, profile: profile, matching: context
                 )
                 expected = context
+            } catch RetrospectiveStartError.futureStart {
+                notice = "未来の始業は勤務実績として保存できません。予定として管理し、実際の始業後に打刻してください（始業予定の保存機能は未接続です）。"
+            } catch RetrospectiveStartError.currentStart {
+                notice = "現在の始業は「勤務開始」から記録してください。"
             } catch {
                 notice = "過去日時・重複・容量・時計を確認してください。"
             }
