@@ -12,12 +12,12 @@
         }
 
         @Published private(set) var ready = false
-        @Published private(set) var schemaTwoInspection: JournalV2ReadOnlyInspection?
-        @Published private(set) var schemaTwoWorkGlance: WorktimeGlance? {
+        @Published var schemaTwoInspection: JournalV2ReadOnlyInspection?
+        @Published var schemaTwoWorkGlance: WorktimeGlance? {
             didSet { updateObservationTimer() }
         }
-        @Published private(set) var schemaTwoWorkNotice: String?
-        @Published private(set) var schemaTwoWorkBusy = false
+        @Published var schemaTwoWorkNotice: String?
+        @Published var schemaTwoWorkBusy = false
         @Published private(set) var message: String?
         @Published private(set) var reviewProposal: WorktimeReviewProposal?
         @Published private(set) var reviewNotice: String?
@@ -44,12 +44,12 @@
         @Published private(set) var requestingReminderPermission = false
 
         private(set) var controller: WorktimeController?
-        private(set) var schemaTwoWorkSession: JournalV2WorktimeController?
-        private(set) var sessionLock: LocalSessionLock?
+        var schemaTwoWorkSession: JournalV2WorktimeController?
+        var sessionLock: LocalSessionLock?
         private(set) var reminderCoordinator: DesktopReminderCoordinator?
         private(set) var reminderRunning = false
         private var nextReminderCheck: Double = 0
-        private var reminderStateUntrusted = false
+        var reminderStateUntrusted = false
         private let observationTimer = DesktopObservationTimer()
 
         init() {
@@ -304,7 +304,6 @@
         }
 
     }
-
     extension DesktopModel {
         var remindersSupported: Bool {
             reminderCoordinator != nil
@@ -377,7 +376,7 @@
             }
         }
 
-        private func queueReminders(force: Bool = false) {
+        func queueReminders(force: Bool = false) {
             guard !maintenanceInProgress else { return }
             if force {
                 nextReminderCheck = 0
