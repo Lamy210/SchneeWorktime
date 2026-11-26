@@ -47,6 +47,59 @@ struct JournalV2WorktimeIntentTests {
         }
     }
 
+    @Test func `confirmed retrospective start rejects changed settings and preserves the original journal`() throws {
+        try fixture { url, initial in
+            var controller = initial
+            let profile = try WorkdayProfile()
+            let changed = try WorkdayProfile(target: 3600, expectedRest: 0)
+            let expected = controller.workActionContext
+            let repository = try JournalV2Repository(url: url)
+            let before = try repository.load(now: 100)
+            let proposal = try controller.previewConfirmedRetrospectiveStart(
+                at: 90, profile: profile, matching: expected, sample: sample(100)
+            )
+            #expect(throws: RetrospectiveStartError.staleProposal) {
+                try controller.commitConfirmedRetrospectiveStart(
+                    proposal, profile: changed, matching: expected, sample: sample(101)
+                )
+            }
+            let untouched = try repository.load(now: 101)
+            #expect(untouched.version == before.version)
+            #expect(untouched.catalog == before.catalog)
+            #expect(untouched.checkpoint == before.checkpoint)
+            let result = try controller.commitConfirmedRetrospectiveStart(
+                proposal, profile: profile, matching: expected, sample: sample(102)
+            )
+            #expect(result?.day.profile == profile)
+            #expect(result?.day.intervals.first?.start == 90)
+            #expect(try repository.load(now: 102).checkpoint?.observedAt == 102)
+            #expect(throws: RetrospectiveStartError.staleProposal) {
+                try controller.commitConfirmedRetrospectiveStart(
+                    proposal, profile: profile, matching: expected, sample: sample(103)
+                )
+            }
+            #expect(try repository.load(now: 103).catalog.days.count == 1)
+        }
+    }
+
+    @Test func `confirmed retrospective start rejects an obsolete idle context`() throws {
+        try fixture { url, initial in
+            var controller = initial
+            let profile = try WorkdayProfile()
+            let expected = controller.workActionContext
+            _ = try controller.perform(.clockIn(id: UUID(), profile: profile), sample: sample(101))
+            _ = try controller.perform(.clockOut(confirmBreak: false), sample: sample(110))
+            #expect(throws: RetrospectiveStartError.staleProposal) {
+                try controller.previewConfirmedRetrospectiveStart(
+                    at: 111, profile: profile, matching: expected, sample: sample(112)
+                )
+            }
+            let saved = try JournalV2Repository(url: url).load(now: 112)
+            #expect(saved.catalog.days.count == 1)
+            #expect(saved.catalog.activeID == nil)
+        }
+    }
+
     @Test func `backdated start refuses stale confirmation and overlapping start`() throws {
         try fixture { url, initial in
             var controller = initial
