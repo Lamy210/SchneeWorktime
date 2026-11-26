@@ -45,6 +45,49 @@ public struct JournalV2Repository {
         try JournalV2Session(JournalV2LiveStore.inspectReadOnly(url: url, now: now))
     }
 
+    /// Compare the exact event rows, epoch/revision, replayed catalog and
+    /// observation checkpoint. Equality of revision alone is insufficient.
+    public static func sameCommittedState(
+        _ expected: JournalV2Session, _ actual: JournalV2Session
+    ) -> Bool {
+        matches(actual.source, expected.source)
+    }
+
+    /// Re-read the entire Journal without a writable SQLite handle.
+    /// A stale inspection must never be treated as a current backup source.
+    public static func revalidateReadOnly(
+        url: URL, now: Int64, matching expected: JournalV2Session
+    ) throws -> JournalV2Session {
+        let current = try inspectReadOnly(url: url, now: now)
+        guard current.version == expected.version else { throw SnapshotStoreError.staleVersion }
+        guard sameCommittedState(expected, current) else {
+            throw JournalMigrationError.verificationFailed
+        }
+        return current
+    }
+
+    /// Export the exact displayed read-only generation, without recovering
+    /// observations or opening the live SQLite file for writing. Destination
+    /// must be outside the application-owned live database directory tree.
+    public static func writeReadOnlyBackup(
+        from url: URL, to destination: URL, now: Int64, matching expected: JournalV2Session
+    ) throws {
+        let sourceDirectory = try DatabaseFileGuard.canonicalURL(url)
+            .deletingLastPathComponent().pathComponents
+        let destinationDirectory = destination.deletingLastPathComponent()
+            .resolvingSymlinksInPath().pathComponents
+        guard destination.isFileURL, !destinationDirectory.starts(with: sourceDirectory) else {
+            throw BackupFileError.invalidDestination
+        }
+        let current = try revalidateReadOnly(url: url, now: now, matching: expected)
+        let bytes = try JournalV2Backup.encode(current.source, now: now)
+        try BackupFile.publish(bytes, to: destination, maxBytes: JournalV2Backup.maxBytes)
+        // Do not delete an archive when a publication/readback is ambiguous.
+        guard try BackupFile.load(destination, maxBytes: JournalV2Backup.maxBytes) == bytes else {
+            throw JournalV2BackupError.invalidArchive
+        }
+    }
+
     public func load(now: Int64) throws -> JournalV2Session {
         try JournalV2Session(store.load(now: now))
     }
