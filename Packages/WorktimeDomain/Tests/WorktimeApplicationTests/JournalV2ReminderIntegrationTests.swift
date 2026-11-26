@@ -46,6 +46,32 @@ struct JournalV2ReminderIntegrationTests {
         try await work(root.appendingPathComponent("worktime.sqlite"))
     }
 
+    private func verifyBreakAndResume(
+        _ initial: JournalV2WorktimeController, sync: ReminderSync,
+        delivery: SchemaTwoReminderDeliveryFake
+    ) async throws -> JournalV2WorktimeController {
+        var current = initial
+        _ = try current.performConfirmed(
+            .startBreak, matching: current.workActionContext, sample: sample(110)
+        )
+        let paused = try current.reminderState(sample: sample(111))
+        #expect(paused?.desired.isEmpty == true)
+        let removed = try await sync.reconcile(latest: { paused }, now: { 111 })
+        #expect(removed == .settled)
+        #expect(delivery.requests.isEmpty)
+        #expect(delivery.cancelled.count == 1)
+
+        _ = try current.performConfirmed(
+            .endBreak, matching: current.workActionContext, sample: sample(120)
+        )
+        let resumed = try current.reminderState(sample: sample(121))
+        #expect(resumed?.desired.count == 1)
+        let rescheduled = try await sync.reconcile(latest: { resumed }, now: { 121 })
+        #expect(rescheduled == .settled)
+        #expect(delivery.requests.count == 1)
+        return current
+    }
+
     @Test func `schema two reminders follow committed clock in break resume and clock out`() async throws {
         try await fixture { url in
             let delivery = SchemaTwoReminderDeliveryFake()
@@ -68,24 +94,7 @@ struct JournalV2ReminderIntegrationTests {
             #expect(delivery.added.count == 1)
             #expect(delivery.requests.count == 1)
 
-            _ = try current.performConfirmed(
-                .startBreak, matching: current.workActionContext, sample: sample(110)
-            )
-            let paused = try current.reminderState(sample: sample(111))
-            #expect(paused?.desired.isEmpty == true)
-            let removed = try await sync.reconcile(latest: { paused }, now: { 111 })
-            #expect(removed == .settled)
-            #expect(delivery.requests.isEmpty)
-            #expect(delivery.cancelled.count == 1)
-
-            _ = try current.performConfirmed(
-                .endBreak, matching: current.workActionContext, sample: sample(120)
-            )
-            let resumed = try current.reminderState(sample: sample(121))
-            #expect(resumed?.desired.count == 1)
-            let rescheduled = try await sync.reconcile(latest: { resumed }, now: { 121 })
-            #expect(rescheduled == .settled)
-            #expect(delivery.requests.count == 1)
+            current = try await verifyBreakAndResume(current, sync: sync, delivery: delivery)
 
             _ = try current.performConfirmed(
                 .clockOut(confirmBreak: false),
