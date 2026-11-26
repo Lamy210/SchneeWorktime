@@ -32,6 +32,16 @@
 
         func choosePreservationDestination() {
             guard canPreserveUnavailableDatabase else { return }
+            // The existing preservation exporter understands schema-1 only.
+            // Never offer to rewrite a schema-2 Journal through that path.
+            if let source = try? databaseURL(),
+               (try? DesktopStorageLaunchGuard.decide(
+                   url: source, createIfMissing: false, allowLegacyDevelopment: false
+               )) == .schemaTwoAwaitingUI
+            {
+                backupNotice = "schema-2の保全には対応版が必要です。原本を変更せず、アプリ終了後に保存フォルダ全体を保全してください。"
+                return
+            }
             backupNotice = nil
             choosingBackupDestination = true
             defer { choosingBackupDestination = false }
