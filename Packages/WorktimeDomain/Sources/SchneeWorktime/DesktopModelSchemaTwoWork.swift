@@ -145,7 +145,7 @@
             open(create: false)
         }
 
-        private func schemaTwoSessionFailed(_ error: Error) {
+        func schemaTwoSessionFailed(_ error: Error) {
             schemaTwoWorkSession = nil
             schemaTwoWorkGlance = nil
             schemaTwoInspection = nil
