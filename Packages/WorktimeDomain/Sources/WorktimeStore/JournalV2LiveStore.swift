@@ -21,10 +21,11 @@ struct JournalV2LiveStore {
     private let url: URL
     private let fileIdentity: DatabaseFileGuard.Identity
 
-    init(url: URL, createIfMissing: Bool = false) throws {
+    init(url: URL, createIfMissing: Bool = false, requireNew: Bool = false) throws {
         let canonical = try DatabaseFileGuard.canonicalURL(url)
         self.url = canonical
         let created = try DatabaseFileGuard.prepare(canonical, createIfMissing: createIfMissing)
+        guard !requireNew || created else { throw SnapshotStoreError.invalidSnapshot }
         try Self.connect(canonical, flags: SQLITE_OPEN_READWRITE) { db in
             if created {
                 try Self.transaction(db) {
