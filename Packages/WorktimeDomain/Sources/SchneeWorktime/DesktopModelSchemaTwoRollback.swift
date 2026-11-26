@@ -88,7 +88,8 @@
                 let result = try await coordinator.reconcile(latest: { nil }, now: { try Self.sample().wall })
                 if result == .settled, maintenanceInProgress, sessionLock != nil,
                    !ready, controller == nil, !schemaTwoWorkBusy,
-                   var current = schemaTwoWorkSession, current.isCurrent(confirmation) {
+                   var current = schemaTwoWorkSession, current.isCurrent(confirmation)
+                {
                     try current.commitConfirmedRollback(
                         confirmation, preserveCurrentAt: destination, sample: Self.sample()
                     )
