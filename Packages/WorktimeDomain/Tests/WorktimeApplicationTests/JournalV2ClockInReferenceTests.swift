@@ -80,6 +80,27 @@ struct JournalV2ClockInReferenceTests {
         }
     }
 
+    @Test func `invalid reference is rejected before any attendance write`() throws {
+        try fixture { url, initial in
+            var controller = initial
+            let settings = try JournalV2ClockInSettings(
+                profile: WorkdayProfile(), timeZoneID: "invalid/timezone", wallTime: ReferenceWallTime()
+            )
+            let repository = try JournalV2Repository(url: url)
+            let before = try repository.load(now: 100)
+            #expect(throws: JournalV2ClockInSettingsError.invalidReference) {
+                try controller.performConfirmedClockIn(
+                    id: UUID(), displayed: settings, current: settings,
+                    matching: controller.workActionContext, sample: sample(101)
+                )
+            }
+            let after = try repository.load(now: 101)
+            #expect(after.version == before.version)
+            #expect(after.catalog == before.catalog)
+            #expect(after.checkpoint == before.checkpoint)
+        }
+    }
+
     @Test func `disabled reference captures timezone without creating a reference notification`() throws {
         try fixture { url, initial in
             var controller = initial
