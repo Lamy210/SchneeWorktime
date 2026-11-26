@@ -47,6 +47,119 @@ struct JournalV2WorktimeIntentTests {
         }
     }
 
+    @Test func `confirmed retrospective start rejects changed settings and preserves the original journal`() throws {
+        try fixture { url, initial in
+            var controller = initial
+            let profile = try WorkdayProfile()
+            let changed = try WorkdayProfile(target: 3600, expectedRest: 0)
+            let expected = controller.workActionContext
+            let repository = try JournalV2Repository(url: url)
+            let before = try repository.load(now: 100)
+            let proposal = try controller.previewConfirmedRetrospectiveStart(
+                at: 90, profile: profile, matching: expected, sample: sample(100)
+            )
+            #expect(throws: RetrospectiveStartError.staleProposal) {
+                try controller.commitConfirmedRetrospectiveStart(
+                    proposal, profile: changed, matching: expected, sample: sample(101)
+                )
+            }
+            let untouched = try repository.load(now: 101)
+            #expect(untouched.version == before.version)
+            #expect(untouched.catalog == before.catalog)
+            #expect(untouched.checkpoint == before.checkpoint)
+            let result = try controller.commitConfirmedRetrospectiveStart(
+                proposal, profile: profile, matching: expected, sample: sample(102)
+            )
+            #expect(result?.day.profile == profile)
+            #expect(result?.day.intervals.first?.start == 90)
+            #expect(try repository.load(now: 102).checkpoint?.observedAt == 102)
+            #expect(throws: RetrospectiveStartError.staleProposal) {
+                try controller.commitConfirmedRetrospectiveStart(
+                    proposal, profile: profile, matching: expected, sample: sample(103)
+                )
+            }
+            #expect(try repository.load(now: 103).catalog.days.count == 1)
+        }
+    }
+
+    @Test func `backdated reference is captured from the asserted start and persists across reload`() throws {
+        try fixture { url, initial in
+            var controller = initial
+            let expected = controller.workActionContext
+            let base = try WorkdayProfile()
+            let reference = try ReferenceWallTime(hour: 1)
+            let profile = try base.capturingReference(at: 90, timeZoneID: "Etc/UTC", wallTime: reference)
+            let proposal = try controller.previewConfirmedRetrospectiveStart(
+                at: 90, profile: profile, matching: expected, sample: sample(100)
+            )
+            #expect(proposal.preview.day.profile.reference?.startedAt == 90)
+            #expect(proposal.preview.day.profile.reference?.referenceAt == 3600)
+            let changed = try base.capturingReference(at: 90, timeZoneID: "Asia/Tokyo", wallTime: reference)
+            let repository = try JournalV2Repository(url: url)
+            let before = try repository.load(now: 100)
+            #expect(throws: RetrospectiveStartError.staleProposal) {
+                try controller.commitConfirmedRetrospectiveStart(
+                    proposal, profile: changed, matching: expected, sample: sample(101)
+                )
+            }
+            let unchanged = try repository.load(now: 101)
+            #expect(unchanged.catalog == before.catalog)
+            #expect(unchanged.version == before.version)
+            #expect(unchanged.checkpoint == before.checkpoint)
+            _ = try controller.commitConfirmedRetrospectiveStart(
+                proposal, profile: profile, matching: expected, sample: sample(102)
+            )
+            let saved = try repository.load(now: 102)
+            #expect(saved.catalog.days.last?.profile.reference == profile.reference)
+            #expect(saved.checkpoint?.observedAt == 102)
+        }
+    }
+
+    @Test func `confirmed retrospective start rejects an obsolete idle context`() throws {
+        try fixture { url, initial in
+            var controller = initial
+            let profile = try WorkdayProfile()
+            let expected = controller.workActionContext
+            _ = try controller.perform(.clockIn(id: UUID(), profile: profile), sample: sample(101))
+            _ = try controller.perform(.clockOut(confirmBreak: false), sample: sample(110))
+            #expect(throws: RetrospectiveStartError.staleProposal) {
+                try controller.previewConfirmedRetrospectiveStart(
+                    at: 111, profile: profile, matching: expected, sample: sample(112)
+                )
+            }
+            let saved = try JournalV2Repository(url: url).load(now: 112)
+            #expect(saved.catalog.days.count == 1)
+            #expect(saved.catalog.activeID == nil)
+        }
+    }
+
+    @Test func `confirmed retrospective start distinguishes future and current time without writing`() throws {
+        try fixture { url, controller in
+            let context = controller.workActionContext
+            let profile = try WorkdayProfile()
+            let repository = try JournalV2Repository(url: url)
+            let before = try repository.load(now: 100)
+            #expect(throws: RetrospectiveStartError.futureStart) {
+                try controller.previewConfirmedRetrospectiveStart(
+                    at: 101, profile: profile, matching: context, sample: sample(100)
+                )
+            }
+            #expect(throws: RetrospectiveStartError.currentStart) {
+                try controller.previewConfirmedRetrospectiveStart(
+                    at: 100, profile: profile, matching: context, sample: sample(100)
+                )
+            }
+            let prior = try controller.previewConfirmedRetrospectiveStart(
+                at: 99, profile: profile, matching: context, sample: sample(100)
+            )
+            #expect(prior.startedAt == 99)
+            let after = try repository.load(now: 100)
+            #expect(after.version == before.version)
+            #expect(after.catalog == before.catalog)
+            #expect(after.checkpoint == before.checkpoint)
+        }
+    }
+
     @Test func `backdated start refuses stale confirmation and overlapping start`() throws {
         try fixture { url, initial in
             var controller = initial
