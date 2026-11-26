@@ -55,6 +55,10 @@
                 if let glance = model.schemaTwoWorkGlance, !glance.reviewableGaps.isEmpty {
                     SchemaTwoReviewableGapsView(model: model, glance: glance)
                 }
+                if let day = model.schemaTwoWorkGlance?.day {
+                    SchemaTwoRestBoundaryView(model: model, day: day, boundary: .start)
+                    SchemaTwoRestBoundaryView(model: model, day: day, boundary: .end)
+                }
                 SchemaTwoDesiredDepartureView(model: model)
                 SchemaTwoReminderSettingsView(model: model)
                 Button("観測を停止して履歴の読み取り専用表示に戻る") {
