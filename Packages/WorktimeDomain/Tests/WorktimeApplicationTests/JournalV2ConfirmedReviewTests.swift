@@ -109,6 +109,35 @@ struct JournalV2ConfirmedReviewTests {
         }
     }
 
+    @Test func `explicit repreview after normal checkpoint update is read only until new confirmation`() throws {
+        try fixture { url in
+            let (initial, _, gap) = try observedGap(url: url)
+            var current = initial
+            let displayed = current.workActionContext
+            let old = try current.previewConfirmedReview(
+                source: gap, selection: gap, classification: .rest,
+                matching: displayed, sample: sample(141)
+            )
+            _ = try current.refresh(sample: sample(151))
+            let fresh = current.workActionContext
+            #expect(fresh != displayed)
+            #expect(throws: JournalV2WorktimeCorrectionError.staleProposal) {
+                try current.commitConfirmedReview(old, matching: displayed, sample: sample(152))
+            }
+            let before = try JournalV2Repository(url: url).load(now: 152)
+            let revised = try current.previewConfirmedReview(
+                source: gap, selection: gap, classification: .rest,
+                matching: fresh, sample: sample(152)
+            )
+            let afterPreview = try JournalV2Repository(url: url).load(now: 152)
+            #expect(afterPreview.version == before.version)
+            #expect(afterPreview.checkpoint == before.checkpoint)
+            #expect(afterPreview.catalog == before.catalog)
+            _ = try current.commitConfirmedReview(revised, matching: fresh, sample: sample(153))
+            #expect(try JournalV2Repository(url: url).load(now: 153).catalog.reviewAudit.count == 1)
+        }
+    }
+
     @Test func `external checkpoint-only change rejects a current-looking review proposal`() throws {
         try fixture { url in
             let (initial, glance, gap) = try observedGap(url: url)

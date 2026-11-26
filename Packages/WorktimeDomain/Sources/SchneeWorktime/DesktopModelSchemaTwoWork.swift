@@ -110,7 +110,9 @@
                 return
             }
             do {
-                let updated = try current.performConfirmed(command, matching: expected, sample: Self.sample())
+                let updated = try current.performConfirmedAfterRoutineObservation(
+                    command, matching: expected, sample: Self.sample()
+                )
                 schemaTwoWorkSession = current
                 schemaTwoWorkGlance = updated
                 schemaTwoWorkNotice = nil
