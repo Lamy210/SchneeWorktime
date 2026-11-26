@@ -47,6 +47,7 @@
         @State private var proposal: JournalV2WorktimeCorrectionProposal?
         @State private var expected: JournalV2WorkActionContext?
         @State private var category: ReviewClassification?
+        @State private var confirmedSelection: ObservationGap?
         @State private var notice: String?
 
         init(model: DesktopModel, glance: WorktimeGlance, gap: ObservationGap) {
@@ -94,7 +95,7 @@
             .onChange(of: startOffset) { _, _ in reset() }
             .onChange(of: endOffset) { _, _ in reset() }
             .onChange(of: model.schemaTwoActionContext) { _, newer in
-                if let expected, newer != expected {
+                if let expected, newer?.permitsRoutineObservation(since: expected) != true {
                     notice = "保存状態が更新されました。入力範囲と分類を保持しています。"
                 }
             }
@@ -121,9 +122,11 @@
                     .font(.caption)
                 Text("記録済み休憩：\(value.before.snapshot.recordedRest)秒 → \(value.after.snapshot.recordedRest)秒")
                     .font(.caption)
-                Text("訂正後の実働はプレビューであり、確定までは保存されません。")
+                Text("確認時点の実働です。正常観測で合計は増えますが、訂正する範囲と分類は変わりません。")
                     .font(.caption)
-                if expected != model.schemaTwoActionContext {
+                Text("訂正案は確定まで保存されません。")
+                    .font(.caption)
+                if let expected, model.schemaTwoActionContext?.permitsRoutineObservation(since: expected) != true {
                     Button("最新状態で訂正案を再確認") {
                         if let category, let selection {
                             prepare(category, selection: selection)
@@ -131,6 +134,7 @@
                     }
                 } else {
                     Button("この区間の訂正を確定して保存") { commit(value) }
+                        .disabled(expected == nil || selection != confirmedSelection)
                 }
                 Button("訂正案を破棄") { reset() }
             }
@@ -152,13 +156,16 @@
                 proposal = value
                 expected = context
                 category = selected
+                confirmedSelection = selection
             } catch {
                 notice = "訂正案を作成できません。最新の勤務記録と範囲を確認してください。"
             }
         }
 
         private func commit(_ value: JournalV2WorktimeCorrectionProposal) {
-            guard let context = expected, context == model.schemaTwoActionContext else {
+            guard let context = expected, let confirmedSelection, selection == confirmedSelection,
+                  model.schemaTwoActionContext?.permitsRoutineObservation(since: context) == true
+            else {
                 notice = "保存せず最新状態で再確認してください。"
                 return
             }
@@ -166,6 +173,8 @@
             do {
                 try model.commitSchemaTwoReview(value, matching: context)
                 notice = "訂正履歴と変更後の区間を保存しました。"
+            } catch JournalV2WorktimeCorrectionError.staleProposal {
+                notice = "訂正の条件が変化しました。入力範囲を保持しています。最新状態で再確認してください。"
             } catch {
                 notice = "保存の確定を確認できません。自動再試行せず原本を確認してください。"
             }
@@ -175,6 +184,7 @@
             proposal = nil
             expected = nil
             category = nil
+            confirmedSelection = nil
         }
 
         private func worked(_ glance: WorktimeGlance) -> String {

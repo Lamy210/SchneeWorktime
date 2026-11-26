@@ -164,6 +164,94 @@ struct JournalV2ConfirmedReviewTests {
         }
     }
 
+    @Test func `routine review preserves exact selection and audit after sixty seconds`() throws {
+        try fixture { url in
+            let (initial, _, gap) = try observedGap(url: url)
+            var current = initial
+            let displayed = current.workActionContext
+            let selection = ObservationGap(start: 120, end: 130)
+            let plan = try current.previewConfirmedReview(
+                source: gap, selection: selection, classification: .rest,
+                matching: displayed, sample: sample(141)
+            )
+            for instant in stride(from: Int64(150), through: 200, by: 10) {
+                _ = try current.refresh(sample: sample(instant))
+            }
+            let result = try current.commitReviewAfterRoutineObservation(plan, matching: displayed, sample: sample(201))
+            #expect(result?.snapshot.recordedRest == 10)
+            #expect(result?.reviewableGaps == [
+                ObservationGap(start: 110, end: 120),
+                ObservationGap(start: 130, end: 140)
+            ])
+            let repository = try JournalV2Repository(url: url)
+            let saved = try repository.load(now: 201)
+            #expect(saved.catalog.reviewAudit.count == 1)
+            #expect(saved.catalog.reviewAudit.last?.review.selection == selection)
+            #expect(saved.catalog.reviewAudit.last?.review.classification == .rest)
+            #expect(saved.version.revision == displayed.version.revision + 1)
+            #expect(saved.checkpoint?.observedAt == 201)
+            #expect(throws: JournalV2WorktimeCorrectionError.staleProposal) {
+                try current.commitReviewAfterRoutineObservation(plan, matching: displayed, sample: sample(202))
+            }
+            #expect(try repository.load(now: 202).catalog == saved.catalog)
+        }
+    }
+
+    @Test func `routine review does not adopt an external checkpoint`() throws {
+        try fixture { url in
+            let (initial, glance, gap) = try observedGap(url: url)
+            var current = initial
+            let displayed = current.workActionContext
+            let plan = try current.previewConfirmedReview(
+                source: gap, selection: gap, classification: .work,
+                matching: displayed, sample: sample(141)
+            )
+            _ = try current.refresh(sample: sample(150))
+            let repository = try JournalV2Repository(url: url)
+            let before = try repository.load(now: 150)
+            let external = try repository.saveObservationCheckpoint(
+                dayID: glance.day.id, observedAt: 151, now: 151, matching: before
+            )
+            #expect(throws: JournalMigrationError.verificationFailed) {
+                try current.commitReviewAfterRoutineObservation(plan, matching: displayed, sample: sample(152))
+            }
+            let saved = try repository.load(now: 152)
+            #expect(saved.version == external.version)
+            #expect(saved.catalog == external.catalog)
+            #expect(saved.checkpoint == external.checkpoint)
+        }
+    }
+
+    @Test func `routine review rejects substituted context and new observation gap`() throws {
+        try fixture { url in
+            let (initial, _, gap) = try observedGap(url: url)
+            var current = initial
+            let displayed = current.workActionContext
+            let plan = try current.previewConfirmedReview(
+                source: gap, selection: gap, classification: .gap,
+                matching: displayed, sample: sample(141)
+            )
+            _ = try current.refresh(sample: sample(150))
+            #expect(throws: JournalV2WorktimeCorrectionError.staleProposal) {
+                try current.commitReviewAfterRoutineObservation(
+                    plan, matching: current.workActionContext, sample: sample(151)
+                )
+            }
+            #expect(throws: JournalV2WorktimeCorrectionError.staleProposal) {
+                try current.commitReviewAfterRoutineObservation(plan, matching: displayed, sample: sample(170))
+            }
+            let repository = try JournalV2Repository(url: url)
+            let untouched = try repository.load(now: 170)
+            #expect(untouched.version == displayed.version)
+            #expect(untouched.catalog.reviewAudit.isEmpty)
+            _ = try current.refresh(sample: sample(170))
+            #expect(throws: JournalV2WorktimeCorrectionError.staleProposal) {
+                try current.commitReviewAfterRoutineObservation(plan, matching: displayed, sample: sample(171))
+            }
+            #expect(try repository.load(now: 171).catalog.reviewAudit.isEmpty)
+        }
+    }
+
     @Test func `invalid selection outside the displayed gap is rejected without an event`() throws {
         try fixture { url in
             let (current, _, gap) = try observedGap(url: url)
