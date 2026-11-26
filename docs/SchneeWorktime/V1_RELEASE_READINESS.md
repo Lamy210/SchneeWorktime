@@ -27,6 +27,12 @@
 | 配布 | #34、UNSIGNED_RELEASE.md | 最新mainの候補生成、ZIP/checksum、インストール、更新・復旧、実機QA |
 | 振り返り（M1） | #51, #52 | 日週月/グラフ/CSVを統合済み。正式勤怠や給与計算ではない。実機QA未完 |
 
+## 配布版の安全な起動経路（PR #131・schema-2 UI未接続）
+
+- `DesktopModel.open`が既存のsession lock取得後、`WorktimeDatabaseFormatProbe`の読み取り専用SQLite形式判定と`DesktopStorageLaunchGuard`を実行する。schema-2/未知・破損DBを**schema-1の旧Controllerへ渡さない**。
+- **配布版（非DEBUG）のschema-1新規作成・既存schema-1書込みを停止**。旧形式の開発データは移行/消去せず原本保全を要求。DEBUGは既存の旧形式での開発・テストを明示的に続行できる。schema-2のデータを旧形式の保全エクスポート処理へ渡さない。
+- これは**安全な停止条件のみ**。配布版はschema-2の通常UI実装が完了するまで**新規利用者も既存schema-2データも操作不能**であり、初回配布に必要な機能を満たさない。安全な停止をリリース達成と混同しない。詳細は[起動ゲートの仕様と回帰試験](SCHEMA2_DESKTOP_STARTUP_GATE.md)。v1.0 **NO-GO継続**。
+
 ## schema-2アプリ接続の段階的準備
 
 PR #117・#118によりschema-2イベント行ストアと観測Checkpointのトランザクション処理を内部実装済み。後続PRでは `JournalV2Repository` を追加し、打刻・観測・予定変更・Checkpoint・削除プレビューをアプリケーションから利用可能なAPIとして分離する。リビジョンが同じでもCheckpointだけ変更された場合、旧セッションの再利用を拒否する。
