@@ -26,6 +26,7 @@
                     .font(.caption)
             }
             .onChange(of: model.schemaTwoActionContext) { _, _ in acknowledged = false }
+            .onChange(of: model.schemaTwoRollback?.id) { _, _ in acknowledged = false }
         }
 
         private func confirmationView(_ confirmation: JournalV2ConfirmedRollback) -> some View {
@@ -37,7 +38,7 @@
                     .foregroundStyle(.orange)
                 Toggle("復元対象と保全の必要性を確認した", isOn: $acknowledged)
                 Button("保全先を選択して復元", role: .destructive) {
-                    model.confirmSchemaTwoRollback(confirmation.context, acknowledged: acknowledged)
+                    model.confirmSchemaTwoRollback(confirmation.id, acknowledged: acknowledged)
                     acknowledged = false
                 }
                 .disabled(!acknowledged || !model.canConfirmSchemaTwoRollback)
