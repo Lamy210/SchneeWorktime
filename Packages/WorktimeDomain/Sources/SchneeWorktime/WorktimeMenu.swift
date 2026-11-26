@@ -53,9 +53,11 @@
                     .foregroundStyle(.secondary)
                 currentWorkdayContent
                 readySettings
-                backupInspectionSettings
-                BackupRollbackView(model: model)
-                HistoryResetView(model: model)
+                if model.schemaTwoInspection == nil {
+                    backupInspectionSettings
+                    BackupRollbackView(model: model)
+                    HistoryResetView(model: model)
+                }
                 Divider()
                 Button("アプリを終了") { NSApplication.shared.terminate(nil) }
                     .disabled(model.maintenanceInProgress)
@@ -87,6 +89,8 @@
                         DepartureScenarioView(glance: glance)
                     }
                 }
+            } else if model.schemaTwoInspection != nil {
+                SchemaTwoReadOnlyHistoryView(model: model)
             } else if model.ready {
                 Text("勤務記録なし")
                 let context = model.actionContext
