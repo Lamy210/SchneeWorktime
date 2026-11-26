@@ -117,7 +117,7 @@ struct JournalV2ReadOnlyBackupTests {
             )
             let original = try Data(contentsOf: url)
             let next = try ClockSample(wall: 110, uptime: 110)
-            #expect(throws: JournalMigrationError.verificationFailed) {
+            #expect(throws: JournalV2ReadOnlyActivationError.staleSnapshot) {
                 try snapshot.openWorkSession(url: url, sample: next)
             }
             #expect(try Data(contentsOf: url) == original)
@@ -132,7 +132,7 @@ struct JournalV2ReadOnlyBackupTests {
             let current = try repo.apply(.startBreak, at: 110, now: 110, matching: saved)
             let previous = try Data(contentsOf: url)
             let sample = try ClockSample(wall: 112, uptime: 112)
-            #expect(throws: SnapshotStoreError.staleVersion) {
+            #expect(throws: JournalV2ReadOnlyActivationError.staleSnapshot) {
                 try snapshot.openWorkSession(url: url, sample: sample)
             }
             #expect(try Data(contentsOf: url) == previous)
