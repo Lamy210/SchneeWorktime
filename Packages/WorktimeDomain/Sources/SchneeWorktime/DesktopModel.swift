@@ -12,6 +12,7 @@
         }
 
         @Published private(set) var ready = false
+        @Published private(set) var schemaTwoInspection: JournalV2ReadOnlyInspection?
         @Published private(set) var message: String?
         @Published private(set) var reviewProposal: WorktimeReviewProposal?
         @Published private(set) var reviewNotice: String?
@@ -71,6 +72,7 @@
             controller = nil
             ready = false
             glance = nil
+            schemaTwoInspection = nil
             do {
                 let url = try databaseURL()
                 let directory = url.deletingLastPathComponent()
@@ -91,6 +93,12 @@
                 }
                 let sample = try Self.sample()
                 if let reason = try schemaTwoStartupBlockReason(url: url, create: create) {
+                    let decision = try DesktopStorageLaunchGuard.decide(
+                        url: url, createIfMissing: false, allowLegacyDevelopment: false
+                    )
+                    if decision == .schemaTwoAwaitingUI {
+                        schemaTwoInspection = try JournalV2ReadOnlyInspection(url: url, now: sample.wall)
+                    }
                     message = reason
                     reminderStateUntrusted = true
                     queueReminders(force: true)
@@ -111,6 +119,22 @@
         func suspendForMaintenance() {
             ready = false
             glance = nil
+            schemaTwoInspection = nil
+        }
+
+        /// Every page uses a fresh, strict SQLite read-only Journal replay. A
+        /// concurrent Journal or checkpoint change invalidates the old page.
+        func schemaTwoHistoryPage(
+            offset: Int, previous: JournalV2ReadOnlyInspection
+        ) throws -> JournalV2ReadOnlyInspection {
+            guard !ready, controller == nil, sessionLock != nil,
+                  let displayed = schemaTwoInspection,
+                  displayed.version == previous.version,
+                  displayed.lastObservedAt == previous.lastObservedAt
+            else { throw WorktimeHistoryError.stalePage }
+            return try JournalV2ReadOnlyInspection(
+                url: databaseURL(), now: Self.sample().wall, offset: offset, previous: previous
+            )
         }
 
         func recentHistory(offset: Int = 0, previous: WorktimeHistory? = nil) throws -> WorktimeHistory? {
@@ -253,6 +277,7 @@
         }
 
         private func fail(_ error: Error) {
+            schemaTwoInspection = nil
             rollbackProposal = nil
             cancelReview()
             controller = nil
