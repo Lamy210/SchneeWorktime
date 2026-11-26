@@ -39,7 +39,10 @@
         private func finishSchemaTwoActivation(
             createNew: Bool, coordinator: DesktopReminderCoordinator
         ) async {
-            defer { schemaTwoWorkBusy = false }
+            defer {
+                schemaTwoWorkBusy = false
+                queueReminders(force: true)
+            }
             do {
                 let stopped = try await coordinator.reconcile(latest: { nil }, now: { try Self.sample().wall })
                 guard stopped == .settled, !ready, controller == nil,
@@ -90,8 +93,7 @@
                 schemaTwoWorkGlance = current
                 schemaTwoInspection = nil
                 schemaTwoWorkNotice = nil
-                reminderStateUntrusted = true
-                queueReminders(force: true)
+                reminderStateUntrusted = false
             } catch {
                 schemaTwoSessionFailed(error)
             }
@@ -112,6 +114,7 @@
                 schemaTwoWorkSession = current
                 schemaTwoWorkGlance = updated
                 schemaTwoWorkNotice = nil
+                queueReminders(force: true)
             } catch JournalV2WorkActionError.staleContext {
                 schemaTwoWorkNotice = "勤務記録が更新されました。操作内容を再確認してください。"
             } catch JournalV2WorkActionError.invalidTransition {
@@ -126,9 +129,11 @@
         func refreshSchemaTwoWorkSession() {
             guard var current = schemaTwoWorkSession else { return }
             do {
+                let previousGoal = schemaTwoWorkGlance?.forecast.goal
                 let updated = try current.refresh(sample: Self.sample())
                 schemaTwoWorkSession = current
                 schemaTwoWorkGlance = updated
+                queueReminders(force: previousGoal != updated?.forecast.goal)
             } catch {
                 schemaTwoSessionFailed(error)
             }
