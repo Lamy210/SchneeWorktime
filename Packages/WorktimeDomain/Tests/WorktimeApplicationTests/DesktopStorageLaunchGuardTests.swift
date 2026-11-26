@@ -15,13 +15,15 @@ struct DesktopStorageLaunchGuardTests {
 
     @Test func `release never creates a legacy store for a fresh installation`() throws {
         try fixture { url in
-            #expect(try DesktopStorageLaunchGuard.decide(
+            let newInstall = try DesktopStorageLaunchGuard.decide(
                 url: url, createIfMissing: true, allowLegacyDevelopment: false
-            ) == .newInstallRequiresSchemaTwoUI)
+            )
+            #expect(newInstall == .newInstallRequiresSchemaTwoUI)
             #expect(!FileManager.default.fileExists(atPath: url.path))
-            #expect(try DesktopStorageLaunchGuard.decide(
+            let missing = try DesktopStorageLaunchGuard.decide(
                 url: url, createIfMissing: false, allowLegacyDevelopment: false
-            ) == .missingDatabase)
+            )
+            #expect(missing == .missingDatabase)
             #expect(!FileManager.default.fileExists(atPath: url.path))
         }
     }
@@ -30,12 +32,14 @@ struct DesktopStorageLaunchGuardTests {
         try fixture { url in
             _ = try SnapshotStore(url: url, createIfMissing: true)
             let bytes = try Data(contentsOf: url)
-            #expect(try DesktopStorageLaunchGuard.decide(
+            let releaseDecision = try DesktopStorageLaunchGuard.decide(
                 url: url, createIfMissing: false, allowLegacyDevelopment: false
-            ) == .legacyRequiresPreservation)
-            #expect(try DesktopStorageLaunchGuard.decide(
+            )
+            #expect(releaseDecision == .legacyRequiresPreservation)
+            let developmentDecision = try DesktopStorageLaunchGuard.decide(
                 url: url, createIfMissing: false, allowLegacyDevelopment: true
-            ) == .legacyDevelopmentOnly)
+            )
+            #expect(developmentDecision == .legacyDevelopmentOnly)
             #expect(try Data(contentsOf: url) == bytes)
         }
     }
@@ -45,9 +49,10 @@ struct DesktopStorageLaunchGuardTests {
             _ = try JournalV2Repository(url: url, createIfMissing: true)
             let bytes = try Data(contentsOf: url)
             for development in [false, true] {
-                #expect(try DesktopStorageLaunchGuard.decide(
+                let decision = try DesktopStorageLaunchGuard.decide(
                     url: url, createIfMissing: false, allowLegacyDevelopment: development
-                ) == .schemaTwoAwaitingUI)
+                )
+                #expect(decision == .schemaTwoAwaitingUI)
                 #expect(try Data(contentsOf: url) == bytes)
             }
         }
