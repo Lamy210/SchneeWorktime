@@ -27,6 +27,14 @@
 | 配布 | #34、UNSIGNED_RELEASE.md | 最新mainの候補生成、ZIP/checksum、インストール、更新・復旧、実機QA |
 | 振り返り（M1） | #51, #52 | 日週月/グラフ/CSVを統合済み。正式勤怠や給与計算ではない。実機QA未完 |
 
+## schema-2の読み取り専用履歴UI（PR #132・検証中）
+
+- 未接続のschema-2保存形式が見つかった場合、既存のschema-1 `WorktimeController`を利用せず、`JournalV2ReadOnlyInspection`と専用macOSメニュー画面で**保存済み勤務日/終了日/監査件数・最後の観測Checkpoint・最大30件単位の終了済み勤務履歴**を閲覧できるようにする。
+- `JournalV2LiveStore.inspectReadOnly`は`SQLITE_OPEN_READONLY`・`PRAGMA query_only`・`BEGIN`でJournal全行を再生し、CheckpointとDB inode/owner/sidecarを前後検証する。読み込み時に`JournalV2WorktimeController`を生成しないため、**起動復旧、観測更新、勤務実績の追記、通知予約、削除、バックアップ作成を行わない**。
+- ページングは毎回同じ形式で再読込み、途中でrevision/epochが変化した場合だけでなく、同じrevisionでCheckpointだけ変更された場合も`stalePage`で拒否。勤務中と記録されていてもリアルタイム観測・勤務継続の証拠にはならない旨を表示する。
+- 既存の編集・確認・バックアップ・ロールバック・全履歴削除UIは**schema-2表示時に隠す**。開発版schema-1用の画面・操作は従来どおり隔離する。
+- **P0残存:** schema-2の書込みを伴う正式UI接続（打刻/休憩/訂正/予定/通知/バックアップ/限定復元/全消去）、管理下ファイルの削除と中断復旧、macOS実機/障害注入/受入証跡は未完。初回配布可能な状態を意味しない。**v1.0 NO-GO**。
+
 ## 配布版の安全な起動経路（PR #131・schema-2 UI未接続）
 
 - `DesktopModel.open`が既存のsession lock取得後、`WorktimeDatabaseFormatProbe`の読み取り専用SQLite形式判定と`DesktopStorageLaunchGuard`を実行する。schema-2/未知・破損DBを**schema-1の旧Controllerへ渡さない**。
