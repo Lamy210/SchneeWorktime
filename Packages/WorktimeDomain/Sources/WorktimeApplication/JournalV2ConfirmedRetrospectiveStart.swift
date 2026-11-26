@@ -10,6 +10,10 @@ public extension JournalV2WorktimeController {
         guard expected == workActionContext else {
             throw RetrospectiveStartError.staleProposal
         }
+        // Keep future plans separate from attendance, using the same sampled
+        // Instant that will be used for the underlying preview.
+        guard instant <= sample.wall else { throw RetrospectiveStartError.futureStart }
+        guard instant < sample.wall else { throw RetrospectiveStartError.currentStart }
         return try previewRetrospectiveStart(at: instant, profile: profile, sample: sample)
     }
 
