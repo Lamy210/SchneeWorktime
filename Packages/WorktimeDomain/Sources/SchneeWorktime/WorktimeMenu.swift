@@ -59,6 +59,9 @@
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 currentWorkdayContent
+                if let notice = model.schemaTwoResetNotice {
+                    Text(notice).font(.caption)
+                }
                 readySettings
                 if model.schemaTwoInspection == nil, model.schemaTwoWorkSession == nil {
                     backupInspectionSettings
