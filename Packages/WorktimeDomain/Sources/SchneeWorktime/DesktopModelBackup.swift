@@ -27,7 +27,8 @@
         }
 
         var canPreserveUnavailableDatabase: Bool {
-            !ready && controller == nil && sessionLock != nil && !maintenanceInProgress && !choosingBackupDestination
+            !ready && controller == nil && schemaTwoWorkSession == nil && sessionLock != nil &&
+                !maintenanceInProgress && !choosingBackupDestination
         }
 
         func choosePreservationDestination() {
