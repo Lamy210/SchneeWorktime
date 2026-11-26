@@ -37,8 +37,7 @@
             if let source = try? databaseURL(),
                (try? DesktopStorageLaunchGuard.decide(
                    url: source, createIfMissing: false, allowLegacyDevelopment: false
-               )) == .schemaTwoAwaitingUI
-            {
+               )) == .schemaTwoAwaitingUI {
                 backupNotice = "schema-2の保全には対応版が必要です。原本を変更せず、アプリ終了後に保存フォルダ全体を保全してください。"
                 return
             }
