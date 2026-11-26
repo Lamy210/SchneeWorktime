@@ -16,7 +16,9 @@ public struct JournalV2WorkActionContext: Sendable, Equatable {
     /// Only an advancing checkpoint in the same live working session can
     /// leave a basic, time-of-confirmation attendance action unchanged.
     public func permitsRoutineObservation(since displayed: Self) -> Bool {
-        if self == displayed { return true }
+        if self == displayed {
+            return true
+        }
         guard sessionID == displayed.sessionID, version == displayed.version,
               day == displayed.day, day?.state == .working,
               canOpenWorkday == displayed.canOpenWorkday, canAppend == displayed.canAppend,
