@@ -165,6 +165,114 @@ struct JournalV2WorkActionContextTests {
         }
     }
 
+    @Test func `basic confirmation survives sixty seconds of routine local observations`() throws {
+        try fixture { url in
+            var current = try JournalV2WorktimeController(
+                url: url, createIfMissing: true, requireNew: true, sample: sample(100)
+            )
+            _ = try current.performConfirmed(
+                .clockIn(id: UUID(), profile: WorkdayProfile()),
+                matching: current.workActionContext, sample: sample(100)
+            )
+            let displayed = current.workActionContext
+            for instant in stride(from: Int64(110), through: 160, by: 10) {
+                _ = try current.refresh(sample: sample(instant))
+            }
+            #expect(current.workActionContext.permitsRoutineObservation(since: displayed))
+            #expect(current.workActionContext != displayed)
+            let ended = try current.performConfirmedAfterRoutineObservation(
+                .clockOut(confirmBreak: false), matching: displayed, sample: sample(161)
+            )
+            #expect(ended?.day.state == .ended)
+            #expect(ended?.snapshot.bounds.lower == 61)
+            let saved = try JournalV2Repository(url: url).load(now: 161)
+            #expect(saved.version.revision == displayed.version.revision + 1)
+            #expect(saved.checkpoint == nil)
+            #expect(throws: JournalV2WorkActionError.staleContext) {
+                try current.performConfirmedAfterRoutineObservation(
+                    .clockOut(confirmBreak: false), matching: displayed, sample: sample(162)
+                )
+            }
+        }
+    }
+
+    @Test func `routine confirmation still rejects a later external checkpoint`() throws {
+        try fixture { url in
+            var current = try JournalV2WorktimeController(
+                url: url, createIfMissing: true, requireNew: true, sample: sample(100)
+            )
+            let id = UUID()
+            _ = try current.performConfirmed(
+                .clockIn(id: id, profile: WorkdayProfile()),
+                matching: current.workActionContext, sample: sample(100)
+            )
+            let displayed = current.workActionContext
+            _ = try current.refresh(sample: sample(110))
+            let repository = try JournalV2Repository(url: url)
+            let before = try repository.load(now: 110)
+            let external = try repository.saveObservationCheckpoint(
+                dayID: id, observedAt: 111, now: 111, matching: before
+            )
+            #expect(throws: JournalMigrationError.verificationFailed) {
+                try current.performConfirmedAfterRoutineObservation(
+                    .startBreak, matching: displayed, sample: sample(112)
+                )
+            }
+            let saved = try repository.load(now: 112)
+            #expect(saved.version == external.version)
+            #expect(saved.catalog == external.catalog)
+            #expect(saved.checkpoint == external.checkpoint)
+        }
+    }
+
+    @Test func `routine confirmation rejects a new session even with identical stored state`() throws {
+        try fixture { url in
+            let original = try JournalV2WorktimeController(
+                url: url, createIfMissing: true, requireNew: true, sample: sample(100)
+            )
+            let displayed = original.workActionContext
+            var reopened = try JournalV2WorktimeController(url: url, sample: sample(100))
+            #expect(reopened.version == displayed.version)
+            #expect(!reopened.workActionContext.permitsRoutineObservation(since: displayed))
+            #expect(throws: JournalV2WorkActionError.staleContext) {
+                try reopened.performConfirmedAfterRoutineObservation(
+                    .clockIn(id: UUID(), profile: WorkdayProfile()),
+                    matching: displayed, sample: sample(100)
+                )
+            }
+            #expect(try JournalV2Repository(url: url).load(now: 100).catalog.days.isEmpty)
+        }
+    }
+
+    @Test func `routine confirmation rejects a gap and subsequent changed journal`() throws {
+        try fixture { url in
+            var current = try JournalV2WorktimeController(
+                url: url, createIfMissing: true, requireNew: true, sample: sample(100)
+            )
+            _ = try current.performConfirmed(
+                .clockIn(id: UUID(), profile: WorkdayProfile()),
+                matching: current.workActionContext, sample: sample(100)
+            )
+            let displayed = current.workActionContext
+            _ = try current.refresh(sample: sample(110))
+            #expect(throws: JournalV2WorkActionError.staleContext) {
+                try current.performConfirmedAfterRoutineObservation(
+                    .startBreak, matching: displayed, sample: sample(130)
+                )
+            }
+            let repository = try JournalV2Repository(url: url)
+            #expect(try repository.load(now: 130).version == displayed.version)
+            _ = try current.refresh(sample: sample(130))
+            #expect(!current.workActionContext.permitsRoutineObservation(since: displayed))
+            #expect(throws: JournalV2WorkActionError.staleContext) {
+                try current.performConfirmedAfterRoutineObservation(
+                    .startBreak, matching: displayed, sample: sample(131)
+                )
+            }
+            #expect(try repository.load(now: 131).catalog.days.last?.state == .working)
+        }
+    }
+
     @Test func `invalid initial transition is rejected without creating a journal event`() throws {
         try fixture { url in
             var current = try JournalV2WorktimeController(

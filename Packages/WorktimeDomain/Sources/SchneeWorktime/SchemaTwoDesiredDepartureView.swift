@@ -46,11 +46,12 @@
                 Text("勤務実績や退勤打刻は変更しません。希望に基づく通知も再計算します。")
             }
             .onChange(of: model.schemaTwoActionContext) { _, newValue in
-                if expected != nil, expected != newValue {
-                    reset()
+                if let expected, expected != newValue {
+                    warningAcknowledged = false
                 }
-                if clearing != nil, clearing != newValue {
+                if let clearing, clearing != newValue {
                     reset()
+                    notice = "記録が更新されたため解除を中止しました。もう一度確認してください。"
                 }
             }
             .onChange(of: candidate) { _, _ in reset() }
@@ -66,8 +67,14 @@
                         .font(.caption)
                         .foregroundStyle(.orange)
                 }
-                Button("確認した希望時刻を保存") { commit(value) }
-                    .disabled(value.assessment.requiresWarning && !warningAcknowledged)
+                if expected != model.schemaTwoActionContext {
+                    Text("観測または記録が更新されました。入力日時は保持しています。")
+                        .font(.caption).foregroundStyle(.orange)
+                    Button("最新状態で希望時刻を再確認") { preview() }
+                } else {
+                    Button("確認した希望時刻を保存") { commit(value) }
+                        .disabled(value.assessment.requiresWarning && !warningAcknowledged)
+                }
                 Button("候補をキャンセル") { reset() }
             }
         }
@@ -90,10 +97,13 @@
         }
 
         private func commit(_ value: JournalV2DesiredDepartureProposal) {
-            let context = expected
+            guard let context = expected, context == model.schemaTwoActionContext else {
+                warningAcknowledged = false
+                notice = "保存せず最新状態で再確認してください。"
+                return
+            }
             let approved = warningAcknowledged
             reset()
-            guard let context else { return }
             do {
                 try model.confirmSchemaTwoDesiredDeparture(
                     value, matching: context, warningAcknowledged: approved

@@ -9,6 +9,7 @@ import WorktimeStore
 public struct JournalV2WorktimeController {
     // Shared only inside WorktimeApplication with the audited correction coordinator.
     // No caller may bypass the repository's full Journal/checkpoint CAS fence.
+    let confirmationSessionID = UUID()
     let repository: JournalV2Repository
     var session: JournalV2Session
     var clock: ClockObservation
