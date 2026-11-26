@@ -41,15 +41,15 @@
             schemaTwoRollbackNotice = nil
         }
 
-        func confirmSchemaTwoRollback(_ displayed: JournalV2WorkActionContext, acknowledged: Bool) {
+        func confirmSchemaTwoRollback(_ displayedID: UUID, acknowledged: Bool) {
             guard acknowledged, canConfirmSchemaTwoRollback, let confirmation = schemaTwoRollback,
-                  confirmation.context == displayed
+                  confirmation.id == displayedID
             else { return }
             choosingBackupDestination = true
             let directory = WorktimeExportFormat.backup.chooseDirectory(initialDirectory: nil)
             choosingBackupDestination = false
             guard let directory else { return }
-            guard canConfirmSchemaTwoRollback, schemaTwoRollback?.context == displayed,
+            guard canConfirmSchemaTwoRollback, schemaTwoRollback?.id == displayedID,
                   schemaTwoWorkSession?.isCurrent(confirmation) == true, let coordinator = reminderCoordinator
             else {
                 schemaTwoRollback = nil
