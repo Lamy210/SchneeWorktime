@@ -57,6 +57,7 @@
                 }
                 SchemaTwoDesiredDepartureView(model: model)
                 SchemaTwoReminderSettingsView(model: model)
+                SchemaTwoRollbackView(model: model)
                 Button("観測を停止して履歴の読み取り専用表示に戻る") {
                     model.stopSchemaTwoObservation()
                 }
@@ -65,6 +66,7 @@
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            .disabled(model.maintenanceInProgress)
             .onChange(of: targetMinutes) { _, _ in invalidateProfile() }
             .onChange(of: restMinutes) { _, _ in invalidateProfile() }
         }
