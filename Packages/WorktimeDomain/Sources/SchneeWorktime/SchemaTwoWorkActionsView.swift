@@ -111,6 +111,7 @@
                     .foregroundStyle(.secondary)
                 Button("勤務開始") { prepare(.clockIn, context: expected) }
                     .disabled(!expected.canOpenWorkday || !validProfile)
+                SchemaTwoRetrospectiveStartView(model: model, targetMinutes: targetMinutes, restMinutes: restMinutes)
             }
         }
 
