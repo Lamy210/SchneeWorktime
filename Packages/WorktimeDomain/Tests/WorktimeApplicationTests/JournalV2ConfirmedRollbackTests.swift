@@ -39,6 +39,9 @@ struct JournalV2ConfirmedRollbackTests {
             let before = try JournalV2Repository(url: url).load(now: 220)
             let plan = try current.previewConfirmedRollback(file: older, matching: context, sample: sample(220))
             #expect(plan.proposal.restoredDays == 1)
+            let second = try current.previewConfirmedRollback(file: older, matching: context, sample: sample(220))
+            #expect(second.id != plan.id)
+            #expect(second.context == plan.context)
             #expect(try JournalV2Repository(url: url).load(now: 220).catalog == before.catalog)
             // Replacing the selected file cannot substitute a different candidate.
             try FileManager.default.removeItem(at: older)
