@@ -1,8 +1,8 @@
 import Foundation
 import Testing
+@testable import WorktimeApplication
 import WorktimeDomain
 @testable import WorktimeStore
-@testable import WorktimeApplication
 
 @MainActor
 private final class SchemaTwoReminderDeliveryFake: ReminderDelivery {
@@ -11,9 +11,17 @@ private final class SchemaTwoReminderDeliveryFake: ReminderDelivery {
     var added: [ReminderRequest] = []
     var cancelled: [String] = []
 
-    func authorization() async -> ReminderAuthorization { authorizationValue }
-    func requestAuthorization() async throws -> Bool { authorizationValue == .allowed }
-    func pending() async -> [PendingReminder] { requests }
+    func authorization() async -> ReminderAuthorization {
+        authorizationValue
+    }
+
+    func requestAuthorization() async throws -> Bool {
+        authorizationValue == .allowed
+    }
+
+    func pending() async -> [PendingReminder] {
+        requests
+    }
 
     func cancel(ids: [String]) {
         cancelled.append(contentsOf: ids)
