@@ -14,7 +14,7 @@
         @State private var pendingProfile: WorkdayProfile?
         @State private var pendingTargetMinutes: Int?
         @State private var pendingRestMinutes: Int?
-        @State private var confirming = false
+        @State private var confirmationNotice: String?
 
         private enum Action {
             case clockIn, startBreak, endBreak, clockOut
@@ -35,6 +35,12 @@
                 statusSummary
                 if let expected = model.schemaTwoActionContext {
                     actions(expected)
+                }
+                if let pending, let context {
+                    confirmation(pending, expected: context)
+                }
+                if let confirmationNotice {
+                    Text(confirmationNotice).font(.caption).foregroundStyle(.orange)
                 }
                 if let notice = model.schemaTwoWorkNotice {
                     Text(notice).font(.caption).foregroundStyle(.orange)
@@ -59,19 +65,8 @@
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            .confirmationDialog("勤務記録を確定しますか？", isPresented: $confirming) {
-                Button("この操作を保存") { commit() }
-                Button("キャンセル", role: .cancel) { clearPending() }
-            } message: {
-                Text("現在の保存済み勤務状態と確認時の時刻を再検証してから記録します。休憩中の退勤は休憩終了も伴います。")
-            }
-            .onChange(of: model.schemaTwoActionContext) { _, newer in
-                if newer != context {
-                    clearPending()
-                }
-            }
-            .onChange(of: targetMinutes) { _, _ in clearPending() }
-            .onChange(of: restMinutes) { _, _ in clearPending() }
+            .onChange(of: targetMinutes) { _, _ in invalidateProfile() }
+            .onChange(of: restMinutes) { _, _ in invalidateProfile() }
         }
 
         @ViewBuilder
@@ -118,7 +113,44 @@
             }
         }
 
+        private func confirmation(_ action: Action, expected: JournalV2WorkActionContext) -> some View {
+            VStack(alignment: .leading, spacing: 5) {
+                Text("確認：\(actionLabel(action))").font(.headline)
+                Text("確定時の時刻を記録します。休憩中の退勤は休憩終了も伴います。")
+                    .font(.caption)
+                if model.schemaTwoActionContext != expected {
+                    Text("観測または記録が更新されました。まだ保存していません。")
+                        .font(.caption).foregroundStyle(.orange)
+                    Button("最新状態で操作を再選択") {
+                        clearPending()
+                        confirmationNotice = "最新の勤務状態から操作を選び直してください。"
+                    }
+                } else {
+                    Button("この操作を保存") { commit() }
+                        .disabled(model.schemaTwoWorkBusy || model.maintenanceInProgress ||
+                            model.choosingBackupDestination)
+                }
+                Button("キャンセル") { clearPending() }
+            }
+        }
+
+        private func actionLabel(_ action: Action) -> String {
+            switch action {
+            case .clockIn: "勤務開始"
+            case .startBreak: "休憩開始"
+            case .endBreak: "休憩終了"
+            case .clockOut: "退勤"
+            }
+        }
+
+        private func invalidateProfile() {
+            guard pending == .clockIn else { return }
+            clearPending()
+            confirmationNotice = "勤務開始設定が変わりました。最新の設定で再確認してください。"
+        }
+
         private func prepare(_ action: Action, context: JournalV2WorkActionContext) {
+            clearPending()
             if case .clockIn = action {
                 guard validProfile,
                       let profile = try? WorkdayProfile(
@@ -132,7 +164,7 @@
             }
             pending = action
             self.context = context
-            confirming = true
+            confirmationNotice = nil
         }
 
         private func clearPending() {
@@ -141,12 +173,14 @@
             pendingProfile = nil
             pendingTargetMinutes = nil
             pendingRestMinutes = nil
-            confirming = false
+            confirmationNotice = nil
         }
 
         private func commit() {
-            guard let pending, let expected = context else {
-                clearPending()
+            guard let pending, let expected = context,
+                  expected == model.schemaTwoActionContext
+            else {
+                confirmationNotice = "記録が更新されました。保存せず再確認してください。"
                 return
             }
             defer { clearPending() }
