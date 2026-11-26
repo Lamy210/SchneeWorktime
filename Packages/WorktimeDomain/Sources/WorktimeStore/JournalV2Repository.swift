@@ -35,6 +35,12 @@ public struct JournalV2Repository {
         store = try JournalV2LiveStore(url: databaseURL, createIfMissing: createIfMissing)
     }
 
+    /// Full replay under SQLITE_OPEN_READONLY and query_only, without recovery
+    /// writes or a mutable repository session. Caller owns the app session lock.
+    public static func inspectReadOnly(url: URL, now: Int64) throws -> JournalV2Session {
+        try JournalV2Session(JournalV2LiveStore.inspectReadOnly(url: url, now: now))
+    }
+
     public func load(now: Int64) throws -> JournalV2Session {
         try JournalV2Session(store.load(now: now))
     }
