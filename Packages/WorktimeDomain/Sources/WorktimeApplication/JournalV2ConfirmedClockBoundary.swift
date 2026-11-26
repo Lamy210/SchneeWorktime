@@ -21,15 +21,14 @@ public extension JournalV2WorktimeController {
         guard expected == workActionContext, expected.canAppend, day.state == .ended else {
             throw JournalV2WorktimeCorrectionError.staleProposal
         }
-        let correction: JournalV2WorktimeCorrectionProposal
-        switch intent {
+        let correction = switch intent {
         case let .clockIn(old, new, summary):
-            correction = try previewClockInCorrection(
+            try previewClockInCorrection(
                 expectedDay: day, oldStart: old, newStart: new, summary: summary,
                 historical: historical, sample: sample
             )
         case let .clockOut(old, new):
-            correction = try previewClockOutCorrection(
+            try previewClockOutCorrection(
                 expectedDay: day, oldEnd: old, newEnd: new, historical: historical, sample: sample
             )
         }
