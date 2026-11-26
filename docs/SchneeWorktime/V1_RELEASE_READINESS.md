@@ -27,6 +27,14 @@
 | 配布 | #34、UNSIGNED_RELEASE.md | 最新mainの候補生成、ZIP/checksum、インストール、更新・復旧、実機QA |
 | 振り返り（M1） | #51, #52 | 日週月/グラフ/CSVを統合済み。正式勤怠や給与計算ではない。実機QA未完 |
 
+## schema-2専用の基本打刻UI（PR #133・検証中）
+
+- 従来のschema-1`WorktimeController`を置き換えるのではなく、`DesktopModel`内に**独立したschema-2`JournalV2WorktimeController`**を追加。新規schema-2 DBの初回作成、既存schema-2の読取専用履歴からの明示的な書込みモード開始、勤務開始・休憩開始/終了・退勤の確認画面をmacOSメニュー/パネルに接続する。
+- 起動時の読取専用検証から書込みモードへの移行は**ユーザーの明示確認**と、`DesktopReminderCoordinator.reconcile(latest:{nil}) == .settled`による**既存所有通知の取消収束**が条件。収束しなければ書込みモードへ移行しない。移行時に未観測区間があれば従来のschema-2アプリ層が不確実区間として記録し、勤務実績に自動加算しない。
+- 新規作成時は`requireNew`をSQLite`O_EXCL`の実際の作成成否まで伝播。別セッションが既にschema-1/2のDBを生成していた場合、**既存DBの再利用/上書き/変換を拒否**する。`JournalV2WorkActionContext`の`StoreVersion`・Workday・Checkpointを画面確認に固定し、確定時の完全CAS再検証、容量・遷移の事前検査のあと同じJournal/Checkpointトランザクションを使用する。
+- schema-2稼働中も旧schema-1の`ready`を有効化せず、既存の履歴訂正・設定・バックアップ・削除画面を非表示にする。通知の自動再予約は**未接続/無効**であり、旧形式の通知計画を誤用しない。観測停止は退勤打刻ではなく、次の明示再開時に未観測区間を再検出する。
+- **P0残存:** 正式版の通知再予約とその実機受入、参考時刻の捕捉、希望退勤/過去始業/履歴訂正の画面、バックアップ/復元/全削除、OSの通知・VoiceOver・スリープ/復帰・クラッシュ/電源断試験、全P0受入証跡・RC実測は未完。新しい基本打刻UIだけで公開可否を変更しない。**v1.0 NO-GO**。
+
 ## schema-2の読み取り専用履歴UI（PR #132・検証中）
 
 - 未接続のschema-2保存形式が見つかった場合、既存のschema-1 `WorktimeController`を利用せず、`JournalV2ReadOnlyInspection`と専用macOSメニュー画面で**保存済み勤務日/終了日/監査件数・最後の観測Checkpoint・最大30件単位の終了済み勤務履歴**を閲覧できるようにする。

@@ -12,7 +12,13 @@
         }
 
         @Published private(set) var ready = false
-        @Published private(set) var schemaTwoInspection: JournalV2ReadOnlyInspection?
+        @Published var schemaTwoInspection: JournalV2ReadOnlyInspection?
+        @Published var schemaTwoWorkGlance: WorktimeGlance? {
+            didSet { updateObservationTimer() }
+        }
+
+        @Published var schemaTwoWorkNotice: String?
+        @Published var schemaTwoWorkBusy = false
         @Published private(set) var message: String?
         @Published private(set) var reviewProposal: WorktimeReviewProposal?
         @Published private(set) var reviewNotice: String?
@@ -39,11 +45,12 @@
         @Published private(set) var requestingReminderPermission = false
 
         private(set) var controller: WorktimeController?
-        private(set) var sessionLock: LocalSessionLock?
+        var schemaTwoWorkSession: JournalV2WorktimeController?
+        var sessionLock: LocalSessionLock?
         private(set) var reminderCoordinator: DesktopReminderCoordinator?
         private(set) var reminderRunning = false
         private var nextReminderCheck: Double = 0
-        private var reminderStateUntrusted = false
+        var reminderStateUntrusted = false
         private let observationTimer = DesktopObservationTimer()
 
         init() {
@@ -59,13 +66,17 @@
         }
 
         private func updateObservationTimer() {
-            observationTimer.update(to: ObservationCadence(dayState: glance?.day.state)) { [weak self] in
+            let cadence = ObservationCadence(dayState: schemaTwoWorkGlance?.day.state ?? glance?.day.state)
+            observationTimer.update(to: cadence) { [weak self] in
                 self?.tick()
             }
         }
 
         func open(create: Bool) {
-            guard !maintenanceInProgress, !choosingBackupDestination else { return }
+            guard !maintenanceInProgress, !choosingBackupDestination, !schemaTwoWorkBusy else { return }
+            schemaTwoWorkSession = nil
+            schemaTwoWorkGlance = nil
+            schemaTwoWorkNotice = nil
             rollbackProposal = nil
             resetState.proposal = nil
             cancelReview()
@@ -240,6 +251,10 @@
 
         private func tick() {
             guard !maintenanceInProgress else { return }
+            if schemaTwoWorkSession != nil {
+                refreshSchemaTwoWorkSession()
+                return
+            }
             guard var current = controller else {
                 queueReminders()
                 return
@@ -262,6 +277,8 @@
         }
 
         private func fail(_ error: Error) {
+            schemaTwoWorkSession = nil
+            schemaTwoWorkGlance = nil
             schemaTwoInspection = nil
             rollbackProposal = nil
             cancelReview()
@@ -284,21 +301,6 @@
             } else {
                 message = "記録を停止：\(error)。既存DBを上書きせず、時刻・権限・バックアップを確認してください。"
             }
-        }
-
-        func databaseURL() throws -> URL {
-            let support = try FileManager.default.url(
-                for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: false
-            )
-            return support.appendingPathComponent("SchneeWorktime", isDirectory: true)
-                .appendingPathComponent("worktime.sqlite")
-        }
-
-        static func sample() throws -> ClockSample {
-            guard let wall = Int64(exactly: Date().timeIntervalSince1970.rounded(.down)) else {
-                throw ApplicationClockError.invalidSample
-            }
-            return try ClockSample(wall: wall, uptime: ProcessInfo.processInfo.systemUptime)
         }
     }
 
@@ -374,7 +376,7 @@
             }
         }
 
-        private func queueReminders(force: Bool = false) {
+        func queueReminders(force: Bool = false) {
             guard !maintenanceInProgress else { return }
             if force {
                 nextReminderCheck = 0

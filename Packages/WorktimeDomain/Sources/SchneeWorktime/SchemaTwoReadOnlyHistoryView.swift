@@ -11,6 +11,7 @@
         @ObservedObject var model: DesktopModel
         @State private var page: JournalV2ReadOnlyInspection?
         @State private var notice: String?
+        @State private var confirmWriteMode = false
 
         private var displayed: JournalV2ReadOnlyInspection? {
             page ?? model.schemaTwoInspection
@@ -32,6 +33,13 @@
                 if let notice {
                     Text(notice).font(.caption).foregroundStyle(.orange)
                 }
+                Button("通知停止を確認して勤務記録モードで開く") {
+                    confirmWriteMode = true
+                }
+                .disabled(model.schemaTwoWorkBusy || model.choosingBackupDestination)
+                if let status = model.schemaTwoWorkNotice {
+                    Text(status).font(.caption).foregroundStyle(.orange)
+                }
                 Button("schema-2履歴を再検証") {
                     page = nil
                     notice = nil
@@ -41,6 +49,14 @@
                 Text("閲覧は同期・復旧・保存を行いません。書込み可能な正式UIと受入検証は未完成です。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+            }
+            .confirmationDialog("schema-2の勤務記録モードを開始しますか？", isPresented: $confirmWriteMode) {
+                Button("通知停止を確認して記録モードへ") {
+                    model.activateSchemaTwoWorkSession(createNew: false)
+                }
+                Button("キャンセル", role: .cancel) {}
+            } message: {
+                Text("既存の稼働中区間がある場合、最後の観測以降は不確実区間として記録します。閲覧専用から書込みセッションに切り替わります。")
             }
             .onChange(of: model.schemaTwoInspection?.version) { _, _ in
                 page = nil

@@ -9,6 +9,7 @@
     struct WorktimeMenu: View {
         @ObservedObject var model: DesktopModel
         @State private var confirmCreate = false
+        @State private var confirmSchemaTwoCreate = false
         @State private var confirmBreakExit = false
         @State private var pendingBreakExit: PanelActionContext?
         @AppStorage("nextDayTargetMinutes") private var targetMinutes = 420
@@ -24,6 +25,12 @@
                     .padding(16)
             }
             .frame(width: 360, height: 540)
+            .confirmationDialog("schema-2勤務記録を新規作成しますか？", isPresented: $confirmSchemaTwoCreate) {
+                Button("schema-2を新規作成") { model.activateSchemaTwoWorkSession(createNew: true) }
+                Button("キャンセル", role: .cancel) {}
+            } message: {
+                Text("既存DBは上書きせず、新しいschema-2だけ作成します。通知停止の確認後に書込みモードになります。")
+            }
             .confirmationDialog("勤務記録を新規作成しますか？", isPresented: $confirmCreate) {
                 Button("新規作成") { model.open(create: true) }
                 Button("キャンセル", role: .cancel) {}
@@ -53,7 +60,7 @@
                     .foregroundStyle(.secondary)
                 currentWorkdayContent
                 readySettings
-                if model.schemaTwoInspection == nil {
+                if model.schemaTwoInspection == nil, model.schemaTwoWorkSession == nil {
                     backupInspectionSettings
                     BackupRollbackView(model: model)
                     HistoryResetView(model: model)
@@ -66,7 +73,9 @@
 
         @ViewBuilder
         private var currentWorkdayContent: some View {
-            if let glance = model.glance {
+            if model.schemaTwoWorkSession != nil {
+                SchemaTwoWorkActionsView(model: model)
+            } else if let glance = model.glance {
                 summary(glance)
                 if model.ready {
                     actions(glance.day).disabled(model.reviewProposal != nil)
@@ -131,8 +140,17 @@
                 }
                 Button("既存データを再読込") { model.open(create: false) }
                     .disabled(model.choosingBackupDestination)
-                Button("新規データベースを作成") { confirmCreate = true }
-                    .disabled(model.choosingBackupDestination)
+                if model.schemaTwoCanCreate {
+                    Button("schema-2勤務記録を新規作成") { confirmSchemaTwoCreate = true }
+                        .disabled(model.choosingBackupDestination || model.schemaTwoWorkBusy)
+                }
+                #if DEBUG
+                    Button("開発用schema-1データベースを新規作成") { confirmCreate = true }
+                        .disabled(model.choosingBackupDestination || model.schemaTwoWorkBusy)
+                #endif
+                if let notice = model.schemaTwoWorkNotice {
+                    Text(notice).font(.caption).foregroundStyle(.orange)
+                }
             }
         }
 
