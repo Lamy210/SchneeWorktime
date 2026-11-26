@@ -82,6 +82,39 @@ struct JournalV2WorktimeIntentTests {
         }
     }
 
+    @Test func `backdated reference is captured from the asserted start and persists across reload`() throws {
+        try fixture { url, initial in
+            var controller = initial
+            let expected = controller.workActionContext
+            let base = try WorkdayProfile()
+            let reference = try ReferenceWallTime(hour: 1)
+            let profile = try base.capturingReference(at: 90, timeZoneID: "Etc/UTC", wallTime: reference)
+            let proposal = try controller.previewConfirmedRetrospectiveStart(
+                at: 90, profile: profile, matching: expected, sample: sample(100)
+            )
+            #expect(proposal.preview.day.profile.reference?.startedAt == 90)
+            #expect(proposal.preview.day.profile.reference?.referenceAt == 3600)
+            let changed = try base.capturingReference(at: 90, timeZoneID: "Asia/Tokyo", wallTime: reference)
+            let repository = try JournalV2Repository(url: url)
+            let before = try repository.load(now: 100)
+            #expect(throws: RetrospectiveStartError.staleProposal) {
+                try controller.commitConfirmedRetrospectiveStart(
+                    proposal, profile: changed, matching: expected, sample: sample(101)
+                )
+            }
+            let unchanged = try repository.load(now: 101)
+            #expect(unchanged.catalog == before.catalog)
+            #expect(unchanged.version == before.version)
+            #expect(unchanged.checkpoint == before.checkpoint)
+            _ = try controller.commitConfirmedRetrospectiveStart(
+                proposal, profile: profile, matching: expected, sample: sample(102)
+            )
+            let saved = try repository.load(now: 102)
+            #expect(saved.catalog.days.last?.profile.reference == profile.reference)
+            #expect(saved.checkpoint?.observedAt == 102)
+        }
+    }
+
     @Test func `confirmed retrospective start rejects an obsolete idle context`() throws {
         try fixture { url, initial in
             var controller = initial
