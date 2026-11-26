@@ -31,25 +31,25 @@
         @Published var maintenanceInProgress = false
         @Published var resetState = DesktopResetState()
 
-        @Published private(set) var remindersEnabled = UserDefaults.standard.bool(forKey: "departureReminderEnabled")
-        @Published private(set) var departureLeads = ReminderLeadSettings.decode(
+        @Published var remindersEnabled = UserDefaults.standard.bool(forKey: "departureReminderEnabled")
+        @Published var departureLeads = ReminderLeadSettings.decode(
             UserDefaults.standard.string(forKey: "departureReminderLeads")
         )
-        @Published private(set) var earliestReminderEnabled = UserDefaults.standard.bool(
+        @Published var earliestReminderEnabled = UserDefaults.standard.bool(
             forKey: "earliestReminderEnabled"
         )
-        @Published private(set) var referenceReminderEnabled = UserDefaults.standard.bool(
+        @Published var referenceReminderEnabled = UserDefaults.standard.bool(
             forKey: "referenceReminderEnabled"
         )
-        @Published private(set) var reminderStatus = ""
-        @Published private(set) var requestingReminderPermission = false
+        @Published var reminderStatus = ""
+        @Published var requestingReminderPermission = false
 
         private(set) var controller: WorktimeController?
         var schemaTwoWorkSession: JournalV2WorktimeController?
         var sessionLock: LocalSessionLock?
         private(set) var reminderCoordinator: DesktopReminderCoordinator?
-        private(set) var reminderRunning = false
-        private var nextReminderCheck: Double = 0
+        var reminderRunning = false
+        var nextReminderCheck: Double = 0
         var reminderStateUntrusted = false
         private let observationTimer = DesktopObservationTimer()
 
@@ -300,118 +300,6 @@
                 }
             } else {
                 message = "記録を停止：\(error)。既存DBを上書きせず、時刻・権限・バックアップを確認してください。"
-            }
-        }
-    }
-
-    extension DesktopModel {
-        var remindersSupported: Bool {
-            reminderCoordinator != nil
-        }
-
-        func enableReminders() {
-            guard ready, sessionLock != nil, let reminderCoordinator, !requestingReminderPermission else { return }
-            requestingReminderPermission = true
-            Task {
-                defer { requestingReminderPermission = false }
-                do {
-                    let granted = try await reminderCoordinator.enable()
-                    remindersEnabled = granted
-                    UserDefaults.standard.set(granted, forKey: "departureReminderEnabled")
-                    reminderStatus = granted ? "通知を設定中" : "macOSの通知設定を確認してください。"
-                    queueReminders(force: true)
-                } catch {
-                    reminderStatus = "通知許可を確認できません。勤務記録は継続します。"
-                }
-            }
-        }
-
-        func setDepartureLead(_ lead: ReminderLead, enabled: Bool) {
-            guard ready, sessionLock != nil, !requestingReminderPermission else { return }
-            var selected = departureLeads
-            if enabled {
-                selected.insert(lead)
-            } else {
-                selected.remove(lead)
-            }
-            guard selected != departureLeads else { return }
-            departureLeads = selected
-            UserDefaults.standard.set(ReminderLeadSettings.encode(selected), forKey: "departureReminderLeads")
-            queueReminders(force: true)
-        }
-
-        func setEarliestReminder(_ enabled: Bool) {
-            guard ready, sessionLock != nil, !requestingReminderPermission else { return }
-            earliestReminderEnabled = enabled
-            UserDefaults.standard.set(enabled, forKey: "earliestReminderEnabled")
-            queueReminders(force: true)
-        }
-
-        func setReferenceReminder(_ enabled: Bool) {
-            guard ready, sessionLock != nil, !requestingReminderPermission else { return }
-            referenceReminderEnabled = enabled
-            UserDefaults.standard.set(enabled, forKey: "referenceReminderEnabled")
-            queueReminders(force: true)
-        }
-
-        func disableReminders() {
-            guard !maintenanceInProgress, sessionLock != nil, !requestingReminderPermission else { return }
-            remindersEnabled = false
-            UserDefaults.standard.set(false, forKey: "departureReminderEnabled")
-            reminderStatus = "通知予約の取消を確認中"
-            queueReminders(force: true)
-        }
-
-        private func latestReminderState() throws -> ReminderSyncState? {
-            guard remindersEnabled, !reminderStateUntrusted else { return nil }
-            guard ready, let controller else { throw ReminderDeliveryError.invalidRequest }
-            do {
-                return try controller.reminderState(
-                    sample: Self.sample(), departureLeads: departureLeads,
-                    earliestLeads: earliestReminderEnabled ? [.fifteen] : [],
-                    referenceEnabled: referenceReminderEnabled
-                )
-            } catch is ApplicationClockError {
-                return nil
-            }
-        }
-
-        func queueReminders(force: Bool = false) {
-            guard !maintenanceInProgress else { return }
-            if force {
-                nextReminderCheck = 0
-            }
-            guard let reminderCoordinator, sessionLock != nil, !reminderRunning,
-                  ready || reminderStateUntrusted || !remindersEnabled else { return }
-            let uptime = ProcessInfo.processInfo.systemUptime
-            guard uptime >= nextReminderCheck else { return }
-            nextReminderCheck = uptime + 15
-            reminderRunning = true
-            Task {
-                defer { reminderRunning = false }
-                do {
-                    let result = try await reminderCoordinator.reconcile(
-                        latest: { try self.latestReminderState() }, now: { try Self.sample().wall }
-                    )
-                    updateReminderStatus(result)
-                } catch {
-                    reminderStatus = "通知を更新できませんでした。勤務記録は変更しません。"
-                }
-            }
-        }
-
-        private func updateReminderStatus(_ result: ReminderSyncResult) {
-            switch result {
-            case .settled:
-                if remindersEnabled {
-                    reminderStatus = reminderStateUntrusted ? "記録または時計を確認できないため通知停止" : "通知予約の更新完了（配信はOS依存）"
-                } else {
-                    reminderStatus = "通知は無効です。"
-                }
-            case .permissionUnavailable:
-                reminderStatus = "macOSの通知設定を確認してください。"
-            case .busy, .superseded, .cancellationPending:
-                reminderStatus = "通知予約を再確認します。"
             }
         }
     }

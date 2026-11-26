@@ -57,6 +57,7 @@
                 if let backupNotice = model.backupNotice {
                     Text(backupNotice).font(.caption).textSelection(.enabled)
                 }
+                SchemaTwoReminderSettingsView(model: model)
                 Button("観測を停止して履歴の読み取り専用表示に戻る") {
                     model.stopSchemaTwoObservation()
                 }
