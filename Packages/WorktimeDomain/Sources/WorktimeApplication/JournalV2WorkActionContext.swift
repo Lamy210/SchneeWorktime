@@ -5,11 +5,25 @@ import WorktimeStore
 /// A specific observed Journal/Checkpoint generation shown to the user.
 /// The token is invalid after any command or checkpoint-only write.
 public struct JournalV2WorkActionContext: Sendable, Equatable {
+    let sessionID: UUID
     public let version: StoreVersion
     public let day: Workday?
     public let checkpoint: ObservationCheckpoint?
     public let canOpenWorkday: Bool
     public let canAppend: Bool
+
+    /// Only an advancing checkpoint in the same live working session can
+    /// leave a basic, time-of-confirmation attendance action unchanged.
+    public func permitsRoutineObservation(since displayed: Self) -> Bool {
+        if self == displayed { return true }
+        guard sessionID == displayed.sessionID, version == displayed.version,
+              day == displayed.day, day?.state == .working,
+              canOpenWorkday == displayed.canOpenWorkday, canAppend == displayed.canAppend,
+              let before = displayed.checkpoint, let after = checkpoint,
+              before.dayID == after.dayID, after.dayID == day?.id
+        else { return false }
+        return after.observedAt > before.observedAt
+    }
 }
 
 public enum JournalV2WorkActionError: Error, Equatable {
@@ -19,11 +33,37 @@ public enum JournalV2WorkActionError: Error, Equatable {
 public extension JournalV2WorktimeController {
     var workActionContext: JournalV2WorkActionContext {
         JournalV2WorkActionContext(
+            sessionID: confirmationSessionID,
             version: session.version, day: session.catalog.days.last,
             checkpoint: session.checkpoint,
             canOpenWorkday: session.journalCapacity.canOpenWorkday,
             canAppend: session.journalCapacity.remainingEvents > 0
         )
+    }
+
+    /// Only basic break/clock-out actions may survive routine local observation.
+    /// The current complete repository generation is still revalidated by the
+    /// strict entry point; never adopt a checkpoint read from another writer.
+    mutating func performConfirmedAfterRoutineObservation(
+        _ command: WorkdayCommand, matching expected: JournalV2WorkActionContext,
+        sample: ClockSample
+    ) throws -> WorktimeGlance? {
+        let current = workActionContext
+        if expected != current {
+            switch command {
+            case .startBreak, .clockOut:
+                guard current.permitsRoutineObservation(since: expected) else {
+                    throw JournalV2WorkActionError.staleContext
+                }
+                var checked = clock
+                guard try checked.advance(to: sample) == nil else {
+                    throw JournalV2WorkActionError.staleContext
+                }
+            default:
+                throw JournalV2WorkActionError.staleContext
+            }
+        }
+        return try performConfirmed(command, matching: current, sample: sample)
     }
 
     /// A UI confirmation cannot be replayed against a different Journal or
