@@ -109,7 +109,10 @@
         }
 
         private func commit() {
-            guard let pending, let expected = context else { clearPending(); return }
+            guard let pending, let expected = context else {
+                clearPending()
+                return
+            }
             defer { clearPending() }
             let command: WorkdayCommand
             switch pending {
