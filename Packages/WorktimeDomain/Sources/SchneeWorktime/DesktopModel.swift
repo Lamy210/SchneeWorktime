@@ -13,6 +13,11 @@
 
         @Published private(set) var ready = false
         @Published private(set) var schemaTwoInspection: JournalV2ReadOnlyInspection?
+        @Published private(set) var schemaTwoWorkGlance: WorktimeGlance? {
+            didSet { updateObservationTimer() }
+        }
+        @Published private(set) var schemaTwoWorkNotice: String?
+        @Published private(set) var schemaTwoWorkBusy = false
         @Published private(set) var message: String?
         @Published private(set) var reviewProposal: WorktimeReviewProposal?
         @Published private(set) var reviewNotice: String?
@@ -39,6 +44,7 @@
         @Published private(set) var requestingReminderPermission = false
 
         private(set) var controller: WorktimeController?
+        private(set) var schemaTwoWorkSession: JournalV2WorktimeController?
         private(set) var sessionLock: LocalSessionLock?
         private(set) var reminderCoordinator: DesktopReminderCoordinator?
         private(set) var reminderRunning = false
@@ -59,13 +65,18 @@
         }
 
         private func updateObservationTimer() {
-            observationTimer.update(to: ObservationCadence(dayState: glance?.day.state)) { [weak self] in
+            observationTimer.update(
+                to: ObservationCadence(dayState: schemaTwoWorkGlance?.day.state ?? glance?.day.state)
+            ) { [weak self] in
                 self?.tick()
             }
         }
 
         func open(create: Bool) {
-            guard !maintenanceInProgress, !choosingBackupDestination else { return }
+            guard !maintenanceInProgress, !choosingBackupDestination, !schemaTwoWorkBusy else { return }
+            schemaTwoWorkSession = nil
+            schemaTwoWorkGlance = nil
+            schemaTwoWorkNotice = nil
             rollbackProposal = nil
             resetState.proposal = nil
             cancelReview()
@@ -240,6 +251,10 @@
 
         private func tick() {
             guard !maintenanceInProgress else { return }
+            if schemaTwoWorkSession != nil {
+                refreshSchemaTwoWorkSession()
+                return
+            }
             guard var current = controller else {
                 queueReminders()
                 return
@@ -262,6 +277,8 @@
         }
 
         private func fail(_ error: Error) {
+            schemaTwoWorkSession = nil
+            schemaTwoWorkGlance = nil
             schemaTwoInspection = nil
             rollbackProposal = nil
             cancelReview()
