@@ -118,7 +118,7 @@
                 Text("確認：\(actionLabel(action))").font(.headline)
                 Text("確定時の時刻を記録します。休憩中の退勤は休憩終了も伴います。")
                     .font(.caption)
-                if model.schemaTwoActionContext != expected {
+                if model.schemaTwoActionContext?.permitsRoutineObservation(since: expected) != true {
                     Text("観測または記録が更新されました。まだ保存していません。")
                         .font(.caption).foregroundStyle(.orange)
                     Button("最新状態で操作を再選択") {
@@ -178,7 +178,7 @@
 
         private func commit() {
             guard let pending, let expected = context,
-                  expected == model.schemaTwoActionContext
+                  model.schemaTwoActionContext?.permitsRoutineObservation(since: expected) == true
             else {
                 confirmationNotice = "記録が更新されました。保存せず再確認してください。"
                 return
