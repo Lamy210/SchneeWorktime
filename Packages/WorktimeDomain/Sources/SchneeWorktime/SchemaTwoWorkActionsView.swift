@@ -29,7 +29,7 @@
             VStack(alignment: .leading, spacing: 8) {
                 Label("schema-2 · 勤務記録", systemImage: "clock.badge.checkmark")
                     .font(.headline)
-                Text("勤務開始・休憩・退勤のみ使用できます。訂正・通知・復元・全履歴削除は未接続です。")
+                Text("勤務開始・休憩・退勤・希望退勤を操作できます。履歴訂正・復元・全履歴削除は未接続です。")
                     .font(.caption)
                     .foregroundStyle(.orange)
                 if let glance = model.schemaTwoWorkGlance {
@@ -57,6 +57,7 @@
                 if let backupNotice = model.backupNotice {
                     Text(backupNotice).font(.caption).textSelection(.enabled)
                 }
+                SchemaTwoDesiredDepartureView(model: model)
                 SchemaTwoReminderSettingsView(model: model)
                 Button("観測を停止して履歴の読み取り専用表示に戻る") {
                     model.stopSchemaTwoObservation()
