@@ -40,6 +40,22 @@ struct JournalV2LiveStore {
         fileIdentity = try DatabaseFileGuard.preservationIdentity(canonical)
     }
 
+    /// Strictly read-only full Journal replay for a non-mutating desktop inspection.
+    /// Do not recover an active interval, repair the database or create sidecars.
+    static func inspectReadOnly(url: URL, now: Int64) throws -> JournalV2LiveState {
+        let canonical = try DatabaseFileGuard.canonicalURL(url)
+        let identity = try DatabaseFileGuard.preservationIdentity(canonical)
+        let loaded = try connect(canonical, flags: SQLITE_OPEN_READONLY) { db in
+            guard sqlite3_db_readonly(db, "main") == 1 else { throw DatabaseFileError.unsafeFile }
+            try execute(db, "PRAGMA query_only = ON")
+            return try transactionRead(db) { try read(db, now: now) }
+        }
+        guard try DatabaseFileGuard.preservationIdentity(canonical) == identity else {
+            throw DatabaseFileError.unsafeFile
+        }
+        return loaded
+    }
+
     private static func bootstrap(_ db: OpaquePointer) throws {
         guard try scalar(db, "PRAGMA user_version") == 0,
               try scalar(db, "SELECT count(*) FROM sqlite_master WHERE name NOT LIKE 'sqlite_%'") == 0
