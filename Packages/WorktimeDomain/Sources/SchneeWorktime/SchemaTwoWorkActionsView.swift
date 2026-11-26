@@ -11,6 +11,9 @@
         @AppStorage("nextDayRestMinutes") private var restMinutes = 60
         @State private var pending: Action?
         @State private var context: JournalV2WorkActionContext?
+        @State private var pendingProfile: WorkdayProfile?
+        @State private var pendingTargetMinutes: Int?
+        @State private var pendingRestMinutes: Int?
         @State private var confirming = false
 
         private enum Action {
@@ -47,6 +50,13 @@
                 if let notice = model.schemaTwoWorkNotice {
                     Text(notice).font(.caption).foregroundStyle(.orange)
                 }
+                Button("schema-2全履歴をJSONでバックアップ") {
+                    model.chooseSchemaTwoBackupDestination()
+                }
+                .disabled(model.choosingBackupDestination || model.schemaTwoWorkBusy)
+                if let backupNotice = model.backupNotice {
+                    Text(backupNotice).font(.caption).textSelection(.enabled)
+                }
                 Button("観測を停止して履歴の読み取り専用表示に戻る") {
                     model.stopSchemaTwoObservation()
                 }
@@ -66,6 +76,8 @@
                     clearPending()
                 }
             }
+            .onChange(of: targetMinutes) { _, _ in clearPending() }
+            .onChange(of: restMinutes) { _, _ in clearPending() }
         }
 
         @ViewBuilder
@@ -97,6 +109,17 @@
         }
 
         private func prepare(_ action: Action, context: JournalV2WorkActionContext) {
+            if case .clockIn = action {
+                guard validProfile,
+                      let profile = try? WorkdayProfile(
+                          target: Int64(targetMinutes) * 60,
+                          expectedRest: Int64(restMinutes) * 60
+                      )
+                else { return }
+                pendingProfile = profile
+                pendingTargetMinutes = targetMinutes
+                pendingRestMinutes = restMinutes
+            }
             pending = action
             self.context = context
             confirming = true
@@ -105,6 +128,9 @@
         private func clearPending() {
             pending = nil
             context = nil
+            pendingProfile = nil
+            pendingTargetMinutes = nil
+            pendingRestMinutes = nil
             confirming = false
         }
 
@@ -117,12 +143,12 @@
             let command: WorkdayCommand
             switch pending {
             case .clockIn:
-                guard validProfile,
-                      let profile = try? WorkdayProfile(
-                          target: Int64(targetMinutes) * 60,
-                          expectedRest: Int64(restMinutes) * 60
-                      )
-                else { return }
+                guard validProfile, pendingTargetMinutes == targetMinutes,
+                      pendingRestMinutes == restMinutes, let profile = pendingProfile
+                else {
+                    model.schemaTwoWorkNotice = "勤務開始設定が変更されたため、内容を再確認してください。"
+                    return
+                }
                 command = .clockIn(id: UUID(), profile: profile)
             case .startBreak:
                 command = .startBreak

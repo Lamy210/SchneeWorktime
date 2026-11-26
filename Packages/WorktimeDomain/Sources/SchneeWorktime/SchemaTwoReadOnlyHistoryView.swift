@@ -40,6 +40,16 @@
                 if let status = model.schemaTwoWorkNotice {
                     Text(status).font(.caption).foregroundStyle(.orange)
                 }
+                Button("schema-2全履歴をJSONでバックアップ") {
+                    model.chooseSchemaTwoBackupDestination()
+                }
+                .disabled(model.choosingBackupDestination || model.schemaTwoWorkBusy)
+                Text("履歴・訂正の平文JSONです。外部の所有者専用フォルダへ保存してください。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                if let backupNotice = model.backupNotice {
+                    Text(backupNotice).font(.caption).textSelection(.enabled)
+                }
                 Button("schema-2履歴を再検証") {
                     page = nil
                     notice = nil

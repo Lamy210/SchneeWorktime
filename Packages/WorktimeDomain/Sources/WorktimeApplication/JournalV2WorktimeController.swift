@@ -27,12 +27,20 @@ public struct JournalV2WorktimeController {
 
     /// Fresh schema-2 files only. An existing schema-1/unknown DB is never converted or erased.
     public init(
-        url: URL, createIfMissing: Bool = false, requireNew: Bool = false, sample: ClockSample
+        url: URL, createIfMissing: Bool = false, requireNew: Bool = false,
+        expectedReadOnly: JournalV2Session? = nil, sample: ClockSample
     ) throws {
         repository = try JournalV2Repository(
             url: url, createIfMissing: createIfMissing, requireNew: requireNew
         )
         session = try repository.load(now: sample.wall)
+        if let expectedReadOnly {
+            guard session.version == expectedReadOnly.version,
+                  JournalV2Repository.sameCommittedState(expectedReadOnly, session)
+            else {
+                throw JournalV2ReadOnlyActivationError.staleSnapshot
+            }
+        }
         clock = ClockObservation(initial: sample)
         try recoverOpenInterval(sample: sample)
         try saveCheckpoint(sample: sample)
