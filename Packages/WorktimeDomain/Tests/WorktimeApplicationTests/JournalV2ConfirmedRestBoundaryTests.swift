@@ -31,7 +31,9 @@ struct JournalV2ConfirmedRestBoundaryTests {
             let intent = JournalV2RestBoundaryIntent(boundary: .start, old: 110, new: 105)
             let repository = try JournalV2Repository(url: url)
             let before = try repository.load(now: 121)
-            let plan = try current.previewConfirmedRestBoundary(intent, day: day, matching: displayed, sample: sample(121))
+            let plan = try current.previewConfirmedRestBoundary(
+                intent, day: day, matching: displayed, sample: sample(121)
+            )
             #expect(try repository.load(now: 121).catalog == before.catalog)
             for instant in stride(from: Int64(130), through: 180, by: 10) {
                 _ = try current.refresh(sample: sample(instant))
@@ -55,7 +57,9 @@ struct JournalV2ConfirmedRestBoundaryTests {
             let displayed = current.workActionContext
             let day = try #require(displayed.day)
             let intent = JournalV2RestBoundaryIntent(boundary: .end, old: 120, new: 115)
-            let plan = try current.previewConfirmedRestBoundary(intent, day: day, matching: displayed, sample: sample(121))
+            let plan = try current.previewConfirmedRestBoundary(
+                intent, day: day, matching: displayed, sample: sample(121)
+            )
             _ = try current.refresh(sample: sample(130))
             let repository = try JournalV2Repository(url: url)
             let before = try repository.load(now: 130)
@@ -82,7 +86,9 @@ struct JournalV2ConfirmedRestBoundaryTests {
                 try current.previewConfirmedRestBoundary(invalid, day: day, matching: displayed, sample: sample(121))
             }
             let valid = JournalV2RestBoundaryIntent(boundary: .end, old: 120, new: 115)
-            let plan = try current.previewConfirmedRestBoundary(valid, day: day, matching: displayed, sample: sample(121))
+            let plan = try current.previewConfirmedRestBoundary(
+                valid, day: day, matching: displayed, sample: sample(121)
+            )
             _ = try current.refresh(sample: sample(150))
             let repository = try JournalV2Repository(url: url)
             let before = try repository.load(now: 151)
