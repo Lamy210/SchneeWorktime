@@ -20,12 +20,13 @@ struct JournalV2DesiredDepartureSafetyTests {
     }
 
     private func started(
-        _ url: URL, profile: WorkdayProfile = WorkdayProfile()
+        _ url: URL, profile: WorkdayProfile? = nil
     ) throws -> (JournalV2WorktimeController, UUID) {
+        let selected = try profile ?? WorkdayProfile()
         var controller = try JournalV2WorktimeController(url: url, createIfMissing: true, sample: sample(100))
         let dayID = UUID()
         _ = try controller.perform(
-            .clockIn(id: dayID, profile: profile), sample: sample(100)
+            .clockIn(id: dayID, profile: selected), sample: sample(100)
         )
         return (controller, dayID)
     }
@@ -135,7 +136,8 @@ struct JournalV2DesiredDepartureSafetyTests {
             _ = try controller.commitDesiredDeparture(
                 proposed, warningAcknowledged: true, sample: sample(102)
             )
-            let paused = try #require(controller.perform(.startBreak, sample: sample(103)))
+            let pausedResult = try controller.perform(.startBreak, sample: sample(103))
+            let paused = try #require(pausedResult)
             #expect(paused.day.state == .onBreak)
             let cleared = try controller.clearDesiredDeparture(expectedDay: paused.day, sample: sample(104))
             #expect(cleared?.day.state == .onBreak)
