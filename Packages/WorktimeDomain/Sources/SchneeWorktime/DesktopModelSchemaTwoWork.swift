@@ -99,8 +99,20 @@
             }
         }
 
+        func schemaTwoClockInSettings(profile: WorkdayProfile) throws -> JournalV2ClockInSettings {
+            do {
+                return try JournalV2ClockInSettings(
+                    profile: profile, timeZoneID: TimeZone.current.identifier,
+                    wallTime: ReferencePreferences.wallTime()
+                )
+            } catch is ReferenceTimeError {
+                throw JournalV2ClockInSettingsError.invalidReference
+            }
+        }
+
         func performSchemaTwoWork(
-            _ command: WorkdayCommand, matching expected: JournalV2WorkActionContext
+            _ command: WorkdayCommand, matching expected: JournalV2WorkActionContext,
+            clockInSettings: JournalV2ClockInSettings? = nil
         ) {
             guard !schemaTwoWorkBusy, !maintenanceInProgress, !choosingBackupDestination,
                   !ready, controller == nil, sessionLock != nil,
@@ -110,15 +122,23 @@
                 return
             }
             do {
-                let updated = try current.performConfirmedAfterRoutineObservation(
-                    command, matching: expected, sample: Self.sample()
-                )
+                let sample = try Self.sample()
+                let updated: WorktimeGlance? = if case let .clockIn(id, profile) = command {
+                    try confirmedSchemaTwoClockIn(
+                        id: id, profile: profile, displayed: clockInSettings,
+                        matching: expected, sample: sample, controller: &current
+                    )
+                } else {
+                    try current.performConfirmedAfterRoutineObservation(command, matching: expected, sample: sample)
+                }
                 schemaTwoWorkSession = current
                 schemaTwoWorkGlance = updated
                 schemaTwoWorkNotice = nil
                 queueReminders(force: true)
             } catch JournalV2WorkActionError.staleContext {
-                schemaTwoWorkNotice = "勤務記録が更新されました。操作内容を再確認してください。"
+                schemaTwoWorkNotice = "勤務記録・設定・タイムゾーンが更新されました。操作内容を再確認してください。"
+            } catch JournalV2ClockInSettingsError.invalidReference {
+                schemaTwoWorkNotice = "参考終業時刻の設定を確認してください。"
             } catch JournalV2WorkActionError.invalidTransition {
                 schemaTwoWorkNotice = "勤務状態が操作と一致しません。操作を再確認してください。"
             } catch JournalV2WorkActionError.insufficientCapacity {
@@ -126,6 +146,18 @@
             } catch {
                 schemaTwoSessionFailed(error)
             }
+        }
+
+        private func confirmedSchemaTwoClockIn(
+            id: UUID, profile: WorkdayProfile, displayed: JournalV2ClockInSettings?,
+            matching expected: JournalV2WorkActionContext, sample: ClockSample,
+            controller: inout JournalV2WorktimeController
+        ) throws -> WorktimeGlance? {
+            guard let displayed else { throw JournalV2WorkActionError.staleContext }
+            let latest = try schemaTwoClockInSettings(profile: profile)
+            return try controller.performConfirmedClockIn(
+                id: id, displayed: displayed, current: latest, matching: expected, sample: sample
+            )
         }
 
         func refreshSchemaTwoWorkSession() {
