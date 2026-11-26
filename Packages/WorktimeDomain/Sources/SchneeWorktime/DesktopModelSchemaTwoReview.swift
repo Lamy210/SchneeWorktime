@@ -42,11 +42,11 @@
             matching expected: JournalV2WorkActionContext
         ) throws {
             guard schemaTwoReviewEnabled, var current = schemaTwoWorkSession,
-                  expected == current.workActionContext,
+                  current.workActionContext.permitsRoutineObservation(since: expected),
                   proposal.before.day == schemaTwoWorkGlance?.day
             else { throw JournalV2WorktimeCorrectionError.staleProposal }
             do {
-                let updated = try current.commitConfirmedReview(
+                let updated = try current.commitReviewAfterRoutineObservation(
                     proposal, matching: expected, sample: Self.sample()
                 )
                 schemaTwoWorkSession = current
