@@ -3,7 +3,7 @@ import WorktimeDomain
 import WorktimeStore
 
 public enum RetrospectiveStartError: Error, Equatable {
-    case invalidStart, staleProposal
+    case invalidStart, staleProposal, futureStart, currentStart
 }
 
 /// An explicit assertion of continuous work, not an observation or an automatic inference.
