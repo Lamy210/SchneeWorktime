@@ -55,6 +55,9 @@
                 if model.schemaTwoWorkSession == nil {
                     PanelWorkActionsView(model: model)
                 }
+                if let notice = model.schemaTwoResetNotice {
+                    Text(notice).font(.caption)
+                }
                 Text("予測は勤務実績ではありません。").font(.caption).foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
