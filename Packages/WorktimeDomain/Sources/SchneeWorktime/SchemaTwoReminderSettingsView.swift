@@ -34,7 +34,11 @@
                     get: { model.earliestReminderEnabled },
                     set: { model.setEarliestReminder($0) }
                 ))
-                Text("参考終業時刻の新規捕捉・設定は未接続です。新たな参考時刻の通知は作成しません。")
+                Toggle("参考終業時刻", isOn: Binding(
+                    get: { model.referenceReminderEnabled },
+                    set: { model.setReferenceReminder($0) }
+                ))
+                Text("参考終業通知は独立した設定です。捕捉済みの有効な参考時刻のみ対象にします。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 if model.remindersEnabled {

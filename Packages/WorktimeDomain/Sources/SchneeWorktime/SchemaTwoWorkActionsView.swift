@@ -11,7 +11,7 @@
         @AppStorage("nextDayRestMinutes") private var restMinutes = 60
         @State private var pending: Action?
         @State private var context: JournalV2WorkActionContext?
-        @State private var pendingProfile: WorkdayProfile?
+        @State private var pendingSettings: JournalV2ClockInSettings?
         @State private var pendingTargetMinutes: Int?
         @State private var pendingRestMinutes: Int?
         @State private var confirmationNotice: String?
@@ -29,7 +29,7 @@
             VStack(alignment: .leading, spacing: 8) {
                 Label("schema-2 · 勤務記録", systemImage: "clock.badge.checkmark")
                     .font(.headline)
-                Text("勤務・休憩・希望退勤と、要確認区間の訂正に対応。過去日訂正・復元・全履歴削除は未接続です。")
+                Text("勤務・休憩・希望退勤と、要確認区間の訂正に対応。過去日の未観測区間も訂正できます。復元・全履歴削除は未接続です。")
                     .font(.caption)
                     .foregroundStyle(.orange)
                 statusSummary
@@ -76,6 +76,7 @@
                 Text(status(glance.day.state)).font(.headline)
                 Text("実働：\(duration(glance.snapshot.bounds.lower ... glance.snapshot.bounds.upper))")
                     .font(.caption)
+                ReferenceStatusView(glance: glance)
                 if glance.snapshot.bounds.lower != glance.snapshot.bounds.upper {
                     Text("未観測時間があります。実働は範囲で表示し、勤務したと断定しません。")
                         .font(.caption)
@@ -106,7 +107,9 @@
             } else {
                 Text("目標：\(targetMinutes)分／標準休憩：\(restMinutes)分")
                     .font(.caption)
-                Text("参考時刻の自動保存は未接続です。目標と標準休憩のみ使用します。")
+                ReferenceSettingsView()
+                    .disabled(pending != nil)
+                Text("参考終業の設定は次の勤務開始時に固定されます。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Button("勤務開始") { prepare(.clockIn, context: expected) }
@@ -118,6 +121,9 @@
         private func confirmation(_ action: Action, expected: JournalV2WorkActionContext) -> some View {
             VStack(alignment: .leading, spacing: 5) {
                 Text("確認：\(actionLabel(action))").font(.headline)
+                if let pendingSettings {
+                    Text("勤務開始時の参考設定：\(referenceLabel(pendingSettings))").font(.caption)
+                }
                 Text("確定時の時刻を記録します。休憩中の退勤は休憩終了も伴います。")
                     .font(.caption)
                 if model.schemaTwoActionContext?.permitsRoutineObservation(since: expected) != true {
@@ -154,13 +160,13 @@
         private func prepare(_ action: Action, context: JournalV2WorkActionContext) {
             clearPending()
             if case .clockIn = action {
-                guard validProfile,
-                      let profile = try? WorkdayProfile(
-                          target: Int64(targetMinutes) * 60,
-                          expectedRest: Int64(restMinutes) * 60
-                      )
-                else { return }
-                pendingProfile = profile
+                do {
+                    let settings = try NextDaySettings(targetMinutes: targetMinutes, restMinutes: restMinutes)
+                    pendingSettings = try model.schemaTwoClockInSettings(profile: settings.profile)
+                } catch {
+                    confirmationNotice = "勤務開始・参考終業の設定を確認してください。"
+                    return
+                }
                 pendingTargetMinutes = targetMinutes
                 pendingRestMinutes = restMinutes
             }
@@ -172,7 +178,7 @@
         private func clearPending() {
             pending = nil
             context = nil
-            pendingProfile = nil
+            pendingSettings = nil
             pendingTargetMinutes = nil
             pendingRestMinutes = nil
             confirmationNotice = nil
@@ -190,12 +196,12 @@
             switch pending {
             case .clockIn:
                 guard validProfile, pendingTargetMinutes == targetMinutes,
-                      pendingRestMinutes == restMinutes, let profile = pendingProfile
+                      pendingRestMinutes == restMinutes, let pendingSettings
                 else {
                     model.schemaTwoWorkNotice = "勤務開始設定が変更されたため、内容を再確認してください。"
                     return
                 }
-                command = .clockIn(id: UUID(), profile: profile)
+                command = .clockIn(id: UUID(), profile: pendingSettings.profile)
             case .startBreak:
                 command = .startBreak
             case .endBreak:
@@ -203,7 +209,19 @@
             case .clockOut:
                 command = .clockOut(confirmBreak: expected.day?.state == .onBreak)
             }
-            model.performSchemaTwoWork(command, matching: expected)
+            model.performSchemaTwoWork(command, matching: expected, clockInSettings: pendingSettings)
+        }
+
+        private func referenceLabel(_ settings: JournalV2ClockInSettings) -> String {
+            guard let time = settings.wallTime else { return "無効・\(settings.timeZoneID)" }
+            let day = time.dayOffset == 0 ? "開始日" : "翌日"
+            let clock = String(format: "%02d:%02d", time.hour, time.minute)
+            let occurrence = switch time.repeatedTime {
+            case .earlier: "早い方"
+            case .later: "遅い方"
+            case nil: "未選択"
+            }
+            return "\(day) \(clock)・\(settings.timeZoneID)（重複時刻：\(occurrence)）"
         }
 
         private func status(_ state: WorkdayState) -> String {

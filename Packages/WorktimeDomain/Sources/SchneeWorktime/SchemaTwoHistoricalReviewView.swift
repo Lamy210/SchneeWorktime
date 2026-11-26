@@ -106,8 +106,8 @@
                     Text("要確認区間はありません。").font(.caption)
                 } else {
                     Picker("要確認区間", selection: $index) {
-                        ForEach(Array(historical.glance.reviewableGaps.enumerated()), id: \.offset) { i, gap in
-                            Text("\(label(gap.start))〜\(label(gap.end))").tag(i)
+                        ForEach(Array(historical.glance.reviewableGaps.enumerated()), id: \.offset) { gapIndex, gap in
+                            Text("\(label(gap.start))〜\(label(gap.end))").tag(gapIndex)
                         }
                     }
                     if historical.glance.reviewableGaps.indices.contains(index) {
