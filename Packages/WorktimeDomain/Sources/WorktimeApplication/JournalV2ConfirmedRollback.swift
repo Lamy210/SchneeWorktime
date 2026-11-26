@@ -4,6 +4,7 @@ import WorktimeStore
 
 /// Bind the immutable repository preview to the owning desktop session.
 public struct JournalV2ConfirmedRollback {
+    public let id: UUID
     public let proposal: JournalV2RollbackProposal
     public let context: JournalV2WorkActionContext
 }
@@ -16,7 +17,7 @@ public extension JournalV2WorktimeController {
             throw JournalV2WorkActionError.staleContext
         }
         let proposal = try previewRollback(file: file, sample: sample)
-        return JournalV2ConfirmedRollback(proposal: proposal, context: expected)
+        return JournalV2ConfirmedRollback(id: UUID(), proposal: proposal, context: expected)
     }
 
     func isCurrent(_ confirmation: JournalV2ConfirmedRollback) -> Bool {
