@@ -29,7 +29,7 @@
             VStack(alignment: .leading, spacing: 8) {
                 Label("schema-2 · 勤務記録", systemImage: "clock.badge.checkmark")
                     .font(.headline)
-                Text("勤務・休憩・希望退勤と、要確認区間の訂正に対応。過去日訂正・復元・全履歴削除は未接続です。")
+                Text("勤務・休憩・希望退勤と、要確認区間の訂正に対応。過去日の未観測区間と現在のDB内の論理削除に対応。全履歴消去は未対応です。")
                     .font(.caption)
                     .foregroundStyle(.orange)
                 statusSummary
@@ -56,6 +56,7 @@
                     SchemaTwoReviewableGapsView(model: model, glance: glance)
                 }
                 SchemaTwoDesiredDepartureView(model: model)
+                SchemaTwoHistoricalReviewView(model: model)
                 SchemaTwoReminderSettingsView(model: model)
                 SchemaTwoDatabaseResetView(model: model)
                 Button("観測を停止して履歴の読み取り専用表示に戻る") {

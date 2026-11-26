@@ -45,7 +45,8 @@
                 let result = try await coordinator.reconcile(latest: { nil }, now: { try Self.sample().wall })
                 if result == .settled, maintenanceInProgress, sessionLock != nil,
                    !ready, controller == nil, !schemaTwoWorkBusy,
-                   var current = schemaTwoWorkSession, current.isCurrent(confirmation) {
+                   var current = schemaTwoWorkSession, current.isCurrent(confirmation)
+                {
                     try current.commitConfirmedReset(confirmation, consent: consent, sample: Self.sample())
                     committed = true
                     schemaTwoResetNotice = "現在のDB内の勤務履歴を初期化しました。外部ファイルは残ります。"
