@@ -26,7 +26,8 @@ struct JournalV2ConfirmedReviewTests {
             .clockIn(id: UUID(), profile: WorkdayProfile()), sample: sample(100)
         )
         _ = try current.refresh(sample: sample(110))
-        let glance = try #require(current.refresh(sample: sample(140)))
+        let observed = try current.refresh(sample: sample(140))
+        let glance = try #require(observed)
         let gap = try #require(glance.reviewableGaps.first)
         #expect(gap == ObservationGap(start: 110, end: 140))
         return (current, glance, gap)
@@ -77,13 +78,13 @@ struct JournalV2ConfirmedReviewTests {
                 source: gap, selection: gap, classification: .work,
                 matching: expected, sample: sample(141)
             )
-            #expect(proposal.after.snapshot.bounds.lowerBound > proposal.before.snapshot.bounds.lowerBound)
+            #expect(proposal.after.snapshot.bounds.lower > proposal.before.snapshot.bounds.lower)
             #expect(try JournalV2Repository(url: url).load(now: 141).catalog == prior.catalog)
             _ = try current.commitConfirmedReview(proposal, matching: expected, sample: sample(142))
             let saved = try JournalV2Repository(url: url).load(now: 142)
             #expect(saved.catalog.reviewAudit.count == 1)
             #expect(try saved.catalog.snapshot(dayID: proposal.before.day.id, now: 142)
-                .bounds.lowerBound > proposal.before.snapshot.bounds.lowerBound)
+                .bounds.lower > proposal.before.snapshot.bounds.lower)
         }
     }
 
