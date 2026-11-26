@@ -29,7 +29,9 @@
 
         private var panelContents: some View {
             VStack(alignment: .leading, spacing: 8) {
-                if model.ready, let glance = model.glance {
+                if model.schemaTwoWorkSession != nil {
+                    SchemaTwoWorkActionsView(model: model)
+                } else if model.ready, let glance = model.glance {
                     let countdown = DepartureCountdown(goal: glance.forecast.goal, observedAt: glance.observedAt)
                     Text(countdown.menuTitle)
                         .font(.title2.monospacedDigit())
@@ -50,7 +52,9 @@
                 } else {
                     Text(model.ready ? "勤務記録なし" : "記録を確認してください").font(.headline)
                 }
-                PanelWorkActionsView(model: model)
+                if model.schemaTwoWorkSession == nil {
+                    PanelWorkActionsView(model: model)
+                }
                 Text("予測は勤務実績ではありません。").font(.caption).foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
