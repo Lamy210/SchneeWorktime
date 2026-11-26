@@ -62,7 +62,7 @@ struct JournalV2ClockInReferenceTests {
             let settings = JournalV2ClockInSettings(profile: profile, timeZoneID: "Etc/UTC", wallTime: time)
             let changes = [
                 JournalV2ClockInSettings(profile: profile, timeZoneID: "Asia/Tokyo", wallTime: time),
-                JournalV2ClockInSettings(profile: profile, timeZoneID: "Etc/UTC", wallTime: nil),
+                JournalV2ClockInSettings(profile: profile, timeZoneID: "Etc/UTC", wallTime: nil)
             ]
             let repository = try JournalV2Repository(url: url)
             let before = try repository.load(now: 100)
