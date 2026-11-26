@@ -46,8 +46,12 @@
                 Text("勤務実績や退勤打刻は変更しません。希望に基づく通知も再計算します。")
             }
             .onChange(of: model.schemaTwoActionContext) { _, newValue in
-                if expected != nil, expected != newValue { reset() }
-                if clearing != nil, clearing != newValue { reset() }
+                if expected != nil, expected != newValue {
+                    reset()
+                }
+                if clearing != nil, clearing != newValue {
+                    reset()
+                }
             }
             .onChange(of: candidate) { _, _ in reset() }
         }
