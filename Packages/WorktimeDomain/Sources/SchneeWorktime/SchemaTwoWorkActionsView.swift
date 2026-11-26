@@ -56,6 +56,7 @@
                     SchemaTwoReviewableGapsView(model: model, glance: glance)
                 }
                 SchemaTwoDesiredDepartureView(model: model)
+                SchemaTwoHistoricalReviewView(model: model)
                 SchemaTwoReminderSettingsView(model: model)
                 Button("観測を停止して履歴の読み取り専用表示に戻る") {
                     model.stopSchemaTwoObservation()
