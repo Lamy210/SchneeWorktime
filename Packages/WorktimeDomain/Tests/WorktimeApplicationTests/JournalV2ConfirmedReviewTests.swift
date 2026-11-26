@@ -179,7 +179,10 @@ struct JournalV2ConfirmedReviewTests {
             }
             let result = try current.commitReviewAfterRoutineObservation(plan, matching: displayed, sample: sample(201))
             #expect(result?.snapshot.recordedRest == 10)
-            #expect(result?.reviewableGaps == [ObservationGap(start: 110, end: 120), ObservationGap(start: 130, end: 140)])
+            #expect(result?.reviewableGaps == [
+                ObservationGap(start: 110, end: 120),
+                ObservationGap(start: 130, end: 140)
+            ])
             let repository = try JournalV2Repository(url: url)
             let saved = try repository.load(now: 201)
             #expect(saved.catalog.reviewAudit.count == 1)
