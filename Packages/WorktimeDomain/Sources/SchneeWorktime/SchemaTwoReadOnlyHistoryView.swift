@@ -27,27 +27,7 @@
                     Text(reason).font(.caption).foregroundStyle(.orange)
                 }
                 if let snapshot = displayed {
-                    summary(snapshot)
-                    Divider()
-                    Text("退勤済みの勤務履歴").font(.headline)
-                    let history = snapshot.history
-                    Text("revision \(history.version.revision) · \(history.totalEndedDays)件")
-                        .font(.caption)
-                    pageControls(snapshot)
-                    if history.rows.isEmpty {
-                        Text("退勤済みの履歴はありません。").font(.caption)
-                    }
-                    ForEach(history.rows) { row in
-                        Divider()
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text("\(time(row.startedAt)) 〜 \(time(row.endedAt))")
-                                .font(.caption)
-                            Text("実働：\(duration(row.worked))").font(.caption)
-                            Text("休憩：\(DepartureCountdown.duration(row.rest))")
-                                .font(.caption)
-                            Text("訂正：\(row.corrections)件").font(.caption)
-                        }
-                    }
+                    historyContent(snapshot)
                 }
                 if let notice {
                     Text(notice).font(.caption).foregroundStyle(.orange)
@@ -65,6 +45,31 @@
             .onChange(of: model.schemaTwoInspection?.version) { _, _ in
                 page = nil
                 notice = nil
+            }
+        }
+
+        @ViewBuilder
+        private func historyContent(_ snapshot: JournalV2ReadOnlyInspection) -> some View {
+            summary(snapshot)
+            Divider()
+            Text("退勤済みの勤務履歴").font(.headline)
+            let history = snapshot.history
+            Text("revision \(history.version.revision) · \(history.totalEndedDays)件")
+                .font(.caption)
+            pageControls(snapshot)
+            if history.rows.isEmpty {
+                Text("退勤済みの履歴はありません。").font(.caption)
+            }
+            ForEach(history.rows) { row in
+                Divider()
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("\(time(row.startedAt)) 〜 \(time(row.endedAt))")
+                        .font(.caption)
+                    Text("実働：\(duration(row.worked))").font(.caption)
+                    Text("休憩：\(DepartureCountdown.duration(row.rest))")
+                        .font(.caption)
+                    Text("訂正：\(row.corrections)件").font(.caption)
+                }
             }
         }
 
