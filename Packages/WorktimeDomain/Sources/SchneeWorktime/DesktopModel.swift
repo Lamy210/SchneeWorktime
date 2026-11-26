@@ -30,6 +30,7 @@
         @Published var rollbackNotice: String?
         @Published var maintenanceInProgress = false
         @Published var resetState = DesktopResetState()
+        @Published var schemaTwoResetNotice: String?
 
         @Published var remindersEnabled = UserDefaults.standard.bool(forKey: "departureReminderEnabled")
         @Published var departureLeads = ReminderLeadSettings.decode(
