@@ -2,7 +2,7 @@ import Foundation
 import Testing
 import WorktimeApplication
 import WorktimeDomain
-import WorktimeStore
+@testable import WorktimeStore
 
 struct JournalV2WorkActionContextTests {
     private func sample(_ instant: Int64) throws -> ClockSample {
