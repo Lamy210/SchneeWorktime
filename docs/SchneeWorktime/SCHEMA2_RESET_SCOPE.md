@@ -11,10 +11,36 @@
 | SQLite `-journal` / `-wal` / `-shm` | `DatabaseFileGuard`が安全性を検査 | アプリが直接unlinkしない。SQLiteの内部管理に従う。物理完全消去や残留ページの消去は保証しない |
 | `session.lock` | `LocalSessionLock` | セッション排他用。勤務履歴そのものではない。削除中も保持が必要で、勝手に消さない |
 | ユーザーが選んだ保存先のJSON/CSV/復元前保全ファイル | `DesktopModelBackup.chooseBackupDestination`、`choosePreservationDestination`、`confirmRollback` | **自動削除しない**。選択された場所がApp Support配下でも、利用者管理のエクスポートとして扱い、明示的な別操作なしに削除しない |
-| 通知予約 | `DesktopModelReset.completeReset`、`DesktopReminderCoordinator` | 既存のUIでは所有通知の取消収束を削除前に要求。新schema-2アプリセッションは**通知を操作しない**ため、呼出し側の調整は未完成 |
+| 通知予約 | `DesktopModelReset.completeReset`、`DesktopReminderCoordinator` | 既存のUIでは所有通知の取消収束を削除前に要求。schema-2の通知接続はmainに存在する。PR #148の削除時取消接続はCI・実機確認が必要 |
 | UserDefaultsに保存した通知設定 | `DesktopModel` | 履歴データではない設定。削除対象から独立させるか要件確認が必要 |
 | アプリ管理下の専用バックアップ台帳・勤務由来診断ファイル | コード上の網羅調査・管理台帳は未完了 | **unknown**。存在しないと断定しない。正規ディレクトリ、ログ出力先、将来の生成物の収集/削除設計が必要 |
 | Time Machine、クラウド同期、外部コピー、SSD上の残存痕跡 | OS/ユーザー管理 | アプリの自動削除対象外。UXに明示する |
+
+## 生成経路の追加調査と所有権の境界
+
+調査基準: main `315edc538a49f16f7a1da42e0bbe218d6ebb5581` と PR #148 のソース。実機ファイル一覧ではない。
+
+| 生成物 | 生成経路・根拠 | 判定 |
+|---|---|---|
+| `SchneeWorktime-schema2-backup-<UUID>.json` | `DesktopModelSchemaTwoBackup.chooseSchemaTwoBackupDestination` が利用者選択フォルダへ出力。DBディレクトリ配下を拒否 | 利用者管理。自動消去対象外 |
+| `.worktime-<UUID>.partial` | `BackupFile.publish` が保存先に排他的に作成し、fsync・linkat・unlinkatで公開。強制終了時は残存しうる | 保存先の所有境界を継承。外部のpartialを名前だけで消さない |
+| `recovery-<UUID>/worktime.sqlite` | `CatalogBackup.createRecoveryCandidate` が呼出し元指定のprivateディレクトリへ作成。失敗・中断時は残存しうる | schema-1のオフライン候補。アプリ管理下かは呼出し元次第。自動採用なし |
+| `journal-v2-<UUID>/candidate.sqlite` | `JournalStagingDatabase.create` が呼出し元指定先に作成。元snapshot・Journal・Checkpoint anchorを保持 | オフライン移行候補。ライブDBと同一視しない。所有権・残存の実機確認が必要 |
+| 勤務由来診断・ログ | Sources内のLogger/OSLog検索では該当する明示的な出力先を取得できなかった | unknown。検索だけで不存在を証明しない。OSクラッシュレポート、stderr、実行時の出力を別途調査 |
+| VisualDiff画像・比較レポート | `Tools/VisualDiff` の出力rootに生成 | 開発用ツール。実行時アプリの管理ファイルとして一律分類しない |
+
+復元前保全ファイルについてはPR #147で外部フォルダへの出力を接続するが、未統合のためmainの実装済み範囲とは区別する。名前・拡張子・現在の配置場所だけから所有権を推定しない。過去の開発版で利用者が保存した同名ファイルやhardlink/symlinkを誤って消さないこと。
+
+## AC-74/134/135/158に向けた消去設計・受入条件（未実装）
+
+1. アプリが所有する専用ディレクトリと生成台帳を定義し、新しい管理ファイルは生成時から識別する。旧版由来の未登録ファイルは未確定として表示し、自動削除しない。外部exportは明示的に対象外。
+2. 読取り専用の削除プレビューで対象、除外、不明、件数を区別する。台帳は相対パス・種類・生成世代・ファイルidentityに紐付ける。勤務区間や本文などの個人データを削除ログへ複製しない。
+3. 所有ロックを保持し、書込み/通知/バックアップ作成を停止。削除前にDBの世代と管理台帳を照合し、永続化された削除intentを記録する。意図確認後に対象が変われば拒否する。
+4. SQLite resetと管理ファイル削除は単一トランザクションにできない。永続intentを用い、DB reset前後・管理ファイル削除途中・完了記録直前の各中断状態を区別する。起動時は未完了intentの再検証を優先し、旧epochの書込みや復元を許さない。曖昧な場合は停止し、未知のファイルを消さない。
+5. 管理ディレクトリへの処理は固定root・所有者/権限・リンク禁止・identity再照合を要求する。再帰的な任意パス削除、SQLite sidecarの直接削除、外部exportへのunlinkは禁止する。実装では既存の安全なファイルI/OとOS APIの適合性を確認する。
+6. 成功は対象の消去と新epoch・空Journal・所有通知取消・管理台帳の整合性を確認した場合に限定する。単なるDB初期化や部分成功を「全履歴消去完了」と表示しない。物理完全消去、OS管理のコピーまでは保証しない。
+
+追加検証: 同名の外部ファイル保持、未知ファイル保持、symlink/hardlink・パス差替え・権限不一致拒否、削除途中の強制終了、再起動時の冪等な再開、ディスク不足、旧epochの復元拒否、通知取消未収束。実機における全対象の一覧と削除後の再走査が必要。**本設計だけでは受入条件をpassedにしない。**
 
 ## アプリケーション層の安全な論理削除（PR #127）
 
@@ -51,7 +77,7 @@
 | プレビュー後に新たな打刻 | stale確認案で復元拒否、保全先へ新規ファイルを書かない | アプリケーション層の回帰テスト |
 | SQLite COMMIT直前/直後の電源断 | 旧/新の一貫した世代からの再読込、曖昧結果の自動再試行禁止 | **未実施** |
 | 管理下バックアップ削除途中の強制終了 | 未完了表示/冪等な再開/誤削除なし | **未実装、未実施** |
-| UI通知の停止/実機確認 | 通知収束後のみ削除/復元 | **schema-2未接続、未実施** |
+| UI通知の停止/実機確認 | 通知収束後のみ削除/復元 | **PR #148で接続、最新CI・実機未確認** |
 | ファイルシステムの物理残存痕跡 | 完全消去を宣言しない | OSレベルの保証なし |
 
 ## リリース判定
