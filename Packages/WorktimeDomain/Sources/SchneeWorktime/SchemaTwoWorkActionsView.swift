@@ -29,21 +29,10 @@
             VStack(alignment: .leading, spacing: 8) {
                 Label("schema-2 · 勤務記録", systemImage: "clock.badge.checkmark")
                     .font(.headline)
-                Text("勤務開始・休憩・退勤・希望退勤を操作できます。履歴訂正・復元・全履歴削除は未接続です。")
+                Text("勤務・休憩・希望退勤と、要確認区間の訂正に対応。過去日訂正・復元・全履歴削除は未接続です。")
                     .font(.caption)
                     .foregroundStyle(.orange)
-                if let glance = model.schemaTwoWorkGlance {
-                    Text(status(glance.day.state)).font(.headline)
-                    Text("実働：\(duration(glance.snapshot.bounds.lower ... glance.snapshot.bounds.upper))")
-                        .font(.caption)
-                    if glance.snapshot.bounds.lower != glance.snapshot.bounds.upper {
-                        Text("未観測時間があります。実働は範囲で表示し、勤務したと断定しません。")
-                            .font(.caption)
-                            .foregroundStyle(.orange)
-                    }
-                } else {
-                    Text("未開始の勤務記録です。").font(.caption)
-                }
+                statusSummary
                 if let expected = model.schemaTwoActionContext {
                     actions(expected)
                 }
@@ -56,6 +45,9 @@
                 .disabled(model.choosingBackupDestination || model.schemaTwoWorkBusy)
                 if let backupNotice = model.backupNotice {
                     Text(backupNotice).font(.caption).textSelection(.enabled)
+                }
+                if let glance = model.schemaTwoWorkGlance, !glance.reviewableGaps.isEmpty {
+                    SchemaTwoReviewableGapsView(model: model, glance: glance)
                 }
                 SchemaTwoDesiredDepartureView(model: model)
                 SchemaTwoReminderSettingsView(model: model)
@@ -80,6 +72,22 @@
             }
             .onChange(of: targetMinutes) { _, _ in clearPending() }
             .onChange(of: restMinutes) { _, _ in clearPending() }
+        }
+
+        @ViewBuilder
+        private var statusSummary: some View {
+            if let glance = model.schemaTwoWorkGlance {
+                Text(status(glance.day.state)).font(.headline)
+                Text("実働：\(duration(glance.snapshot.bounds.lower ... glance.snapshot.bounds.upper))")
+                    .font(.caption)
+                if glance.snapshot.bounds.lower != glance.snapshot.bounds.upper {
+                    Text("未観測時間があります。実働は範囲で表示し、勤務したと断定しません。")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+            } else {
+                Text("未開始の勤務記録です。").font(.caption)
+            }
         }
 
         @ViewBuilder
