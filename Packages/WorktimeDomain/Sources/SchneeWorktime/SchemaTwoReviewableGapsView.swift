@@ -94,9 +94,8 @@
             .onChange(of: startOffset) { _, _ in reset() }
             .onChange(of: endOffset) { _, _ in reset() }
             .onChange(of: model.schemaTwoActionContext) { _, newer in
-                if expected != nil, newer != expected {
-                    reset()
-                    notice = "保存状態が更新されました。訂正範囲を再確認してください。"
+                if let expected, newer != expected {
+                    notice = "保存状態が更新されました。入力範囲と分類を保持しています。"
                 }
             }
         }
@@ -124,7 +123,15 @@
                     .font(.caption)
                 Text("訂正後の実働はプレビューであり、確定までは保存されません。")
                     .font(.caption)
-                Button("この区間の訂正を確定して保存") { commit(value) }
+                if expected != model.schemaTwoActionContext {
+                    Button("最新状態で訂正案を再確認") {
+                        if let category, let selection {
+                            prepare(category, selection: selection)
+                        }
+                    }
+                } else {
+                    Button("この区間の訂正を確定して保存") { commit(value) }
+                }
                 Button("訂正案を破棄") { reset() }
             }
         }
@@ -151,9 +158,11 @@
         }
 
         private func commit(_ value: JournalV2WorktimeCorrectionProposal) {
-            let context = expected
+            guard let context = expected, context == model.schemaTwoActionContext else {
+                notice = "保存せず最新状態で再確認してください。"
+                return
+            }
             reset()
-            guard let context else { return }
             do {
                 try model.commitSchemaTwoReview(value, matching: context)
                 notice = "訂正履歴と変更後の区間を保存しました。"
