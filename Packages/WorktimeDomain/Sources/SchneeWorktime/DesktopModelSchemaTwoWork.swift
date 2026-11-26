@@ -72,9 +72,19 @@
                     }
                 }
                 let sample = try Self.sample()
-                var opened = try JournalV2WorktimeController(
-                    url: url, createIfMissing: createNew, requireNew: createNew, sample: sample
-                )
+                var opened: JournalV2WorktimeController
+                if createNew {
+                    opened = try JournalV2WorktimeController(
+                        url: url, createIfMissing: true, requireNew: true, sample: sample
+                    )
+                } else {
+                    guard let preview = schemaTwoInspection else {
+                        throw JournalV2WorkActionError.staleContext
+                    }
+                    // Fail closed if another process changed the full Journal or
+                    // checkpoint while the notification cancellation was pending.
+                    opened = try preview.openWorkSession(url: url, sample: sample)
+                }
                 let current = try opened.refresh(sample: sample)
                 schemaTwoWorkSession = opened
                 schemaTwoWorkGlance = current
