@@ -2,6 +2,10 @@ import Foundation
 import WorktimeDomain
 import WorktimeStore
 
+public enum JournalV2ReadOnlyActivationError: Error, Equatable {
+    case staleSnapshot
+}
+
 /// Validated, immutable snapshot for the limited schema-2 desktop history screen.
 /// It does not start a work interval, recover gaps, save a checkpoint or schedule notifications.
 public struct JournalV2ReadOnlyInspection {
