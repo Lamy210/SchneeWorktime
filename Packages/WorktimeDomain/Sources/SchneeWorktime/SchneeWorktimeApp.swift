@@ -44,6 +44,9 @@
         }
 
         private var menuTitle: String {
+            if let glance = model.schemaTwoWorkGlance {
+                return DepartureCountdown(goal: glance.forecast.goal, observedAt: glance.observedAt).menuTitle
+            }
             guard model.ready, let glance = model.glance else { return "SchneeWorktime" }
             return DepartureCountdown(goal: glance.forecast.goal, observedAt: glance.observedAt).menuTitle
         }
