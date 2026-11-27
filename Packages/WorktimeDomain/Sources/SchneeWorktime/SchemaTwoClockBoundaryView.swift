@@ -9,7 +9,7 @@
         @ObservedObject var model: DesktopModel
         let day: Workday
         var historical: HistoricalReviewContext?
-        var onSaved: (() -> Void)? = nil
+        var onSaved: (() -> Void)?
         @State private var editingStart = true
         @State private var minutes = ""
         @State private var unit: WorktimeSummaryUnit = .day
