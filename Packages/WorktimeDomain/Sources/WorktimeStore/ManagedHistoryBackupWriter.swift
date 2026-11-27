@@ -10,6 +10,38 @@ import Foundation
 /// Caller owns the private root and exclusive session lock. No UI connection.
 /// A failure after publication deliberately leaves the file unregistered.
 enum ManagedHistoryBackupWriter {
+    /// Explicit bootstrap only. Existing directories or metadata, including
+    /// crash remnants, are never silently adopted or replaced.
+    static func initializeEmpty(in root: URL) throws {
+        guard root.isFileURL, try !ManagedHistoryStartupFence.hasPending(in: root) else {
+            throw ManagedHistoryPersistenceError.pendingIntent
+        }
+        let parent = open(root.path, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
+        guard parent >= 0 else { throw ManagedHistoryInventoryError.system(errno) }
+        defer { close(parent) }
+        var info = stat()
+        guard fstat(parent, &info) == 0 else { throw ManagedHistoryInventoryError.system(errno) }
+        guard info.st_uid == geteuid(), info.st_mode & 0o077 == 0 else {
+            throw ManagedHistoryInventoryError.unsafeDirectory
+        }
+        var existing = stat()
+        let registryName = ManagedHistoryRegistryFile.filename
+        if fstatat(parent, registryName, &existing, AT_SYMLINK_NOFOLLOW) == 0 {
+            throw ManagedHistoryPersistenceError.incompleteInventory
+        }
+        guard errno == ENOENT else { throw ManagedHistoryInventoryError.system(errno) }
+        guard mkdirat(parent, ManagedHistoryInventory.directoryName, 0o700) == 0 else {
+            throw ManagedHistoryInventoryError.system(errno)
+        }
+        guard fsync(parent) == 0 else { throw ManagedHistoryInventoryError.system(errno) }
+        let registry = try ManagedHistoryRegistry(entries: [])
+        let inventory = try ManagedHistoryInventoryReader.inspect(applicationDirectory: root, registry: registry)
+        guard inventory.isComplete, inventory.directoryIdentity != nil else {
+            throw ManagedHistoryPersistenceError.incompleteInventory
+        }
+        try ManagedHistoryRegistryFile.publishInitial(registry, in: root)
+    }
+
     static func publish(
         _ data: Data, epoch: UUID, in root: URL
     ) throws -> ManagedHistoryEntry {
