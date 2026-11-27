@@ -10,7 +10,7 @@
         let day: Workday
         let boundary: RestBoundary
         var historical: HistoricalReviewContext?
-        var onSaved: (() -> Void)? = nil
+        var onSaved: (() -> Void)?
         @State private var selected: Int64?
         @State private var minutes = ""
         @State private var proposal: JournalV2ConfirmedRestBoundary?
