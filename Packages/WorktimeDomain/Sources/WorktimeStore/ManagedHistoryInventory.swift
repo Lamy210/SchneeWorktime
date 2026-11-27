@@ -116,12 +116,13 @@ enum ManagedHistoryInventoryReader {
         let parent = open(applicationDirectory.path, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
         guard parent >= 0 else { throw ManagedHistoryInventoryError.system(errno) }
         defer { close(parent) }
-        _ = try privateDirectory(parent)
+        let parentIdentity = try privateDirectory(parent)
         let name = ManagedHistoryInventory.directoryName
         let directory = openat(parent, name, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
         guard directory >= 0 else {
             let code = errno
             guard code == ENOENT else { throw ManagedHistoryInventoryError.system(code) }
+            try verifyParent(applicationDirectory, fd: parent, expected: parentIdentity)
             return ManagedHistoryInventory(directoryIdentity: nil, items: registry.entries.map {
                 ManagedHistoryInventoryItem(name: $0.name, entry: $0, status: .missing)
             }.sorted { $0.name < $1.name })
@@ -137,7 +138,18 @@ enum ManagedHistoryInventoryReader {
         guard try privateDirectory(directory) == identity,
               try currentDirectory(parent: parent, name: name) == identity
         else { throw ManagedHistoryInventoryError.changedDirectory }
+        try verifyParent(applicationDirectory, fd: parent, expected: parentIdentity)
         return ManagedHistoryInventory(directoryIdentity: identity, items: items)
+    }
+
+    private static func verifyParent(
+        _ url: URL, fd: Int32, expected: ManagedHistoryFileIdentity
+    ) throws {
+        var info = stat()
+        guard lstat(url.path, &info) == 0 else { throw ManagedHistoryInventoryError.system(errno) }
+        guard try directoryIdentity(info) == expected, try privateDirectory(fd) == expected else {
+            throw ManagedHistoryInventoryError.changedDirectory
+        }
     }
 
     private static func privateDirectory(_ fd: Int32) throws -> ManagedHistoryFileIdentity {
@@ -170,7 +182,7 @@ enum ManagedHistoryInventoryReader {
             guard let entry = registered[name] else {
                 return ManagedHistoryInventoryItem(name: name, entry: nil, status: .unregistered)
             }
-            let status = try status(of: entry, directory: directory)
+            let status = try Self.status(of: entry, directory: directory)
             return ManagedHistoryInventoryItem(name: name, entry: entry, status: status)
         }
     }
