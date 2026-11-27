@@ -9,6 +9,7 @@
         @ObservedObject var model: DesktopModel
         let day: Workday
         var historical: HistoricalReviewContext?
+        var onSaved: (() -> Void)? = nil
         @State private var editingStart = true
         @State private var minutes = ""
         @State private var unit: WorktimeSummaryUnit = .day
@@ -144,6 +145,7 @@
             do {
                 try model.commitSchemaTwoClockBoundary(value)
                 notice = "訂正を保存しました。"
+                onSaved?()
             } catch JournalV2WorktimeCorrectionError.staleProposal {
                 notice = "訂正案が失効しました。最新記録から再確認してください。"
             } catch {
