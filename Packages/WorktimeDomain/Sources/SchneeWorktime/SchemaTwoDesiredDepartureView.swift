@@ -46,10 +46,10 @@
                 Text("勤務実績や退勤打刻は変更しません。希望に基づく通知も再計算します。")
             }
             .onChange(of: model.schemaTwoActionContext) { _, newValue in
-                if let expected, expected != newValue {
+                if let expected, newValue?.permitsRoutineObservation(since: expected) != true {
                     warningAcknowledged = false
                 }
-                if let clearing, clearing != newValue {
+                if let clearing, newValue?.permitsRoutineObservation(since: clearing) != true {
                     reset()
                     notice = "記録が更新されたため解除を中止しました。もう一度確認してください。"
                 }
@@ -67,13 +67,13 @@
                         .font(.caption)
                         .foregroundStyle(.orange)
                 }
-                if expected != model.schemaTwoActionContext {
+                if let expected, model.schemaTwoActionContext?.permitsRoutineObservation(since: expected) != true {
                     Text("観測または記録が更新されました。入力日時は保持しています。")
                         .font(.caption).foregroundStyle(.orange)
                     Button("最新状態で希望時刻を再確認") { preview() }
                 } else {
                     Button("確認した希望時刻を保存") { commit(value) }
-                        .disabled(value.assessment.requiresWarning && !warningAcknowledged)
+                        .disabled(expected == nil || (value.assessment.requiresWarning && !warningAcknowledged))
                 }
                 Button("候補をキャンセル") { reset() }
             }
@@ -97,7 +97,11 @@
         }
 
         private func commit(_ value: JournalV2DesiredDepartureProposal) {
-            guard let context = expected, context == model.schemaTwoActionContext else {
+            guard let context = expected,
+                  model.schemaTwoActionContext?.permitsRoutineObservation(since: context) == true,
+                  Int64(exactly: (candidate.timeIntervalSince1970 / 60).rounded(.down) * 60) ==
+                  value.assessment.scenario.candidate
+            else {
                 warningAcknowledged = false
                 notice = "保存せず最新状態で再確認してください。"
                 return
@@ -109,6 +113,8 @@
                     value, matching: context, warningAcknowledged: approved
                 )
                 notice = "希望退勤時刻を保存しました。通知は確定した記録から再計算します。"
+            } catch DesiredDepartureSaveError.staleProposal {
+                notice = "勤務予測または記録が変わりました。入力日時を保持しています。最新状態で再確認してください。"
             } catch {
                 notice = "保存を確認できません。自動再試行せず、最新の記録を確認してください。"
             }
