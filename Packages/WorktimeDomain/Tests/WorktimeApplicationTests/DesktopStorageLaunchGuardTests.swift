@@ -70,4 +70,45 @@ struct DesktopStorageLaunchGuardTests {
             #expect(try Data(contentsOf: url) == Data("corrupt".utf8))
         }
     }
+
+    @Test func `pending erasure marker blocks existing and missing database launches`() throws {
+        try fixture { url in
+            let root = url.deletingLastPathComponent()
+            let marker = root.appendingPathComponent("managed-history-erasure-v1.json")
+            _ = try JournalV2Repository(url: url, createIfMissing: true)
+            let bytes = try Data(contentsOf: url)
+            try Data("malformed intent".utf8).write(to: marker)
+            for development in [false, true] {
+                #expect(throws: DesktopStorageLaunchError.pendingManagedErasure) {
+                    try DesktopStorageLaunchGuard.decide(
+                        url: url, createIfMissing: false, allowLegacyDevelopment: development
+                    )
+                }
+            }
+            #expect(try Data(contentsOf: url) == bytes)
+            try FileManager.default.removeItem(at: url)
+            #expect(throws: DesktopStorageLaunchError.pendingManagedErasure) {
+                try DesktopStorageLaunchGuard.decide(
+                    url: url, createIfMissing: true, allowLegacyDevelopment: false
+                )
+            }
+            #expect(!FileManager.default.fileExists(atPath: url.path))
+        }
+    }
+
+    @Test func `dangling intent symlink blocks launch without following target`() throws {
+        try fixture { url in
+            let root = url.deletingLastPathComponent()
+            let marker = root.appendingPathComponent("managed-history-erasure-v1.json")
+            try FileManager.default.createSymbolicLink(
+                at: marker, withDestinationURL: root.appendingPathComponent("absent.json")
+            )
+            #expect(throws: DesktopStorageLaunchError.pendingManagedErasure) {
+                try DesktopStorageLaunchGuard.decide(
+                    url: url, createIfMissing: true, allowLegacyDevelopment: false
+                )
+            }
+            #expect(!FileManager.default.fileExists(atPath: url.path))
+        }
+    }
 }
