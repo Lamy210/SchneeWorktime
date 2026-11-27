@@ -9,11 +9,12 @@
         @ObservedObject var model: DesktopModel
         @State private var history: WorktimeHistory?
         @State private var historical: HistoricalReviewContext?
+        @State private var selectionID = UUID()
         @State private var notice: String?
 
         var body: some View {
             DisclosureGroup("過去勤務日の訂正（schema-2）") {
-                Text("終了済みの過去勤務日を選択します。最新勤務日の訂正は通常の勤務画面から行います。")
+                Text("終了済みの過去勤務日の要確認区間・休憩・始業・終業を訂正できます。最新勤務日は通常の勤務画面から操作します。")
                     .font(.caption)
                 Button("最新の履歴を読み込む") { reload() }
                 if let history {
@@ -24,8 +25,8 @@
                     }
                 }
                 if let historical, model.schemaTwoWorkSession?.isCurrent(historical) == true {
-                    SchemaTwoHistoricalGapEditor(model: model, historical: historical, onSaved: didSave)
-                        .id(historical.glance.day.id)
+                    historicalEditors(historical)
+                        .id(selectionID)
                     Button("選択解除") { self.historical = nil }
                 }
                 if let notice {
@@ -35,6 +36,21 @@
             .disabled(!model.schemaTwoReviewEnabled)
             .onChange(of: model.schemaTwoActionContext?.version) { _, _ in
                 historical = nil
+            }
+        }
+
+        private func historicalEditors(_ selected: HistoricalReviewContext) -> some View {
+            let day = selected.glance.day
+            return VStack(alignment: .leading, spacing: 8) {
+                Text("選択中：\(label(day.intervals.first?.start ?? 0))").font(.headline)
+                SchemaTwoHistoricalGapEditor(model: model, historical: selected, onSaved: didSave)
+                SchemaTwoRestBoundaryView(
+                    model: model, day: day, boundary: .start, historical: selected, onSaved: didSave
+                )
+                SchemaTwoRestBoundaryView(
+                    model: model, day: day, boundary: .end, historical: selected, onSaved: didSave
+                )
+                SchemaTwoClockBoundaryView(model: model, day: day, historical: selected, onSaved: didSave)
             }
         }
 
@@ -75,6 +91,7 @@
 
         private func select(_ id: UUID, page: WorktimeHistory) {
             historical = nil
+            selectionID = UUID()
             notice = nil
             do {
                 historical = try model.selectSchemaTwoHistoricalDay(id: id, history: page)

@@ -10,6 +10,7 @@
         let day: Workday
         let boundary: RestBoundary
         var historical: HistoricalReviewContext?
+        var onSaved: (() -> Void)? = nil
         @State private var selected: Int64?
         @State private var minutes = ""
         @State private var proposal: JournalV2ConfirmedRestBoundary?
@@ -113,6 +114,7 @@
             do {
                 try model.commitSchemaTwoRestBoundary(value)
                 notice = "休憩境界を訂正しました。"
+                onSaved?()
             } catch JournalV2WorktimeCorrectionError.staleProposal {
                 notice = "訂正案が失効しました。再確認してください。"
             } catch {
