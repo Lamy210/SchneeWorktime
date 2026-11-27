@@ -59,7 +59,7 @@ struct ManagedHistoryFileIdentity: Codable, Equatable {
 /// The registry must originate from a trusted producer, not from scanning
 /// names. This format is preparatory: no runtime producer writes it yet.
 struct ManagedHistoryRegistry: Codable, Equatable {
-    static let maxEntries = 10_000
+    static let maxEntries = 10000
     static let maxBytes = 4 * 1024 * 1024
     let schema: Int
     let entries: [ManagedHistoryEntry]
