@@ -86,10 +86,9 @@
             var committed = false
             do {
                 let result = try await coordinator.reconcile(latest: { nil }, now: { try Self.sample().wall })
-                if result == .settled, maintenanceInProgress, sessionLock != nil,
-                   !ready, controller == nil, !schemaTwoWorkBusy,
-                   var current = schemaTwoWorkSession, current.isCurrent(confirmation)
-                {
+                let canCommit = result == .settled && maintenanceInProgress && sessionLock != nil &&
+                    !ready && controller == nil && !schemaTwoWorkBusy
+                if canCommit, var current = schemaTwoWorkSession, current.isCurrent(confirmation) {
                     try current.commitConfirmedRollback(
                         confirmation, preserveCurrentAt: destination, sample: Self.sample()
                     )
