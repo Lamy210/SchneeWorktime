@@ -54,13 +54,21 @@
 
 - `ManagedHistoryRegistryFile`: 専用アプリディレクトリの固定ファイル `managed-history-registry-v1.json` に初回台帳のみ公開。既存 `BackupFile` の非上書き・private権限・fsync・読戻しを利用する。欠落/破損/リンクは空台帳として扱わない。台帳の更新、信頼済み生成元からの登録、世代管理は後続。
 - `ManagedHistoryErasureIntentFile`: 固定ファイル `managed-history-erasure-v1.json` へ1件のintentを永続化する。上書き禁止。保存前に台帳と管理インベントリを再照合し、異常があれば拒否。曖昧な公開結果を自動リトライしない。
-- intentはソースepoch/revision、予定target epoch、管理台帳と管理rootのidentityを保持する。勤務区間や診断本文は保持しない。**現在のreset APIはまだ予定target epochを受け取らない**ため、実運用のreset/起動時処理とこの基盤は未接続。
+- intentはソースepoch/revision、予定target epoch、管理台帳と管理rootのidentityを保持する。勤務区間や診断本文は保持しない。Store内部APIでは予定target epochを受け取るよう拡張した。UIからの実運用resetと消去再開は未接続。
 - 復旧判定は次のとおり。判定そのものは消去権限を発行しない。旧世代のままなら再確認が必要であり、同revisionでもCheckpoint/全Journal CASの再確認は後続の実行器が担う。
   - ソース版かつ管理対象が一致: 再確認が必要。
   - 予定した新epoch、revision 0、空カタログ・Checkpointなし、管理対象が一致または欠落: 残ファイル一覧、または最終検証待ち。
   - 無関係の世代、台帳差異、rootの差替え、変更済み・危険・未登録ファイル: 停止。
 - 新epochで欠落を検出しても消去完了とは断定しない。永続的なファイル単位の進捗、通知取消、DB/台帳の再検証が必要。完了時のintent/台帳更新、起動ゲート、実際の消去処理は未実装。
 - 新規回帰試験4件（初回公開・上書き拒否、世代フェンス・欠落時の判定、未登録・root差替え、破損/リンク/欠落拒否）。試験用一時ディレクトリのみを操作する。実機、電源断・障害注入、AC-74/134の最終検証は未完了。
+
+## 予定epochのreset接続と起動遮断（CI未確認）
+
+- Store内部の `commitManagedReset` は完全なJournal/Checkpoint CAS付きreset previewとintentのソース版を検証し、intentを非上書きで永続化した後、台帳・管理root・保存済みintentを再照合する。SQLiteトランザクション内で再度完全CASを行い、intentに記録済みのtarget epochへ切り替える。現epochと同じtargetは拒否。
+- 旧世代のまま中断したintentを自動再試行しない。通常のDB限定resetでも未完了intentがあれば別のepochへ切り替える操作を拒否する。保存済みintentは成功・失敗を問わず保持する。
+- `DesktopStorageLaunchGuard` は固定intentパスの存在を先に確認する。壊れた内容やdangling symlinkも遮断対象。DBが未作成でも初期化を許さない。I/Oエラーは安全側に停止する。これは通常の起動/セッション開始ゲートであり、任意の同一uidプロセスを阻止するOS強制機構ではない。
+- このStore内部APIはまだUIから呼ばれない。管理台帳更新・信頼済み生成元、明示的な全消去確認、通知停止、ファイル単位の進捗/消去・完了処理、専用復旧画面は後続。遮断解除の自動化はない。外部ファイルや既存ユーザーデータの削除は実行しない。
+- 回帰試験5件を追加：予定epochと再読込、同revisionのCheckpoint競合、永続化後の再試行拒否、破損intentによる既存/新規起動遮断、dangling symlink拒否。合成データのみ。電源断の実機試験とAC-74/134完了証跡は未実施。
 
 ## アプリケーション層の安全な論理削除（PR #127）
 

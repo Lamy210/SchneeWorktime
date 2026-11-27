@@ -134,8 +134,11 @@ struct JournalV2LiveStore {
     }
 
     /// A logical reset, not secure erasure. Exact journal bytes and epoch are CAS-fenced.
-    func reset(matching expected: JournalV2LiveState, now: Int64) throws -> JournalV2LiveState {
-        let next = StoreVersion(epoch: UUID(), revision: 0)
+    func reset(
+        matching expected: JournalV2LiveState, now: Int64, targetEpoch: UUID = UUID()
+    ) throws -> JournalV2LiveState {
+        guard targetEpoch != expected.version.epoch else { throw JournalMigrationError.verificationFailed }
+        let next = StoreVersion(epoch: targetEpoch, revision: 0)
         guard try DatabaseFileGuard.preservationIdentity(url) == fileIdentity else {
             throw DatabaseFileError.unsafeFile
         }
