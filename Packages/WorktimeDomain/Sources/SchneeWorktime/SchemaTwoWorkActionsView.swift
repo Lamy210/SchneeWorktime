@@ -56,6 +56,7 @@
                     SchemaTwoReviewableGapsView(model: model, glance: glance)
                 }
                 restBoundaryControls
+                clockBoundaryControls
                 SchemaTwoDesiredDepartureView(model: model)
                 SchemaTwoHistoricalReviewView(model: model)
                 SchemaTwoReminderSettingsView(model: model)
@@ -76,6 +77,13 @@
             if let day = model.schemaTwoWorkGlance?.day {
                 SchemaTwoRestBoundaryView(model: model, day: day, boundary: .start)
                 SchemaTwoRestBoundaryView(model: model, day: day, boundary: .end)
+            }
+        }
+
+        @ViewBuilder
+        private var clockBoundaryControls: some View {
+            if let day = model.schemaTwoWorkGlance?.day, day.state == .ended {
+                SchemaTwoClockBoundaryView(model: model, day: day)
             }
         }
 
