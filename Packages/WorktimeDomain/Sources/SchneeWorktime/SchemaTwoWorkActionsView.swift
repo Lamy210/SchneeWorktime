@@ -55,6 +55,7 @@
                 if let glance = model.schemaTwoWorkGlance, !glance.reviewableGaps.isEmpty {
                     SchemaTwoReviewableGapsView(model: model, glance: glance)
                 }
+                restBoundaryControls
                 SchemaTwoDesiredDepartureView(model: model)
                 SchemaTwoHistoricalReviewView(model: model)
                 SchemaTwoReminderSettingsView(model: model)
@@ -70,6 +71,14 @@
             .disabled(model.maintenanceInProgress)
             .onChange(of: targetMinutes) { _, _ in invalidateProfile() }
             .onChange(of: restMinutes) { _, _ in invalidateProfile() }
+        }
+
+        @ViewBuilder
+        private var restBoundaryControls: some View {
+            if let day = model.schemaTwoWorkGlance?.day {
+                SchemaTwoRestBoundaryView(model: model, day: day, boundary: .start)
+                SchemaTwoRestBoundaryView(model: model, day: day, boundary: .end)
+            }
         }
 
         @ViewBuilder
