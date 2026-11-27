@@ -45,13 +45,7 @@
                 if let notice = model.schemaTwoWorkNotice {
                     Text(notice).font(.caption).foregroundStyle(.orange)
                 }
-                Button("schema-2全履歴をJSONでバックアップ") {
-                    model.chooseSchemaTwoBackupDestination()
-                }
-                .disabled(model.choosingBackupDestination || model.schemaTwoWorkBusy)
-                if let backupNotice = model.backupNotice {
-                    Text(backupNotice).font(.caption).textSelection(.enabled)
-                }
+                backupControls
                 if let glance = model.schemaTwoWorkGlance, !glance.reviewableGaps.isEmpty {
                     SchemaTwoReviewableGapsView(model: model, glance: glance)
                 }
@@ -60,19 +54,35 @@
                 SchemaTwoDesiredDepartureView(model: model)
                 SchemaTwoHistoricalReviewView(model: model)
                 SchemaTwoReminderSettingsView(model: model)
-                SchemaTwoRollbackView(model: model)
-                SchemaTwoDatabaseResetView(model: model)
-                Button("観測を停止して履歴の読み取り専用表示に戻る") {
-                    model.stopSchemaTwoObservation()
-                }
-                .disabled(model.schemaTwoWorkBusy)
-                Text("観測停止は退勤打刻ではありません。再開時の未観測時間は要確認になります。")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                maintenanceControls
             }
             .disabled(model.maintenanceInProgress)
             .onChange(of: targetMinutes) { _, _ in invalidateProfile() }
             .onChange(of: restMinutes) { _, _ in invalidateProfile() }
+        }
+
+        @ViewBuilder
+        private var backupControls: some View {
+            Button("schema-2全履歴をJSONでバックアップ") {
+                model.chooseSchemaTwoBackupDestination()
+            }
+            .disabled(model.choosingBackupDestination || model.schemaTwoWorkBusy)
+            if let backupNotice = model.backupNotice {
+                Text(backupNotice).font(.caption).textSelection(.enabled)
+            }
+        }
+
+        @ViewBuilder
+        private var maintenanceControls: some View {
+            SchemaTwoRollbackView(model: model)
+            SchemaTwoDatabaseResetView(model: model)
+            Button("観測を停止して履歴の読み取り専用表示に戻る") {
+                model.stopSchemaTwoObservation()
+            }
+            .disabled(model.schemaTwoWorkBusy)
+            Text("観測停止は退勤打刻ではありません。再開時の未観測時間は要確認になります。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
 
         @ViewBuilder
