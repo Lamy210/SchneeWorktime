@@ -302,7 +302,6 @@
                     .disabled(!available.contains(.resume))
             }
         }
-
     }
 
     extension WorktimeMenu {
