@@ -302,7 +302,9 @@
                     .disabled(!available.contains(.resume))
             }
         }
+    }
 
+    extension WorktimeMenu {
         private func stateLabel(_ state: WorkdayState) -> String {
             switch state {
             case .working: "勤務中"
@@ -327,9 +329,7 @@
             let upper = minutes(seconds.upperBound)
             return lower == upper ? "\(lower)分" : "\(lower)〜\(upper)分"
         }
-    }
 
-    extension WorktimeMenu {
         private var reminderSettings: some View {
             DisclosureGroup("勤務の通知") {
                 Text("希望退勤（適格な場合）または希望がない場合の退勤見込みを基準に通知します。過ぎた時刻には通知しません。")
