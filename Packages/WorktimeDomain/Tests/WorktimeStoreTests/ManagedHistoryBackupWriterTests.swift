@@ -96,4 +96,30 @@ struct ManagedHistoryBackupWriterTests {
             #expect(try BackupFile.load(file) == next)
         }
     }
+
+    @Test func `interrupted registration preserves unregistered backup and stops further publication`() throws {
+        try fixture { root, repository in
+            try ManagedHistoryBackupWriter.initializeEmpty(in: root)
+            let session = try repository.load(now: 100)
+            let bytes = try repository.makeBackup(now: 100, matching: session)
+            #expect(throws: ManagedHistoryPersistenceError.verificationFailed) {
+                try ManagedHistoryBackupWriter.publish(bytes, epoch: session.version.epoch, in: root) {
+                    throw ManagedHistoryPersistenceError.verificationFailed
+                }
+            }
+            let registry = try ManagedHistoryRegistryFile.load(in: root)
+            #expect(registry.entries.isEmpty)
+            let inventory = try ManagedHistoryInventoryReader.inspect(applicationDirectory: root, registry: registry)
+            #expect(!inventory.isComplete)
+            let item = try #require(inventory.items.first)
+            #expect(item.status == .unregistered)
+            let directory = root.appendingPathComponent(ManagedHistoryInventory.directoryName)
+            #expect(try BackupFile.load(directory.appendingPathComponent(item.name)) == bytes)
+            #expect(throws: ManagedHistoryPersistenceError.incompleteInventory) {
+                try repository.writeManagedBackup(now: 101, matching: session)
+            }
+            #expect(try ManagedHistoryInventoryReader.inspect(applicationDirectory: root, registry: registry) == inventory)
+            #expect(JournalV2Repository.sameCommittedState(try repository.load(now: 102), session))
+        }
+    }
 }

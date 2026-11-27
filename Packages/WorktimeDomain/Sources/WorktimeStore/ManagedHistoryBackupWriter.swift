@@ -43,7 +43,8 @@ enum ManagedHistoryBackupWriter {
     }
 
     static func publish(
-        _ data: Data, epoch: UUID, in root: URL
+        _ data: Data, epoch: UUID, in root: URL,
+        beforeRegistryUpdate: () throws -> Void = {}
     ) throws -> ManagedHistoryEntry {
         guard try !ManagedHistoryStartupFence.hasPending(in: root) else {
             throw ManagedHistoryPersistenceError.pendingIntent
@@ -66,6 +67,8 @@ enum ManagedHistoryBackupWriter {
         guard after.isComplete, sameDirectory(inventory, after),
               try !ManagedHistoryStartupFence.hasPending(in: root)
         else { throw ManagedHistoryPersistenceError.incompleteInventory }
+        // Test seam: interruption after file publication but before registration.
+        try beforeRegistryUpdate()
         let encoded = try JSONEncoder().encode(next)
         try BackupFile.replaceMetadata(
             encoded, at: registryURL, matching: original, maxBytes: ManagedHistoryRegistry.maxBytes
