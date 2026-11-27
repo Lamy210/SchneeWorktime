@@ -10,6 +10,10 @@ public enum DesktopStorageLaunchDecision: Sendable, Equatable {
     case newInstallRequiresSchemaTwoUI
 }
 
+public enum DesktopStorageLaunchError: Error, Equatable {
+    case pendingManagedErasure
+}
+
 /// Before the v1 UI cutover, a release build must never create or write schema-1.
 /// Developer-only compatibility is explicit and may not enter the release path.
 /// A schema-2 version header does not imply Journal validity, and never enables
@@ -18,6 +22,9 @@ public enum DesktopStorageLaunchGuard {
     public static func decide(
         url: URL, createIfMissing: Bool, allowLegacyDevelopment: Bool
     ) throws -> DesktopStorageLaunchDecision {
+        guard try !ManagedHistoryStartupFence.hasPending(in: url.deletingLastPathComponent()) else {
+            throw DesktopStorageLaunchError.pendingManagedErasure
+        }
         switch try WorktimeDatabaseFormatProbe.inspect(url: url) {
         case .missing:
             if createIfMissing {

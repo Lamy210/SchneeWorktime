@@ -292,7 +292,9 @@
             ready = false
             reminderStateUntrusted = true
             queueReminders(force: true)
-            if error is CommittedCheckpointError {
+            if case DesktopStorageLaunchError.pendingManagedErasure = error {
+                message = "未完了の全履歴消去があります。勤務記録を停止しました。既存DB・管理ファイルは変更していません。"
+            } else if error is CommittedCheckpointError {
                 message = "操作は保存済みですが観測情報の保存に失敗しました。再操作せず既存データを再読込してください。"
             } else if let lockError = error as? LocalSessionLockError {
                 switch lockError {

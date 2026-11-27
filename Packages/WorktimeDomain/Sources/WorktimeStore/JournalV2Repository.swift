@@ -231,8 +231,37 @@ public extension JournalV2Repository {
 
     /// Logical deletion only. Does not claim physical erasure or delete owned backups.
     func commitReset(_ preview: JournalV2ResetPreview, now: Int64) throws -> JournalV2Session {
+        guard try !ManagedHistoryStartupFence.hasPending(in: databaseURL.deletingLastPathComponent()) else {
+            throw ManagedHistoryPersistenceError.pendingIntent
+        }
         _ = try revalidate(preview.session, now: now)
         return try JournalV2Session(store.reset(matching: preview.session.source, now: now))
+    }
+}
+
+extension JournalV2Repository {
+    /// Internal, explicitly confirmed operation only. Caller holds the owner
+    /// lock and has stopped writers/notifications. Not connected to the UI.
+    /// The intent is never cleared here, including on uncertain failures.
+    func commitManagedReset(
+        _ preview: JournalV2ResetPreview, intent: ManagedHistoryErasureIntent, now: Int64
+    ) throws -> JournalV2Session {
+        let current = try revalidate(preview.session, now: now)
+        guard current.version.epoch == intent.sourceEpoch, current.version.revision == intent.sourceRevision else {
+            throw ManagedHistoryPersistenceError.invalidIntent
+        }
+        let directory = databaseURL.deletingLastPathComponent()
+        try ManagedHistoryErasureIntentFile.publish(intent, in: directory)
+        let registry = try ManagedHistoryRegistryFile.load(in: directory)
+        let inventory = try ManagedHistoryInventoryReader.inspect(applicationDirectory: directory, registry: registry)
+        guard try ManagedHistoryErasureIntentFile.load(in: directory) == intent,
+              intent.assess(session: current, registry: registry, inventory: inventory) == .needsNewConfirmation
+        else { throw ManagedHistoryPersistenceError.verificationFailed }
+        // The existing transaction verifies the complete Journal and checkpoint
+        // again. No recovery path is allowed to reconstruct a stale preview.
+        return try JournalV2Session(store.reset(
+            matching: current.source, now: now, targetEpoch: intent.targetEpoch
+        ))
     }
 }
 

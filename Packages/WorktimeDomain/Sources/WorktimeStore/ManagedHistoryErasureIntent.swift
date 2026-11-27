@@ -1,8 +1,14 @@
 import Foundation
 import WorktimeDomain
 
+#if canImport(Darwin)
+    import Darwin
+#else
+    import Glibc
+#endif
+
 enum ManagedHistoryPersistenceError: Error, Equatable {
-    case verificationFailed, invalidIntent, incompleteInventory
+    case verificationFailed, invalidIntent, incompleteInventory, pendingIntent
 }
 
 /// Immutable publication only. Missing or malformed registries are not treated
@@ -161,5 +167,22 @@ enum ManagedHistoryErasureIntentFile {
             directory.appendingPathComponent(filename), maxBytes: ManagedHistoryErasureIntent.maxBytes
         )
         return try ManagedHistoryErasureIntent.decode(data)
+    }
+}
+
+/// Presence, not successful decoding, is the startup fence. A malformed
+/// marker or dangling symlink also blocks; permission/I/O errors fail closed.
+/// No marker is automatically removed. Missing application roots are allowed.
+package enum ManagedHistoryStartupFence {
+    package static func hasPending(in directory: URL) throws -> Bool {
+        guard directory.isFileURL else { throw ManagedHistoryInventoryError.unsafeDirectory }
+        let path = directory.appendingPathComponent(ManagedHistoryErasureIntentFile.filename).path
+        var info = stat()
+        if lstat(path, &info) == 0 {
+            return true
+        }
+        let code = errno
+        guard code == ENOENT else { throw ManagedHistoryInventoryError.system(code) }
+        return false
     }
 }
