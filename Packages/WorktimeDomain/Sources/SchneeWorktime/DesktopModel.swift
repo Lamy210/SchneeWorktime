@@ -28,6 +28,8 @@
         @Published var inspectionNotice: String?
         @Published var rollbackProposal: WorktimeRollbackProposal?
         @Published var rollbackNotice: String?
+        @Published var schemaTwoRollback: JournalV2ConfirmedRollback?
+        @Published var schemaTwoRollbackNotice: String?
         @Published var maintenanceInProgress = false
         @Published var resetState = DesktopResetState()
         @Published var schemaTwoResetNotice: String?
@@ -79,6 +81,7 @@
             schemaTwoWorkGlance = nil
             schemaTwoWorkNotice = nil
             rollbackProposal = nil
+            schemaTwoRollback = nil
             resetState.proposal = nil
             cancelReview()
             controller = nil
@@ -282,6 +285,7 @@
             schemaTwoWorkGlance = nil
             schemaTwoInspection = nil
             rollbackProposal = nil
+            schemaTwoRollback = nil
             cancelReview()
             controller = nil
             glance = nil

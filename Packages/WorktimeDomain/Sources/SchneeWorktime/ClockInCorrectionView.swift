@@ -124,7 +124,7 @@
         }
     }
 
-    private struct ClockInSummaryImpactView: View {
+    struct ClockInSummaryImpactView: View {
         let impact: ClockInSummaryImpact
 
         var body: some View {

@@ -55,6 +55,9 @@
                 if model.schemaTwoWorkSession == nil {
                     PanelWorkActionsView(model: model)
                 }
+                if let notice = model.schemaTwoRollbackNotice {
+                    Text(notice).font(.caption).textSelection(.enabled)
+                }
                 if let notice = model.schemaTwoResetNotice {
                     Text(notice).font(.caption)
                 }

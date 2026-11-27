@@ -62,6 +62,9 @@
                 if let notice = model.schemaTwoResetNotice {
                     Text(notice).font(.caption)
                 }
+                if let notice = model.schemaTwoRollbackNotice {
+                    Text(notice).font(.caption).textSelection(.enabled)
+                }
                 readySettings
                 if model.schemaTwoInspection == nil, model.schemaTwoWorkSession == nil {
                     backupInspectionSettings
