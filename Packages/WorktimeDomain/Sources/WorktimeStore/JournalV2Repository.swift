@@ -342,3 +342,15 @@ public extension JournalV2Repository {
         }
     }
 }
+
+extension JournalV2Repository {
+    /// Produce an exact validated backup inside the initialized managed root.
+    /// Caller owns the session lock; external exports remain separate.
+    func writeManagedBackup(now: Int64, matching session: JournalV2Session) throws -> ManagedHistoryEntry {
+        let current = try revalidate(session, now: now)
+        let data = try makeBackup(now: now, matching: current)
+        return try ManagedHistoryBackupWriter.publish(
+            data, epoch: current.version.epoch, in: databaseURL.deletingLastPathComponent()
+        )
+    }
+}
