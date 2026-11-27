@@ -58,6 +58,9 @@
                 if let notice = model.schemaTwoRollbackNotice {
                     Text(notice).font(.caption).textSelection(.enabled)
                 }
+                if let notice = model.schemaTwoResetNotice {
+                    Text(notice).font(.caption)
+                }
                 Text("予測は勤務実績ではありません。").font(.caption).foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
