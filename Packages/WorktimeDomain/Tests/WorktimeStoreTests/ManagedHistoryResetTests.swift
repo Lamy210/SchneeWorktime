@@ -30,7 +30,9 @@ struct ManagedHistoryResetTests {
             let started = try start(repository)
             let preview = try repository.previewReset(now: 105, matching: started)
             let inventory = try ManagedHistoryInventoryReader.inspect(applicationDirectory: root, registry: registry)
-            let intent = try ManagedHistoryErasureIntent(source: started.version, registry: registry, inventory: inventory)
+            let intent = try ManagedHistoryErasureIntent(
+                source: started.version, registry: registry, inventory: inventory
+            )
             let cleared = try repository.commitManagedReset(preview, intent: intent, now: 110)
             #expect(cleared.version == StoreVersion(epoch: intent.targetEpoch, revision: 0))
             #expect(cleared.catalog == WorkdayCatalog())
@@ -56,7 +58,9 @@ struct ManagedHistoryResetTests {
             let started = try start(repository)
             let preview = try repository.previewReset(now: 105, matching: started)
             let inventory = try ManagedHistoryInventoryReader.inspect(applicationDirectory: root, registry: registry)
-            let intent = try ManagedHistoryErasureIntent(source: started.version, registry: registry, inventory: inventory)
+            let intent = try ManagedHistoryErasureIntent(
+                source: started.version, registry: registry, inventory: inventory
+            )
             let id = try #require(started.catalog.activeID)
             let external = try repository.saveObservationCheckpoint(
                 dayID: id, observedAt: 110, now: 110, matching: started
@@ -76,7 +80,9 @@ struct ManagedHistoryResetTests {
             let started = try start(repository)
             let preview = try repository.previewReset(now: 105, matching: started)
             let inventory = try ManagedHistoryInventoryReader.inspect(applicationDirectory: root, registry: registry)
-            let intent = try ManagedHistoryErasureIntent(source: started.version, registry: registry, inventory: inventory)
+            let intent = try ManagedHistoryErasureIntent(
+                source: started.version, registry: registry, inventory: inventory
+            )
             try ManagedHistoryErasureIntentFile.publish(intent, in: root)
             #expect(throws: BackupFileError.self) {
                 try repository.commitManagedReset(preview, intent: intent, now: 110)
