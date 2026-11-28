@@ -76,6 +76,7 @@
         private var maintenanceControls: some View {
             SchemaTwoRollbackView(model: model)
             SchemaTwoDatabaseResetView(model: model)
+            SchemaTwoManagedHistoryPreviewView(model: model)
             Button("観測を停止して履歴の読み取り専用表示に戻る") {
                 model.stopSchemaTwoObservation()
             }

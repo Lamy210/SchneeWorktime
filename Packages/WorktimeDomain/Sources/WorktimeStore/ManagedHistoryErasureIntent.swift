@@ -180,10 +180,8 @@ package enum ManagedHistoryStartupFence {
             ManagedHistoryErasureIntentFile.filename, ManagedHistoryErasureProgressFile.filename,
             ManagedHistoryErasureCompletion.filename
         ]
-        for name in markers {
-            if try exists(directory.appendingPathComponent(name)) {
-                return true
-            }
+        for name in markers where try exists(directory.appendingPathComponent(name)) {
+            return true
         }
         return false
     }

@@ -30,7 +30,7 @@ struct ManagedHistoryErasureCompletionTests {
     }
 
     @Test func `completion refuses unprocessed files and retains all markers`() throws {
-        try fixture { url, intent in
+        try fixture { (url: URL, intent: ManagedHistoryErasureIntent) throws in
             let root = url.deletingLastPathComponent()
             #expect(throws: ManagedHistoryPersistenceError.incompleteInventory) {
                 try ManagedHistoryErasureCompletion.finish(databaseURL: url, intent: intent, now: 105)
@@ -48,7 +48,7 @@ struct ManagedHistoryErasureCompletionTests {
             .receiptPublished, .registryCleared, .progressRemoved, .intentRemoved
         ]
         for stage in stages {
-            try fixture { url, intent in
+            try fixture { (url: URL, intent: ManagedHistoryErasureIntent) throws in
                 let root = url.deletingLastPathComponent()
                 let entry = try #require(intent.registry.entries.first)
                 let directory = root.appendingPathComponent(ManagedHistoryInventory.directoryName)
@@ -58,7 +58,9 @@ struct ManagedHistoryErasureCompletionTests {
                 _ = try ManagedHistoryFileErasure.advance(databaseURL: url, intent: intent, now: 105)
                 #expect(throws: ManagedHistoryPersistenceError.verificationFailed) {
                     try ManagedHistoryErasureCompletion.finish(databaseURL: url, intent: intent, now: 106) {
-                        if $0 == stage { throw ManagedHistoryPersistenceError.verificationFailed }
+                        if $0 == stage {
+                            throw ManagedHistoryPersistenceError.verificationFailed
+                        }
                     }
                 }
                 #expect(try ManagedHistoryStartupFence.hasPending(in: root))
@@ -78,12 +80,14 @@ struct ManagedHistoryErasureCompletionTests {
     }
 
     @Test func `unknown file after receipt publication blocks finalization`() throws {
-        try fixture { url, intent in
+        try fixture { (url: URL, intent: ManagedHistoryErasureIntent) throws in
             let root = url.deletingLastPathComponent()
             _ = try ManagedHistoryFileErasure.advance(databaseURL: url, intent: intent, now: 105)
             #expect(throws: ManagedHistoryPersistenceError.verificationFailed) {
                 try ManagedHistoryErasureCompletion.finish(databaseURL: url, intent: intent, now: 106) {
-                    if $0 == .receiptPublished { throw ManagedHistoryPersistenceError.verificationFailed }
+                    if $0 == .receiptPublished {
+                        throw ManagedHistoryPersistenceError.verificationFailed
+                    }
                 }
             }
             let directory = root.appendingPathComponent(ManagedHistoryInventory.directoryName)

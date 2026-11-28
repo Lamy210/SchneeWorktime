@@ -150,7 +150,7 @@ enum ManagedHistoryErasureCompletion {
     private static func optionalBytes(_ url: URL, maxBytes: Int) throws -> Data? {
         do {
             return try BackupFile.load(url, maxBytes: maxBytes)
-        } catch BackupFileError.system(let code) {
+        } catch let BackupFileError.system(code) {
             // ENOENT from opening the leaf is allowed only after a private
             // root was already established by the caller; dangling links
             // are rejected by O_NOFOLLOW.
