@@ -45,6 +45,8 @@
                 switch scope.state {
                 case .notInitialized:
                     Text("管理台帳は未初期化です。管理対象がないと断定できません。")
+                case .incompleteSetup:
+                    Text("台帳または専用フォルダが欠落しています。対象件数を確定できません。")
                 case .pendingErasure:
                     Text("未完了の消去があります。新しい消去を開始できません。")
                 case .inventoried, .inconsistent:

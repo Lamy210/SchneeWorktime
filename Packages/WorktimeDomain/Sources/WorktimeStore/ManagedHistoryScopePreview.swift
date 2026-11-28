@@ -7,7 +7,7 @@ import Foundation
 #endif
 
 public enum ManagedHistoryScopeState: Sendable, Equatable {
-    case notInitialized, inventoried, inconsistent, pendingErasure
+    case notInitialized, incompleteSetup, inventoried, inconsistent, pendingErasure
 }
 
 /// Counts only explicitly registered managed files, never external exports
@@ -37,7 +37,7 @@ enum ManagedHistoryScopeReader {
         let registryExists = try exists(registryURL)
         let directoryExists = try exists(managedURL)
         guard registryExists, directoryExists else {
-            let state: ManagedHistoryScopeState = registryExists || directoryExists ? .inconsistent : .notInitialized
+            let state: ManagedHistoryScopeState = registryExists || directoryExists ? .incompleteSetup : .notInitialized
             return summary(session, state: state)
         }
         let registry = try ManagedHistoryRegistryFile.load(in: root)
