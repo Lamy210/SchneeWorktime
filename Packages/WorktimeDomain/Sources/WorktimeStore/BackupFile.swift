@@ -60,6 +60,57 @@ package enum BackupFile {
         }
     }
 
+    /// Replace existing metadata only under the caller's owner lock, with
+    /// a byte CAS and file identity recheck. Never used for user exports.
+    static func replaceMetadata(
+        _ data: Data, at url: URL, matching expected: Data, maxBytes: Int
+    ) throws {
+        guard maxBytes > 0, maxBytes <= maxSupportedBytes,
+              data.count <= maxBytes, expected.count <= maxBytes
+        else { throw BackupFileError.tooLarge }
+        try withDirectory(url) { directory, name in
+            let original = openat(directory, name, O_RDONLY | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK)
+            guard original >= 0 else { throw BackupFileError.system(errno) }
+            defer { close(original) }
+            let identity = try metadataIdentity(original, maxBytes: maxBytes)
+            guard try readAll(fd: original, maxBytes: maxBytes) == expected else {
+                throw BackupFileError.unsafeFile
+            }
+            let temp = ".worktime-\(UUID().uuidString).partial"
+            let fd = openat(directory, temp, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0o600)
+            guard fd >= 0 else { throw BackupFileError.system(errno) }
+            var published = false
+            defer {
+                close(fd)
+                if !published {
+                    unlinkat(directory, temp, 0)
+                }
+            }
+            guard fchmod(fd, 0o600) == 0 else { throw BackupFileError.system(errno) }
+            try writeAll(data, fd: fd)
+            guard fsync(fd) == 0 else { throw BackupFileError.system(errno) }
+            var current = stat()
+            guard fstatat(directory, name, &current, AT_SYMLINK_NOFOLLOW) == 0,
+                  current.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG),
+                  current.st_uid == geteuid(), current.st_nlink == 1, current.st_mode & 0o077 == 0,
+                  ManagedHistoryFileIdentity(current) == identity,
+                  try metadataIdentity(original, maxBytes: maxBytes) == identity
+            else { throw BackupFileError.unsafeFile }
+            guard renameat(directory, temp, directory, name) == 0 else { throw BackupFileError.system(errno) }
+            published = true
+            try syncDirectory(directory)
+        }
+    }
+
+    private static func metadataIdentity(_ fd: Int32, maxBytes: Int) throws -> ManagedHistoryFileIdentity {
+        var info = stat()
+        guard fstat(fd, &info) == 0 else { throw BackupFileError.system(errno) }
+        guard info.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG), info.st_uid == geteuid(),
+              info.st_nlink == 1, info.st_mode & 0o077 == 0, info.st_size >= 0, info.st_size <= maxBytes
+        else { throw BackupFileError.unsafeFile }
+        return ManagedHistoryFileIdentity(info)
+    }
+
     private static func syncDirectory(_ directory: Int32) throws {
         while fsync(directory) != 0 {
             let code = errno
