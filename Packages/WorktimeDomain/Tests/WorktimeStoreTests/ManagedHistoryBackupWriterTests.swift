@@ -35,8 +35,10 @@ struct ManagedHistoryBackupWriterTests {
             #expect(inventory.items.count == 2)
             let directory = root.appendingPathComponent(ManagedHistoryInventory.directoryName)
             let bytes = try BackupFile.load(directory.appendingPathComponent(first.name))
-            #expect(bytes == (try repository.makeBackup(now: 101, matching: session)))
-            #expect(JournalV2Repository.sameCommittedState(try repository.load(now: 103), session))
+            let expected = try repository.makeBackup(now: 101, matching: session)
+            #expect(bytes == expected)
+            let saved = try repository.load(now: 103)
+            #expect(JournalV2Repository.sameCommittedState(saved, session))
         }
     }
 
@@ -119,7 +121,8 @@ struct ManagedHistoryBackupWriterTests {
                 try repository.writeManagedBackup(now: 101, matching: session)
             }
             #expect(try ManagedHistoryInventoryReader.inspect(applicationDirectory: root, registry: registry) == inventory)
-            #expect(JournalV2Repository.sameCommittedState(try repository.load(now: 102), session))
+            let saved = try repository.load(now: 102)
+            #expect(JournalV2Repository.sameCommittedState(saved, session))
         }
     }
 }
