@@ -176,7 +176,16 @@ enum ManagedHistoryErasureIntentFile {
 package enum ManagedHistoryStartupFence {
     package static func hasPending(in directory: URL) throws -> Bool {
         guard directory.isFileURL else { throw ManagedHistoryInventoryError.unsafeDirectory }
-        let path = directory.appendingPathComponent(ManagedHistoryErasureIntentFile.filename).path
+        for name in [ManagedHistoryErasureIntentFile.filename, ManagedHistoryErasureProgressFile.filename] {
+            if try exists(directory.appendingPathComponent(name)) {
+                return true
+            }
+        }
+        return false
+    }
+
+    private static func exists(_ url: URL) throws -> Bool {
+        let path = url.path
         var info = stat()
         if lstat(path, &info) == 0 {
             return true
