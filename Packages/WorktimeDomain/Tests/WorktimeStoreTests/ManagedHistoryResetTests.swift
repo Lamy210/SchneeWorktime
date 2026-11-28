@@ -84,7 +84,7 @@ struct ManagedHistoryResetTests {
                 source: started.version, registry: registry, inventory: inventory
             )
             try ManagedHistoryErasureIntentFile.publish(intent, in: root)
-            #expect(throws: BackupFileError.self) {
+            #expect(throws: ManagedHistoryPersistenceError.pendingIntent) {
                 try repository.commitManagedReset(preview, intent: intent, now: 110)
             }
             let saved = try repository.load(now: 111)
