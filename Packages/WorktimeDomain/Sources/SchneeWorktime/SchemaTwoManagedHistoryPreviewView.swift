@@ -7,15 +7,18 @@
         @ObservedObject var model: DesktopModel
         @State private var preview: JournalV2ManagedHistoryPreview?
         @State private var notice: String?
+        @State private var pending: JournalV2ManagedHistoryPreparation?
+        @State private var confirming = false
 
         var body: some View {
-            DisclosureGroup("全履歴消去の対象確認（開発中・読取り専用）") {
+            DisclosureGroup("管理バックアップ・全履歴消去の対象確認") {
                 Text("現在のDBと明示登録済みの管理ファイルを確認します。削除は実行しません。")
                     .font(.caption)
                 Button("対象を確認") { prepare() }
                     .disabled(!model.canPreviewSchemaTwoReset)
                 if let preview {
                     scopeDetails(preview)
+                    preparationControls(preview)
                 }
                 if let notice {
                     Text(notice).font(.caption).foregroundStyle(.orange)
@@ -26,9 +29,19 @@
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            .confirmationDialog("管理ファイルの操作を確認", isPresented: $confirming) {
+                Button("実行") { commitPreparation() }
+                Button("キャンセル", role: .cancel) { pending = nil }
+            } message: {
+                Text(pending == .initialize
+                    ? "専用フォルダと空の台帳を新規作成します。既存データは変更しません。"
+                    : "勤務履歴の平文JSONを専用フォルダへ保存します。将来の全履歴消去の対象になります。")
+            }
             .onChange(of: model.schemaTwoActionContext) { _, _ in
                 if preview != nil {
                     preview = nil
+                    pending = nil
+                    confirming = false
                     notice = "勤務記録が更新されました。対象を再確認してください。"
                 }
             }
@@ -70,8 +83,43 @@
             }
         }
 
+        @ViewBuilder
+        private func preparationControls(_ value: JournalV2ManagedHistoryPreview) -> some View {
+            if value.scope.state == .notInitialized {
+                Button("専用管理台帳を初期化") { request(.initialize) }
+                    .disabled(!model.canPreviewSchemaTwoReset)
+            } else if value.scope.state == .inventoried {
+                Button("管理バックアップを作成") { request(.backup) }
+                    .disabled(!model.canPreviewSchemaTwoReset)
+            }
+        }
+
+        private func request(_ operation: JournalV2ManagedHistoryPreparation) {
+            pending = operation
+            confirming = true
+        }
+
+        private func commitPreparation() {
+            guard let pending, let preview else { return }
+            self.pending = nil
+            self.preview = nil
+            guard model.canPreviewSchemaTwoReset, let current = model.schemaTwoWorkSession else {
+                notice = "記録状態が変わりました。対象を再確認してください。"
+                return
+            }
+            do {
+                self.preview = try current.prepareManagedHistory(
+                    pending, matching: preview, sample: DesktopModel.sample()
+                )
+                notice = "管理ファイルの操作が完了しました。"
+            } catch {
+                notice = "完了を確認できません。自動再試行せず対象を再確認してください。"
+            }
+        }
+
         private func prepare() {
             preview = nil
+            pending = nil
             notice = nil
             guard model.canPreviewSchemaTwoReset, let current = model.schemaTwoWorkSession else { return }
             do {
