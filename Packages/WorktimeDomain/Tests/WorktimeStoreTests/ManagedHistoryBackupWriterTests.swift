@@ -120,7 +120,8 @@ struct ManagedHistoryBackupWriterTests {
             #expect(throws: ManagedHistoryPersistenceError.incompleteInventory) {
                 try repository.writeManagedBackup(now: 101, matching: session)
             }
-            #expect(try ManagedHistoryInventoryReader.inspect(applicationDirectory: root, registry: registry) == inventory)
+            let remaining = try ManagedHistoryInventoryReader.inspect(applicationDirectory: root, registry: registry)
+            #expect(remaining == inventory)
             let saved = try repository.load(now: 102)
             #expect(JournalV2Repository.sameCommittedState(saved, session))
         }
