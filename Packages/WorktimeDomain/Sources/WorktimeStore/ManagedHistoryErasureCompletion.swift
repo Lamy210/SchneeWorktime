@@ -1,6 +1,12 @@
 import Foundation
 import WorktimeDomain
 
+#if canImport(Darwin)
+    import Darwin
+#else
+    import Glibc
+#endif
+
 /// Finalization is a separate, explicit maintenance operation. The immutable
 /// receipt preserves the full intent after the earlier markers are removed.
 /// It remains a startup fence until all other changes are durable.
@@ -148,7 +154,7 @@ enum ManagedHistoryErasureCompletion {
             // ENOENT from opening the leaf is allowed only after a private
             // root was already established by the caller; dangling links
             // are rejected by O_NOFOLLOW.
-            guard code == 2 else { throw BackupFileError.system(code) }
+            guard code == ENOENT else { throw BackupFileError.system(code) }
             return nil
         }
     }
