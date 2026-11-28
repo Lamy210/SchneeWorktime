@@ -176,10 +176,12 @@ enum ManagedHistoryErasureIntentFile {
 package enum ManagedHistoryStartupFence {
     package static func hasPending(in directory: URL) throws -> Bool {
         guard directory.isFileURL else { throw ManagedHistoryInventoryError.unsafeDirectory }
-        for name in [ManagedHistoryErasureIntentFile.filename, ManagedHistoryErasureProgressFile.filename] {
-            if try exists(directory.appendingPathComponent(name)) {
-                return true
-            }
+        let markers = [
+            ManagedHistoryErasureIntentFile.filename, ManagedHistoryErasureProgressFile.filename,
+            ManagedHistoryErasureCompletion.filename
+        ]
+        for name in markers where try exists(directory.appendingPathComponent(name)) {
+            return true
         }
         return false
     }

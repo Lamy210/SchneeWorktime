@@ -102,6 +102,31 @@ package enum BackupFile {
         }
     }
 
+    /// Fixed maintenance metadata only; caller holds the owner lock.
+    static func removeMetadata(at url: URL, matching expected: Data, maxBytes: Int) throws {
+        guard maxBytes > 0, maxBytes <= maxSupportedBytes, expected.count <= maxBytes else {
+            throw BackupFileError.tooLarge
+        }
+        try withDirectory(url) { directory, name in
+            let fd = openat(directory, name, O_RDONLY | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK)
+            guard fd >= 0 else { throw BackupFileError.system(errno) }
+            defer { close(fd) }
+            let identity = try metadataIdentity(fd, maxBytes: maxBytes)
+            guard try readAll(fd: fd, maxBytes: maxBytes) == expected else {
+                throw BackupFileError.unsafeFile
+            }
+            var current = stat()
+            guard fstatat(directory, name, &current, AT_SYMLINK_NOFOLLOW) == 0,
+                  current.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG),
+                  current.st_uid == geteuid(), current.st_nlink == 1, current.st_mode & 0o077 == 0,
+                  ManagedHistoryFileIdentity(current) == identity,
+                  try metadataIdentity(fd, maxBytes: maxBytes) == identity
+            else { throw BackupFileError.unsafeFile }
+            guard unlinkat(directory, name, 0) == 0 else { throw BackupFileError.system(errno) }
+            try syncDirectory(directory)
+        }
+    }
+
     private static func metadataIdentity(_ fd: Int32, maxBytes: Int) throws -> ManagedHistoryFileIdentity {
         var info = stat()
         guard fstat(fd, &info) == 0 else { throw BackupFileError.system(errno) }
