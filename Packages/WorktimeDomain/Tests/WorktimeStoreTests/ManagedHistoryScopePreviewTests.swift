@@ -1,7 +1,7 @@
 import Foundation
 import Testing
-@testable import WorktimeStore
 import WorktimeDomain
+@testable import WorktimeStore
 
 struct ManagedHistoryScopePreviewTests {
     private func fixture(_ body: (URL, JournalV2Repository, JournalV2Session) throws -> Void) throws {

@@ -369,10 +369,10 @@ public extension JournalV2Repository {
     }
 }
 
-extension JournalV2Repository {
+package extension JournalV2Repository {
     /// Only explicit initialization of an absent managed namespace. Caller
     /// owns the session lock. Never adopt a partially initialized directory.
-    package func initializeManagedHistory(now: Int64, matching session: JournalV2Session) throws {
+    func initializeManagedHistory(now: Int64, matching session: JournalV2Session) throws {
         let scope = try previewManagedHistory(now: now, matching: session)
         guard scope.state == .notInitialized else {
             throw ManagedHistoryPersistenceError.incompleteInventory
@@ -381,7 +381,7 @@ extension JournalV2Repository {
         _ = try revalidate(session, now: now)
     }
 
-    package func createManagedHistoryBackup(now: Int64, matching session: JournalV2Session) throws {
+    func createManagedHistoryBackup(now: Int64, matching session: JournalV2Session) throws {
         _ = try writeManagedBackup(now: now, matching: session)
         _ = try revalidate(session, now: now)
     }

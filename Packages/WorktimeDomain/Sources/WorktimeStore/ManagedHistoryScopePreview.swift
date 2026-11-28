@@ -51,7 +51,9 @@ enum ManagedHistoryScopeReader {
 
     private static func exists(_ url: URL) throws -> Bool {
         var info = stat()
-        if lstat(url.path, &info) == 0 { return true }
+        if lstat(url.path, &info) == 0 {
+            return true
+        }
         let code = errno
         guard code == ENOENT else { throw ManagedHistoryInventoryError.system(code) }
         return false
