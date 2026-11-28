@@ -357,3 +357,14 @@ extension JournalV2Repository {
         )
     }
 }
+
+public extension JournalV2Repository {
+    /// Read-only scope preview. No initialization, registration or deletion.
+    func previewManagedHistory(now: Int64, matching session: JournalV2Session) throws -> ManagedHistoryScopePreview {
+        let current = try revalidate(session, now: now)
+        let directory = databaseURL.deletingLastPathComponent()
+        let scope = try ManagedHistoryScopeReader.inspect(in: directory, session: current)
+        _ = try revalidate(current, now: now)
+        return scope
+    }
+}
