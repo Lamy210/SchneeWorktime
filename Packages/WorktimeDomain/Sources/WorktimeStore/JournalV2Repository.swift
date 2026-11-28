@@ -386,3 +386,56 @@ extension JournalV2Repository {
         _ = try revalidate(session, now: now)
     }
 }
+
+/// Opaque immutable deletion plan. Counts alone cannot authorize deletion.
+package struct JournalV2ManagedErasurePlan {
+    package let scope: ManagedHistoryScopePreview
+    fileprivate let reset: JournalV2ResetPreview
+    fileprivate let intent: ManagedHistoryErasureIntent
+}
+
+package extension JournalV2Repository {
+    func previewManagedErasure(now: Int64, matching session: JournalV2Session) throws -> JournalV2ManagedErasurePlan {
+        let scope = try previewManagedHistory(now: now, matching: session)
+        guard scope.state == .inventoried else {
+            throw ManagedHistoryPersistenceError.incompleteInventory
+        }
+        let root = databaseURL.deletingLastPathComponent()
+        let registry = try ManagedHistoryRegistryFile.load(in: root)
+        let inventory = try ManagedHistoryInventoryReader.inspect(applicationDirectory: root, registry: registry)
+        guard inventory.isComplete, inventory.directoryIdentity != nil,
+              registry.entries.count == scope.verifiedFiles,
+              registry.entries.filter({ $0.kind == .backup }).count == scope.registeredBackups,
+              registry.entries.filter({ $0.kind == .diagnostic }).count == scope.registeredDiagnostics
+        else { throw ManagedHistoryPersistenceError.incompleteInventory }
+        let reset = try previewReset(now: now, matching: session)
+        let intent = try ManagedHistoryErasureIntent(source: reset.version, registry: registry, inventory: inventory)
+        return JournalV2ManagedErasurePlan(scope: scope, reset: reset, intent: intent)
+    }
+
+    /// The owner lock, stopped writers and settled notification cancellation
+    /// are required for the complete maintenance operation.
+    func beginManagedErasure(
+        _ plan: JournalV2ManagedErasurePlan, now: Int64, matching session: JournalV2Session
+    ) throws -> JournalV2Session {
+        let current = try revalidate(session, now: now)
+        guard Self.sameCommittedState(plan.reset.session, current) else {
+            throw ManagedHistoryPersistenceError.invalidIntent
+        }
+        return try commitManagedReset(plan.reset, intent: plan.intent, now: now)
+    }
+
+    /// Only the exact plan that committed the empty target generation can
+    /// enter this initial execution path. Never auto-retry on errors.
+    func finishManagedErasure(_ plan: JournalV2ManagedErasurePlan, now: Int64) throws {
+        let intent = plan.intent
+        try ManagedHistoryFileErasure.initialize(databaseURL: databaseURL, intent: intent, now: now)
+        for index in 0 ..< intent.registry.entries.count {
+            let step = try ManagedHistoryFileErasure.advance(databaseURL: databaseURL, intent: intent, now: now)
+            guard step == .advanced(completed: index + 1, total: intent.registry.entries.count) else {
+                throw ManagedHistoryPersistenceError.verificationFailed
+            }
+        }
+        try ManagedHistoryErasureCompletion.finish(databaseURL: databaseURL, intent: intent, now: now)
+    }
+}
