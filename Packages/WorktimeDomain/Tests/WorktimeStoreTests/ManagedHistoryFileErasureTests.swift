@@ -126,11 +126,16 @@ struct ManagedHistoryFileErasureTests {
     }
 
     @Test func `orphan progress is a startup fence even without an intent`() throws {
-        try fixture { url, _, intent in
+        try fixture { url, repository, intent in
             let root = url.deletingLastPathComponent()
             #expect(try !ManagedHistoryStartupFence.hasPending(in: root))
             try ManagedHistoryErasureProgressFile.publish(ManagedHistoryErasureProgress(intent: intent), in: root)
             #expect(try ManagedHistoryStartupFence.hasPending(in: root))
+            #expect(throws: ManagedHistoryPersistenceError.pendingIntent) {
+                try reset(repository, intent: intent)
+            }
+            let saved = try repository.load(now: 105)
+            #expect(saved.version.epoch == intent.sourceEpoch)
         }
     }
 }

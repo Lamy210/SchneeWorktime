@@ -251,6 +251,9 @@ extension JournalV2Repository {
             throw ManagedHistoryPersistenceError.invalidIntent
         }
         let directory = databaseURL.deletingLastPathComponent()
+        guard try !ManagedHistoryStartupFence.hasPending(in: directory) else {
+            throw ManagedHistoryPersistenceError.pendingIntent
+        }
         try ManagedHistoryErasureIntentFile.publish(intent, in: directory)
         let registry = try ManagedHistoryRegistryFile.load(in: directory)
         let inventory = try ManagedHistoryInventoryReader.inspect(applicationDirectory: directory, registry: registry)
