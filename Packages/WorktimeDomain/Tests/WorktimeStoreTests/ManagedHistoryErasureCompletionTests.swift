@@ -44,9 +44,10 @@ struct ManagedHistoryErasureCompletionTests {
     }
 
     @Test func `finalization resumes at each durable boundary and preserves an external copy`() throws {
-        for stage: ManagedHistoryErasureCompletion.Stage in [
+        let stages: [ManagedHistoryErasureCompletion.Stage] = [
             .receiptPublished, .registryCleared, .progressRemoved, .intentRemoved
-        ] {
+        ]
+        for stage in stages {
             try fixture { url, intent in
                 let root = url.deletingLastPathComponent()
                 let entry = try #require(intent.registry.entries.first)

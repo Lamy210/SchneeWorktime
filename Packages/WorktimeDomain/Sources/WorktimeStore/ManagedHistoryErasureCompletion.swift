@@ -13,7 +13,7 @@ import WorktimeDomain
 enum ManagedHistoryErasureCompletion {
     static let filename = "managed-history-erasure-completion-v1.json"
 
-    enum Stage {
+    enum Stage: Equatable {
         case receiptPublished, registryCleared, progressRemoved, intentRemoved
     }
 
